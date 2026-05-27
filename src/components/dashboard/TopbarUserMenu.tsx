@@ -5,10 +5,9 @@ import { useAuth } from "../../contexts/AuthContext";
 interface TopbarUserMenuProps {
   firstName: string;
   lastName: string;
-  roleLabel: string;
 }
 
-export default function TopbarUserMenu({ firstName, lastName, roleLabel }: TopbarUserMenuProps) {
+export default function TopbarUserMenu({ firstName, lastName }: TopbarUserMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { logout } = useAuth();

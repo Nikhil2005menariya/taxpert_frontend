@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { apiClient } from "../../api/client";
@@ -108,10 +108,10 @@ function ChevronRight() {
 
 function ChecklistUploadButton({
   clientServiceId, documentId, documentName, templateId, status,
-  onUploaded,
+  onUploaded, label
 }: {
   clientServiceId: string; documentId?: string; documentName: string; templateId?: string;
-  status: string; onUploaded: () => void;
+  status: string; onUploaded: () => void; label?: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +155,7 @@ function ChecklistUploadButton({
         disabled={uploading}
         style={{ whiteSpace: "nowrap" }}
       >
-        {uploading ? "Uploading…" : status === "rejected" ? "Re-upload" : "Upload"}
+        {uploading ? "Uploading…" : label ? label : status === "rejected" ? "Re-upload" : "Upload"}
       </button>
       {error && <span style={{ color: "var(--danger)", fontSize: "0.75rem" }}>{error}</span>}
     </div>
@@ -336,6 +336,52 @@ function VaultCommonUpload({ onUploaded }: { onUploaded: () => void }) {
       >
         {uploading ? "Uploading…" : "Choose file & upload"}
       </button>
+    </div>
+  );
+}
+
+function CommonDocUpdateButton({ documentType, onUploaded }: { documentType: string; onUploaded: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    setError(null);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("documentType", documentType);
+
+    try {
+      await apiClient.post("/vault/common-upload", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      onUploaded();
+    } catch (err: any) {
+      setError(err.response?.data?.error ?? "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "flex-end" }}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+      />
+      <button
+        className="btn btn-secondary db-btn-sm"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        style={{ whiteSpace: "nowrap" }}
+      >
+        {uploading ? "Uploading…" : "Update"}
+      </button>
+      {error && <span style={{ color: "var(--danger)", fontSize: "0.75rem" }}>{error}</span>}
     </div>
   );
 }
@@ -547,8 +593,16 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
   const inputDocs  = docs.filter((d: any) => d.status === "pending" || d.status === "uploaded" || d.status === "rejected" || d.status === "under_review");
   const finalDocs  = docs.filter((d: any) => d.status === "approved");
 
-  const uploadedTemplateIds = new Set(docs.map((d: any) => d.templateId).filter(Boolean));
-  const pendingTemplates = templates.filter((t: any) => !uploadedTemplateIds.has(t.id));
+  const isTemplateCompleted = (t: any) => {
+    const hasUploadedDoc = docs.some((d: any) => 
+      (d.status === "uploaded" || d.status === "under_review" || d.status === "approved") &&
+      (d.templateId === t.id || normalize(d.documentName) === normalize(t.name))
+    );
+    const inCommon = isCommonDocAvailable(t.name, commonDocs);
+    return hasUploadedDoc || inCommon;
+  };
+
+  const pendingTemplates = templates.filter((t: any) => !isTemplateCompleted(t));
   const allDone = templates.length > 0 && pendingTemplates.length === 0;
 
   const tone = SERVICE_STATUS_STYLES[detail.status] ?? SERVICE_STATUS_STYLES.pending;
@@ -612,17 +666,30 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
                        : doc.status === "rejected" ? "✕ Rejected"
                        : "⏳ Pending"}
                     </span>
-                    {doc.fileUrl && <ViewDocButton documentId={doc.id} />}
-                    {(doc.status === "pending" || doc.status === "rejected") && (
-                      <ChecklistUploadButton
-                        clientServiceId={detail.clientServiceId}
-                        documentId={doc.id}
-                        documentName={doc.documentName}
-                        templateId={doc.templateId}
-                        status={doc.status}
-                        onUploaded={refresh}
-                      />
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      {doc.fileUrl && <ViewDocButton documentId={doc.id} />}
+                      {(doc.status === "pending" || doc.status === "rejected") && (
+                        <ChecklistUploadButton
+                          clientServiceId={detail.clientServiceId}
+                          documentId={doc.id}
+                          documentName={doc.documentName}
+                          templateId={doc.templateId}
+                          status={doc.status}
+                          onUploaded={refresh}
+                        />
+                      )}
+                      {(doc.status === "uploaded" || doc.status === "under_review" || doc.status === "approved") && (
+                        <ChecklistUploadButton
+                          clientServiceId={detail.clientServiceId}
+                          documentId={doc.id}
+                          documentName={doc.documentName}
+                          templateId={doc.templateId}
+                          status={doc.status}
+                          onUploaded={refresh}
+                          label="Update"
+                        />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -648,7 +715,18 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
                       )}
                     </div>
                     <span className="vault-doc-status" style={{ color: "var(--green-600)" }}>✓ Approved</span>
-                    {doc.fileUrl && <ViewDocButton documentId={doc.id} />}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      {doc.fileUrl && <ViewDocButton documentId={doc.id} />}
+                      <ChecklistUploadButton
+                        clientServiceId={detail.clientServiceId}
+                        documentId={doc.id}
+                        documentName={doc.documentName}
+                        templateId={doc.templateId}
+                        status={doc.status}
+                        onUploaded={refresh}
+                        label="Update"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -683,12 +761,12 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
 
             <div className="vault-panel-list">
               {templates.map((t: any) => {
-                const uploaded = uploadedTemplateIds.has(t.id);
-                const inCommon = !uploaded && isCommonDocAvailable(t.name, commonDocs);
+                const isDone = isTemplateCompleted(t);
+                const inCommon = isCommonDocAvailable(t.name, commonDocs);
                 return (
-                  <div key={t.id} className={`vault-panel-item${uploaded ? " vault-panel-item-done" : ""}`}>
+                  <div key={t.id} className={`vault-panel-item${isDone ? " vault-panel-item-done" : ""}`}>
                     <div className="vault-panel-check">
-                      {uploaded
+                      {isDone
                         ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green-600)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m20 7-11 11-5-5"/></svg>
                         : <div className="vault-panel-dot" />
                       }
@@ -701,7 +779,7 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
                     </div>
                     {inCommon ? (
                       <span className="vault-panel-common-badge">In Common Docs</span>
-                    ) : t.required && !uploaded ? (
+                    ) : t.required && !isDone ? (
                       <span className="vault-panel-req">Required</span>
                     ) : null}
                   </div>
@@ -770,7 +848,10 @@ function VaultCommonDocsView() {
                 {d.documentName && <span className="vault-doc-date">{d.documentName}</span>}
               </div>
               <span className="vault-doc-status" style={{ color: "var(--green-600)" }}>✓ Uploaded</span>
-              {d.fileUrl && <ViewDocButton documentId={d.id} isCommon={true} />}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                {d.fileUrl && <ViewDocButton documentId={d.id} isCommon={true} />}
+                <CommonDocUpdateButton documentType={d.documentType} onUploaded={refresh} />
+              </div>
             </div>
           ))}
         </div>
@@ -783,9 +864,22 @@ function VaultCommonDocsView() {
 
 export default function VaultPage() {
   const [searchParams] = useSearchParams();
+  const qc = useQueryClient();
   const fy = searchParams.get("fy");
   const svc = searchParams.get("svc");
   const common = searchParams.get("common");
+
+  // Backfill sync: on every vault page load, propagate any existing common docs
+  // into pending service-doc rows so users don't see stale "Pending" states.
+  useEffect(() => {
+    apiClient.post("/vault/sync").then(() => {
+      // Refresh all vault queries so the UI picks up the newly synced statuses
+      qc.invalidateQueries({ queryKey: ["vault-service"] });
+      qc.invalidateQueries({ queryKey: ["vault-groups"] });
+    }).catch(() => {
+      // Non-critical — silently ignore sync errors
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (common === "1") return <VaultCommonDocsView />;
   if (fy && svc)       return <VaultServiceView fy={fy} svcId={svc} />;

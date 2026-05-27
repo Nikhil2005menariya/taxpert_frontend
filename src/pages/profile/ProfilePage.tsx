@@ -1,8 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { Link } from "react-router-dom";
 import { apiClient } from "../../api/client";
-import { formatRupees } from "../../shared/finance-utils";
 
 type TabId = "account" | "security";
 
