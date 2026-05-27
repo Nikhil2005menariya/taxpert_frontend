@@ -625,7 +625,6 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
             </span>
           </p>
         </div>
-        <VaultUpload serviceId={svcId} templates={templates} onUploaded={refresh} />
       </div>
 
       <div className="vault-service-layout">
