@@ -6,14 +6,16 @@ import { formatRupees } from "../../shared/finance-utils";
 
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
+
   function handleCopy() {
     navigator.clipboard.writeText(code).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   }
+
   return (
-    <button onClick={handleCopy} style={{ fontSize: "0.8rem", fontWeight: 600, color: "#2563eb", background: "#eff6ff", padding: "0.25rem 0.5rem", borderRadius: "4px", border: "none", cursor: "pointer" }}>
+    <button className="ref-copy-btn" onClick={handleCopy}>
       {copied ? "Copied!" : "Copy"}
     </button>
   );
@@ -36,11 +38,9 @@ export default function ReferralsPage() {
 
   if (error || !data) {
     return (
-      <div className="db-shell">
-        <h1 className="page-title">Refer & Earn</h1>
-        <div className="card" style={{ padding: "3rem", textAlign: "center" }}>
-          <p style={{ color: "#ef4444" }}>Could not load referral data. Please refresh.</p>
-        </div>
+      <div className="db-coming-soon">
+        <h2>Referrals</h2>
+        <p style={{ color: "var(--danger)" }}>Could not load referral data. Please refresh.</p>
       </div>
     );
   }
@@ -50,84 +50,97 @@ export default function ReferralsPage() {
   function handleEmailShare(e: React.FormEvent) {
     e.preventDefault();
     const subject = encodeURIComponent("Join TheTaxpert — Tax filing made simple");
-    const body = encodeURIComponent(`Hi,\n\nI've been using TheTaxpert for my tax filings and it's been great.\n\nSign up with my referral code ${data.referralCode} and get ₹500 off your first service:\n${shareUrl}\n\nCheers!`);
+    const body = encodeURIComponent(
+      `Hi,\n\nI've been using TheTaxpert for my tax filings and it's been great.\n\nSign up with my referral code ${data.referralCode} and get ₹500 off your first service:\n${shareUrl}\n\nCheers!`
+    );
     window.location.href = `mailto:${emailInput}?subject=${subject}&body=${body}`;
   }
 
   return (
-    <div className="db-shell">
-      <div className="db-page-header">
-        <h1 className="page-title">Refer & Earn</h1>
-        <p className="page-sub">
-          Share your code and earn <strong>10% of their first payment</strong> (up to ₹1,000) as a reward coupon. Your friend gets <strong>₹500 off</strong> their first service.
-        </p>
+    <div className="ref-shell">
+      <h1 className="ref-title">Refer &amp; Earn</h1>
+      <p className="ref-subtitle">
+        Share your code and earn <strong>10% of their first payment</strong> (up to ₹1,000) as a reward coupon.
+        Your friend gets <strong>₹500 off</strong> their first service.
+      </p>
+
+      {/* Referral code card */}
+      <div className="ref-code-card">
+        <span className="ref-code-eyebrow">Your referral code</span>
+        <div className="ref-code-row">
+          <span className="ref-code">{data.referralCode}</span>
+          <CopyButton code={data.referralCode} />
+        </div>
+        <div className="ref-share-row">
+          <span className="ref-share-label">Share link:</span>
+          <span className="ref-share-url">{shareUrl}</span>
+          <CopyButton code={shareUrl} />
+        </div>
+        <div className="ref-share-row" style={{ marginTop: "1rem" }}>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(`Join TheTaxpert — use my referral code ${data.referralCode} to get ₹500 off your first service: ${shareUrl}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-secondary"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            Share via WhatsApp
+          </a>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
-        {/* Referral code card */}
-        <div className="card" style={{ padding: "1.5rem" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>Your referral code</span>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: "1rem", borderRadius: "0.5rem", marginTop: "0.5rem", border: "1px dashed #cbd5e1" }}>
-            <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0f172a", letterSpacing: "0.1em" }}>{data.referralCode}</span>
-            <CopyButton code={data.referralCode} />
-          </div>
-          
-          <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.875rem", color: "#64748b" }}>Share link:</span>
-            <span style={{ fontSize: "0.875rem", color: "#0f172a", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shareUrl}</span>
-            <CopyButton code={shareUrl} />
-          </div>
-          
-          <div style={{ marginTop: "1rem" }}>
-            <a href={`https://wa.me/?text=${encodeURIComponent(`Join TheTaxpert — use my referral code ${data.referralCode} to get ₹500 off your first service: ${shareUrl}`)}`} target="_blank" rel="noopener noreferrer" className="block text-center w-full bg-[#25d366] hover:bg-[#1fa952] text-white px-4 py-2 rounded font-medium transition-colors">
-              Share via WhatsApp
-            </a>
-          </div>
-        </div>
-
-        {/* Email Share */}
-        <div className="card" style={{ padding: "1.5rem" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b" }}>Share via Email</span>
-          <form onSubmit={handleEmailShare} style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
-            <input type="email" placeholder="friend@example.com" value={emailInput} onChange={e => setEmailInput(e.target.value)} required className="w-full p-3 border border-gray-300 rounded outline-none focus:border-[#c49a3a]" />
-            <button type="submit" className="w-full bg-[#1e293b] hover:bg-[#0f172a] text-white px-4 py-3 rounded font-medium transition-colors">Send Invite</button>
-          </form>
-        </div>
+      {/* Email Share */}
+      <div className="ref-code-card">
+        <span className="ref-code-eyebrow">Share via Email</span>
+        <form onSubmit={handleEmailShare} style={{ display: "flex", gap: "0.75rem", marginTop: "0.75rem" }}>
+          <input
+            type="email"
+            placeholder="friend@example.com"
+            value={emailInput}
+            onChange={e => setEmailInput(e.target.value)}
+            required
+            className="pm-filter-input"
+            style={{ flex: 1, height: "40px" }}
+          />
+          <button type="submit" className="btn btn-primary" style={{ height: "40px", minHeight: "40px" }}>
+            Send Invite
+          </button>
+        </form>
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "2rem" }}>
-        {[
-          { label: "Referrals", value: data.count },
-          { label: "Total earned", value: formatRupees(data.totalEarned) },
-          { label: "Reward coupons", value: data.rewardCoupons.length }
-        ].map((s, i) => (
-          <div key={i} className="card" style={{ padding: "1.5rem", textAlign: "center" }}>
-            <div style={{ fontSize: "2rem", fontWeight: 800, color: "#c49a3a" }}>{s.value}</div>
-            <div style={{ fontSize: "0.875rem", color: "#64748b", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: "0.5rem" }}>{s.label}</div>
-          </div>
-        ))}
+      <div className="ref-stats-row">
+        <div className="ref-stat-card">
+          <span className="ref-stat-num">{data.count}</span>
+          <span className="ref-stat-label">Referrals</span>
+        </div>
+        <div className="ref-stat-card">
+          <span className="ref-stat-num">{formatRupees(data.totalEarned)}</span>
+          <span className="ref-stat-label">Total earned</span>
+        </div>
+        <div className="ref-stat-card">
+          <span className="ref-stat-num">{data.rewardCoupons.length}</span>
+          <span className="ref-stat-label">Reward coupons</span>
+        </div>
       </div>
 
       {/* Coupons List */}
       {data.rewardCoupons.length > 0 && (
-        <div style={{ marginBottom: "2rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "1rem" }}>Your reward coupons</h2>
-          <div style={{ display: "grid", gap: "1rem" }}>
+        <div className="ref-section">
+          <h2 className="ref-section-title">Your reward coupons</h2>
+          <div className="ref-coupon-list">
             {data.rewardCoupons.map((c: any) => (
-              <div key={c.id} className="card" style={{ padding: "1rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", opacity: !c.is_active ? 0.6 : 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-                  <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0f172a", letterSpacing: "0.1em" }}>{c.code}</div>
-                  <div style={{ fontSize: "0.95rem", color: "#475569" }}>{c.description ?? formatRupees(c.value) + " off"}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <div key={c.id} className={`ref-coupon-row${!c.is_active ? " ref-coupon-used" : ""}`}>
+                <div className="ref-coupon-code">{c.code}</div>
+                <div className="ref-coupon-desc">{c.description ?? formatRupees(c.value) + " off"}</div>
+                <div className="ref-coupon-status">
                   {c.is_active && c.used_count === 0 ? (
-                    <span style={{ background: "#dcfce7", color: "#166534", padding: "0.2rem 0.6rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 600 }}>Available</span>
+                    <span className="ref-badge ref-badge-active">Available</span>
                   ) : (
-                    <span style={{ background: "#f1f5f9", color: "#64748b", padding: "0.2rem 0.6rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 600 }}>Used</span>
+                    <span className="ref-badge ref-badge-used">Used</span>
                   )}
-                  {c.is_active && <CopyButton code={c.code} />}
                 </div>
+                {c.is_active && <CopyButton code={c.code} />}
               </div>
             ))}
           </div>
@@ -136,41 +149,34 @@ export default function ReferralsPage() {
 
       {/* History */}
       {data.referrals.length > 0 ? (
-        <div>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "1rem" }}>Referral history</h2>
-          <div className="card overflow-hidden">
-            <div style={{ display: "grid", gap: "1px", background: "#f1f5f9" }}>
-              {data.referrals.map((r: any) => (
-                <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 1.5rem", background: "white" }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: "#0f172a" }}>
-                      {r.referred ? `${r.referred.first_name ?? ""} ${r.referred.last_name ?? ""}`.trim() || "User" : "User"}
-                    </div>
-                    <div style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.25rem" }}>
-                      {new Date(r.converted_at ?? r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-                    <span style={{ 
-                      padding: "0.2rem 0.6rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em",
-                      ...(r.status === "rewarded" ? { background: "#dcfce7", color: "#166534" } : 
-                         r.status === "converted" ? { background: "#dbeafe", color: "#1e40af" } : 
-                         { background: "#fef3c7", color: "#b45309" })
-                    }}>
-                      {r.status === "rewarded" ? "Rewarded" : r.status === "converted" ? "Converted" : "Pending"}
-                    </span>
-                    {r.reward_amount != null && (
-                      <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#10b981", width: "80px", textAlign: "right" }}>+{formatRupees(r.reward_amount)}</div>
-                    )}
-                  </div>
+        <div className="ref-section">
+          <h2 className="ref-section-title">Referral history</h2>
+          <div className="ref-history-list">
+            {data.referrals.map((r: any) => (
+              <div key={r.id} className="ref-history-row">
+                <div className="ref-history-name">
+                  {r.referred ? `${r.referred.first_name ?? ""} ${r.referred.last_name ?? ""}`.trim() || "User" : "User"}
                 </div>
-              ))}
-            </div>
+                <div className={`ref-badge ref-badge-${r.status === 'rewarded' ? 'rewarded' : r.status === 'converted' ? 'converted' : 'pending'}`}>
+                  {r.status === "rewarded" ? "Rewarded" : r.status === "converted" ? "Converted" : "Pending"}
+                </div>
+                {r.reward_amount != null && (
+                  <div className="ref-history-reward">+{formatRupees(r.reward_amount)}</div>
+                )}
+                <div className="ref-history-date">
+                  {new Date(r.converted_at ?? r.created_at).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
-        <div className="card" style={{ padding: "3rem", textAlign: "center", color: "#64748b" }}>
-          No referrals yet. Share your code and start earning!
+        <div className="ref-empty">
+          <p>No referrals yet. Share your code and start earning!</p>
         </div>
       )}
     </div>

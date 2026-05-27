@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../api/client";
+import AddServiceModal from "../../components/dashboard/AddServiceModal";
 
 // Types
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "completed" | "cancelled";
@@ -154,19 +155,26 @@ export default function DashboardPage() {
 
   return (
     <div className="db-page-new">
-      {/* Welcome */}
-      <div className="db-welcome">
-        <span className="db-welcome-eyebrow">{greeting}</span>
-        <h1 className="db-welcome-heading">
-          Welcome back, <em>{firstName}</em>.
-        </h1>
-        <p className="db-welcome-sub">
-          {totalPendingDocs > 0
-            ? `${totalPendingDocs} document${totalPendingDocs !== 1 ? "s" : ""} waiting for upload.`
-            : all.length > 0
-              ? "All your services are up to date."
-              : "Add a service to get started."}
-        </p>
+      {/* Welcome & Add Service Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
+        <div className="db-welcome">
+          <span className="db-welcome-eyebrow">{greeting}</span>
+          <h1 className="db-welcome-heading">
+            Welcome back, <em>{firstName}</em>.
+          </h1>
+          <p className="db-welcome-sub">
+            {totalPendingDocs > 0
+              ? `${totalPendingDocs} document${totalPendingDocs !== 1 ? "s" : ""} waiting for upload.`
+              : all.length > 0
+                ? "All your services are up to date."
+                : "Add a service to get started."}
+          </p>
+        </div>
+        {isClient && (
+          <div style={{ marginBottom: "0.25rem" }}>
+            <AddServiceModal />
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}

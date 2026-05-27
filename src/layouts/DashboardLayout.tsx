@@ -3,7 +3,6 @@ import { Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileNav from "../components/dashboard/MobileNav";
-import AddServiceModal from "../components/dashboard/AddServiceModal";
 import TopbarUserMenu from "../components/dashboard/TopbarUserMenu";
 import IdleSessionGuard from "../guards/IdleSessionGuard";
 
@@ -68,7 +67,6 @@ export default function DashboardLayout() {
               expertLastName={sharedProps.expertLastName}
               expertRole={sharedProps.expertRole}
             />
-            {isClient && <AddServiceModal />}
           </div>
 
           {/* Right: notification bell + user menu */}

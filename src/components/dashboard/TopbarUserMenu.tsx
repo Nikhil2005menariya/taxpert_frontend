@@ -54,7 +54,6 @@ export default function TopbarUserMenu({ firstName, lastName, roleLabel }: Topba
         <div className="db-topbar-avatar">{avatar}</div>
         <div className="db-topbar-user-info">
           <div className="db-topbar-user-name">{actualFirstName} {lastName}</div>
-          <div className="db-topbar-user-role">{roleLabel}</div>
         </div>
         <svg
           width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -68,11 +67,7 @@ export default function TopbarUserMenu({ firstName, lastName, roleLabel }: Topba
       {open && (
         <div className="db-user-dropdown" role="menu">
           <div className="db-user-dropdown-header">
-            <div className="db-user-dropdown-avatar">{avatar}</div>
-            <div>
-              <div className="db-user-dropdown-name">{actualFirstName} {lastName}</div>
-              <div className="db-user-dropdown-role">{roleLabel}</div>
-            </div>
+            <div className="db-user-dropdown-name">{actualFirstName} {lastName}</div>
           </div>
 
           <div className="db-user-dropdown-divider" />
@@ -82,13 +77,6 @@ export default function TopbarUserMenu({ firstName, lastName, roleLabel }: Topba
               <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
             </svg>
             Profile
-          </Link>
-
-          <Link to="/profile" className="db-user-dropdown-item" role="menuitem" onClick={() => setOpen(false)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            Security
           </Link>
 
           <div className="db-user-dropdown-divider" />

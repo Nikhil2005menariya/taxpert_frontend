@@ -2,11 +2,47 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { Link, useSearchParams } from "react-router-dom";
-import { Navigate } from "react-router-dom";
+import { Link, useSearchParams, Navigate } from "react-router-dom";
 import { formatRupees, calcGst } from "../../shared/finance-utils";
 
-function AdminPaymentsClient({ payments, stats }: { payments: any[], stats: any }) {
+interface ServiceRef {
+  name?: string;
+  category?: string;
+}
+
+interface UserProfileRef {
+  first_name?: string;
+  last_name?: string;
+  pan?: string;
+}
+
+interface PaymentRow {
+  id: string;
+  amount: number;
+  gst_amount: number;
+  gst_rate: number;
+  status: string;
+  captured_at: string | null;
+  created_at: string;
+  razorpay_payment_id: string | null;
+  payment_method: string | null;
+  service: ServiceRef | null;
+  user_profile: UserProfileRef | null;
+}
+
+interface ClientPaymentRow {
+  id: string;
+  amount: number;
+  gst_rate: number;
+  status: string;
+  captured_at: string | null;
+  created_at: string;
+  razorpay_payment_id: string | null;
+  client_service_id: string | null;
+  service: ServiceRef | null;
+}
+
+function AdminPaymentsClient({ payments, stats }: { payments: PaymentRow[]; stats: any }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [startDate, setStartDate] = useState(searchParams.get("startDate") ?? "");
   const [endDate, setEndDate] = useState(searchParams.get("endDate") ?? "");
@@ -20,7 +56,9 @@ function AdminPaymentsClient({ payments, stats }: { payments: any[], stats: any 
   }
 
   function clearFilters() {
-    setStartDate(""); setEndDate(""); setSearch("");
+    setStartDate("");
+    setEndDate("");
+    setSearch("");
     setSearchParams(new URLSearchParams());
   }
 
@@ -39,15 +77,15 @@ function AdminPaymentsClient({ payments, stats }: { payments: any[], stats: any 
   const gstFiltered = filtered.reduce((s, p) => s + (p.gst_amount || calcGst(p.amount, p.gst_rate).gst), 0);
 
   return (
-    <div className="pm-shell">
-      <div className="db-page-header">
+    <div className="db-shell">
+      <div className="pm-page-header">
         <div>
-          <h1 className="page-title">Payments</h1>
-          <p className="page-sub">All transactions · GST worksheet · User tracking</p>
+          <h1 className="db-page-title">Payments</h1>
+          <p className="db-page-sub">All transactions · GST worksheet · User tracking</p>
         </div>
         <a
           href={`http://localhost:4000/api/payments/admin/export?status=captured${startDate ? `&startDate=${startDate}` : ""}${endDate ? `&endDate=${endDate}` : ""}`}
-          className="bg-white border border-[#e2e8f0] text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-50 transition-colors"
+          className="btn btn-secondary pm-export-btn"
           download
         >
           ↓ Download GST Worksheet
@@ -55,89 +93,107 @@ function AdminPaymentsClient({ payments, stats }: { payments: any[], stats: any 
       </div>
 
       {stats && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
+        <div className="pm-stats-grid">
           {[
             { label: "Total Revenue", value: formatRupees(stats.total) },
             { label: "GST Collected", value: formatRupees(stats.gst) },
             { label: "This Month", value: formatRupees(stats.thisMonth) },
             { label: "Total Payments", value: stats.count.toString() },
           ].map(s => (
-            <div key={s.label} className="card" style={{ padding: "1.5rem" }}>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0f172a" }}>{s.value}</div>
-              <div style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.25rem" }}>{s.label}</div>
+            <div key={s.label} className="pm-stat-card">
+              <span className="pm-stat-value">{s.value}</span>
+              <span className="pm-stat-label">{s.label}</span>
             </div>
           ))}
         </div>
       )}
 
       {/* Filter bar */}
-      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "1rem", background: "white", padding: "1rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">From</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border border-gray-300 rounded outline-none focus:border-[#c49a3a]" />
+      <div className="pm-filter-bar">
+        <div className="pm-filter-group">
+          <label className="pm-filter-label">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="pm-filter-input"
+          />
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">To</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border border-gray-300 rounded outline-none focus:border-[#c49a3a]" />
+        <div className="pm-filter-group">
+          <label className="pm-filter-label">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="pm-filter-input"
+          />
         </div>
-        <button onClick={applyFilters} className="bg-[#1e293b] text-white px-4 py-2 rounded font-medium hover:bg-[#0f172a] transition-colors">Apply</button>
-        <button onClick={clearFilters} className="bg-gray-100 text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-200 transition-colors">Clear</button>
-        <div style={{ flex: 1, minWidth: "250px" }}>
+        <button onClick={applyFilters} className="pm-filter-apply">Apply</button>
+        <button onClick={clearFilters} className="pm-filter-clear">Clear</button>
+        <div className="pm-filter-search-wrap">
           <input
             type="search"
             placeholder="Search user, PAN, service, payment ID…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded outline-none focus:border-[#c49a3a]"
+            className="pm-filter-search"
           />
         </div>
       </div>
 
+      {/* Summary for filtered set */}
       {filtered.length > 0 && (
-        <div style={{ display: "flex", gap: "1.5rem", fontSize: "0.875rem", color: "#475569", marginBottom: "1rem", padding: "0 0.5rem" }}>
+        <div className="pm-filter-summary">
           <span>{filtered.length} payments</span>
           <span>Total: <strong>{formatRupees(totalFiltered)}</strong></span>
           <span>GST: <strong>{formatRupees(gstFiltered)}</strong></span>
         </div>
       )}
 
-      <div className="card overflow-hidden">
+      {/* Table */}
+      <div className="pm-table-wrap">
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No payments found.</div>
+          <div className="pm-empty">No payments found.</div>
         ) : (
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+          <table className="pm-table">
+            <thead>
               <tr>
-                <th className="p-3 pl-4">Date</th>
-                <th className="p-3">Customer</th>
-                <th className="p-3">PAN</th>
-                <th className="p-3">Service</th>
-                <th className="p-3 text-right">Amount</th>
-                <th className="p-3 text-right">Base</th>
-                <th className="p-3 text-right">GST</th>
-                <th className="p-3">Method</th>
-                <th className="p-3">Payment ID</th>
-                <th className="p-3 pr-4">Status</th>
+                <th className="pm-th">Date</th>
+                <th className="pm-th">Customer</th>
+                <th className="pm-th">PAN</th>
+                <th className="pm-th">Service</th>
+                <th className="pm-th pm-th-num">Amount</th>
+                <th className="pm-th pm-th-num">Base</th>
+                <th className="pm-th pm-th-num">GST</th>
+                <th className="pm-th">Method</th>
+                <th className="pm-th">Payment ID</th>
+                <th className="pm-th">Status</th>
               </tr>
             </thead>
-            <tbody className="text-sm text-gray-700 divide-y divide-gray-100">
+            <tbody>
               {filtered.map(p => {
                 const { base, gst } = calcGst(p.amount, p.gst_rate ?? 18);
                 const up = p.user_profile;
-                const date = new Date(p.captured_at ?? p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                const date = new Date(p.captured_at ?? p.created_at).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                });
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="p-3 pl-4 whitespace-nowrap">{date}</td>
-                    <td className="p-3 font-medium text-gray-900">{up ? `${up.first_name ?? ""} ${up.last_name ?? ""}`.trim() : "—"}</td>
-                    <td className="p-3 font-mono text-xs">{up?.pan ?? "—"}</td>
-                    <td className="p-3">{p.service?.name ?? "—"}</td>
-                    <td className="p-3 text-right font-medium">{formatRupees(p.amount)}</td>
-                    <td className="p-3 text-right">{formatRupees(base)}</td>
-                    <td className="p-3 text-right text-gray-500">{formatRupees(gst)}</td>
-                    <td className="p-3">{p.payment_method ?? "—"}</td>
-                    <td className="p-3 font-mono text-xs text-gray-500">{p.razorpay_payment_id ?? "—"}</td>
-                    <td className="p-3 pr-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wider ${p.status === 'captured' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  <tr key={p.id} className="pm-tr">
+                    <td className="pm-td pm-td-date">{date}</td>
+                    <td className="pm-td font-medium">
+                      {up ? `${up.first_name ?? ""} ${up.last_name ?? ""}`.trim() : "—"}
+                    </td>
+                    <td className="pm-td pm-td-mono">{up?.pan ?? "—"}</td>
+                    <td className="pm-td pm-td-service">{p.service?.name ?? "—"}</td>
+                    <td className="pm-td pm-td-num font-medium">{formatRupees(p.amount)}</td>
+                    <td className="pm-td pm-td-num">{formatRupees(base)}</td>
+                    <td className="pm-td pm-td-num pm-td-gst">{formatRupees(gst)}</td>
+                    <td className="pm-td pm-td-method">{p.payment_method ?? "—"}</td>
+                    <td className="pm-td pm-td-mono pm-td-pid">{p.razorpay_payment_id ?? "—"}</td>
+                    <td className="pm-td">
+                      <span className={`pm-status-pill pm-status-${p.status}`}>
                         {p.status}
                       </span>
                     </td>
@@ -145,13 +201,13 @@ function AdminPaymentsClient({ payments, stats }: { payments: any[], stats: any 
                 );
               })}
             </tbody>
-            <tfoot className="bg-gray-50 border-t border-gray-200 font-semibold text-sm">
-              <tr>
-                <td colSpan={4} className="p-3 pl-4 text-gray-600">Total ({filtered.length} records)</td>
-                <td className="p-3 text-right">{formatRupees(totalFiltered)}</td>
-                <td className="p-3 text-right">{formatRupees(totalFiltered - gstFiltered)}</td>
-                <td className="p-3 text-right text-gray-500">{formatRupees(gstFiltered)}</td>
-                <td colSpan={3}></td>
+            <tfoot>
+              <tr className="pm-tfoot-row">
+                <td colSpan={4} className="pm-td pm-tfoot-label">Total ({filtered.length} records)</td>
+                <td className="pm-td pm-td-num pm-tfoot-val">{formatRupees(totalFiltered)}</td>
+                <td className="pm-td pm-td-num pm-tfoot-val">{formatRupees(totalFiltered - gstFiltered)}</td>
+                <td className="pm-td pm-td-num pm-tfoot-val pm-td-gst">{formatRupees(gstFiltered)}</td>
+                <td colSpan={3} className="pm-td"></td>
               </tr>
             </tfoot>
           </table>
@@ -161,48 +217,70 @@ function AdminPaymentsClient({ payments, stats }: { payments: any[], stats: any 
   );
 }
 
-function ClientPaymentsClient({ myPayments, pendingInvoices }: { myPayments: any[], pendingInvoices: any[] }) {
+function ClientPaymentsClient({
+  myPayments,
+  pendingInvoices,
+}: {
+  myPayments: ClientPaymentRow[];
+  pendingInvoices: any[];
+}) {
   return (
     <div className="pm-client-shell">
-      <div className="db-page-header">
-        <h1 className="page-title">Payments</h1>
-        <p className="page-sub">Your invoices and payment history.</p>
+      <div className="pm-client-header">
+        <h1 className="db-page-title">Payments</h1>
+        <p className="db-page-sub">Your invoices and payment history.</p>
       </div>
 
-      <section style={{ marginBottom: "2.5rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>Pending Invoices</h2>
+      {/* ── Pending Invoices ── */}
+      <section className="pm-section">
+        <div className="pm-section-header">
+          <span className="pm-section-title">Pending Invoices</span>
           {pendingInvoices.length > 0 && (
-            <span style={{ background: "#ef4444", color: "white", padding: "0.1rem 0.5rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 700 }}>{pendingInvoices.length}</span>
+            <span className="pm-section-badge pm-badge-urgent">{pendingInvoices.length}</span>
           )}
         </div>
 
         {pendingInvoices.length === 0 ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#10b981", fontWeight: 500, background: "#ecfdf5", padding: "1rem", borderRadius: "0.5rem", border: "1px solid #a7f3d0" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m20 7-11 11-5-5"/></svg>
+          <div className="pm-invoice-clear">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--green-600)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m20 7-11 11-5-5" />
+            </svg>
             <span>No pending invoices</span>
           </div>
         ) : (
-          <div style={{ display: "grid", gap: "1rem" }}>
+          <div className="pm-invoice-list">
             {pendingInvoices.map(cs => {
               const price = cs.service?.price ?? null;
               return (
-                <div key={cs.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem 1.5rem" }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: "#0f172a" }}>{cs.service?.name}</div>
-                    <div style={{ fontSize: "0.875rem", color: "#64748b" }}>{cs.service?.category}</div>
+                <div key={cs.id} className="pm-invoice-card">
+                  <div className="pm-invoice-left">
+                    <div className="pm-invoice-service">{cs.service?.name}</div>
+                    <div className="pm-invoice-category">{cs.service?.category}</div>
                     {price && price > 0 ? (
-                      <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#c49a3a", marginTop: "0.5rem" }}>{formatRupees(price)}</div>
+                      <div className="pm-invoice-amount">{formatRupees(price)}</div>
                     ) : (
-                      <div style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.5rem" }}>Service ready · Invoice pending</div>
+                      <div className="pm-invoice-meta">Service ready · Invoice pending</div>
                     )}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.75rem" }}>
-                    <span style={{ background: "#fef3c7", color: "#b45309", padding: "0.25rem 0.75rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Invoice Pending</span>
+                  <div className="pm-invoice-right">
+                    <span className="pm-invoice-status-badge">Invoice Pending</span>
                     {cs.id ? (
-                      <Link to={`/invoices/${cs.id}`} className="bg-[#1e293b] hover:bg-[#0f172a] text-white px-4 py-2 rounded font-medium transition-colors">Pay Now →</Link>
+                      <Link to={`/invoices/${cs.id}`} className="btn btn-primary pm-pay-btn">
+                        Pay Now →
+                      </Link>
                     ) : (
-                      <a href="mailto:info@thetaxpert.com" style={{ fontSize: "0.875rem", color: "#c49a3a", fontWeight: 500 }}>Contact your Taxpert</a>
+                      <a href="mailto:info@thetaxpert.com" className="pm-invoice-contact">
+                        Contact your Taxpert
+                      </a>
                     )}
                   </div>
                 </div>
@@ -212,57 +290,72 @@ function ClientPaymentsClient({ myPayments, pendingInvoices }: { myPayments: any
         )}
       </section>
 
-      <section>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>Payment History</h2>
+      {/* ── Payment History ── */}
+      <section className="pm-section">
+        <div className="pm-section-header">
+          <span className="pm-section-title">Payment History</span>
           {myPayments.length > 0 && (
-            <span style={{ fontSize: "0.875rem", color: "#64748b" }}>{myPayments.length} transaction{myPayments.length !== 1 ? "s" : ""}</span>
+            <span className="pm-section-count">
+              {myPayments.length} transaction{myPayments.length !== 1 ? "s" : ""}
+            </span>
           )}
         </div>
 
         {!myPayments.length ? (
-          <div className="card text-center" style={{ padding: "3rem" }}>
-            <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>💳</div>
-            <p style={{ fontWeight: 600, color: "#0f172a", marginBottom: "0.25rem" }}>No payments yet.</p>
-            <p style={{ color: "#64748b", fontSize: "0.95rem" }}>Your completed payment receipts will appear here.</p>
+          <div className="pm-empty">
+            <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "1rem" }}>💳</span>
+            <p style={{ fontWeight: 600, color: "var(--ink-900)", marginBottom: "0.25rem" }}>No payments yet.</p>
+            <p style={{ color: "var(--ink-400)", fontSize: "0.95rem" }}>
+              Your completed payment receipts will appear here.
+            </p>
           </div>
         ) : (
-          <div style={{ display: "grid", gap: "1rem" }}>
+          <div className="pm-history-list">
             {myPayments.map(p => {
               const { base, gst } = calcGst(p.amount, p.gst_rate ?? 18);
-              const date = new Date(p.captured_at ?? p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-              
+              const date = new Date(p.captured_at ?? p.created_at).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+
               return (
-                <div key={p.id} className="card" style={{ padding: "1.5rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem", paddingBottom: "1.25rem", borderBottom: "1px dashed #e2e8f0" }}>
+                <div key={p.id} className="pm-receipt-card">
+                  <div className="pm-receipt-top">
                     <div>
-                      <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "1.05rem" }}>{p.service?.name}</div>
-                      <div style={{ fontSize: "0.875rem", color: "#64748b" }}>{p.service?.category}</div>
-                      <div style={{ fontSize: "0.875rem", color: "#94a3b8", marginTop: "0.25rem" }}>{date}</div>
+                      <div className="pm-receipt-service">{p.service?.name}</div>
+                      <div className="pm-receipt-category">{p.service?.category}</div>
+                      <div className="pm-receipt-date">{date}</div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#0f172a", marginBottom: "0.25rem" }}>{formatRupees(p.amount)}</div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wider ${p.status === 'captured' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    <div className="pm-receipt-right">
+                      <span className="pm-receipt-amount">{formatRupees(p.amount)}</span>
+                      <span className={`pm-receipt-status pm-status-${p.status}`}>
                         {p.status === "captured" ? "Paid" : p.status}
                       </span>
                     </div>
                   </div>
-                  
-                  <div style={{ fontSize: "0.875rem", color: "#475569" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                      <span>Base amount</span><span>{formatRupees(base)}</span>
+
+                  <div className="pm-receipt-breakdown">
+                    <div className="pm-breakdown-row">
+                      <span>Base amount</span>
+                      <span>{formatRupees(base)}</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                      <span>GST ({p.gst_rate ?? 18}%)</span><span>{formatRupees(gst)}</span>
+                    <div className="pm-breakdown-row">
+                      <span>GST ({p.gst_rate ?? 18}%)</span>
+                      <span>{formatRupees(gst)}</span>
                     </div>
                     {p.razorpay_payment_id && (
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                        <span>Payment ID</span><span style={{ fontFamily: "monospace", color: "#94a3b8" }}>{p.razorpay_payment_id}</span>
+                      <div className="pm-breakdown-row pm-payment-id-row">
+                        <span>Payment ID</span>
+                        <span className="pm-mono">{p.razorpay_payment_id}</span>
                       </div>
                     )}
                     {p.client_service_id && (
-                      <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid #f1f5f9" }}>
-                        <Link to={`/my-services/${p.client_service_id}`} style={{ color: "#2563eb", fontWeight: 500 }}>
+                      <div
+                        className="pm-breakdown-row"
+                        style={{ borderTop: "1px solid var(--line-soft)", paddingTop: "0.5rem", marginTop: "0.25rem" }}
+                      >
+                        <Link to={`/my-services/${p.client_service_id}`} className="pm-view-service-link">
                           View service workspace →
                         </Link>
                       </div>
@@ -290,7 +383,7 @@ export default function PaymentsPage() {
       const qs = searchParams.toString() ? `?${searchParams.toString()}` : "";
       const [paymentsRes, statsRes] = await Promise.all([
         apiClient.get(`/payments/admin/all${qs}`),
-        apiClient.get(`/payments/admin/stats`)
+        apiClient.get(`/payments/admin/stats`),
       ]);
       return { payments: paymentsRes.data.data, stats: statsRes.data.data };
     },
@@ -302,7 +395,7 @@ export default function PaymentsPage() {
     queryFn: async () => {
       const [myRes, pendingRes] = await Promise.all([
         apiClient.get("/payments/my-payments"),
-        apiClient.get("/payments/pending-invoices")
+        apiClient.get("/payments/pending-invoices"),
       ]);
       return { myPayments: myRes.data.data, pendingInvoices: pendingRes.data.data };
     },
@@ -319,5 +412,10 @@ export default function PaymentsPage() {
     return <AdminPaymentsClient payments={adminData?.payments ?? []} stats={adminData?.stats} />;
   }
 
-  return <ClientPaymentsClient myPayments={clientData?.myPayments ?? []} pendingInvoices={clientData?.pendingInvoices ?? []} />;
+  return (
+    <ClientPaymentsClient
+      myPayments={clientData?.myPayments ?? []}
+      pendingInvoices={clientData?.pendingInvoices ?? []}
+    />
+  );
 }

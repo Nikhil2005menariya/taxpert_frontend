@@ -42,7 +42,7 @@ function isStepActive(stepIdx: number, status: ServiceStatus): boolean {
   return stepIdx === stepIndex(status);
 }
 
-export default function MilestoneBar({ status }: { status: ServiceStatus }) {
+export default function MilestoneBar({ status, compact }: { status: ServiceStatus; compact?: boolean }) {
   if (status === "on_hold" || status === "cancelled") {
     return (
       <div className="ms-bar ms-cancelled">
@@ -72,7 +72,7 @@ export default function MilestoneBar({ status }: { status: ServiceStatus }) {
                   <span className="ms-dot" />
                 )}
               </div>
-              <span className="ms-label">{step.label}</span>
+              {!compact && <span className="ms-label">{step.label}</span>}
             </div>
           </div>
         );

@@ -3,28 +3,33 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../api/client";
 import MilestoneBar from "../../components/dashboard/MilestoneBar";
+import AddServiceModal from "../../components/dashboard/AddServiceModal";
 
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
   documents_required: "Documents Required",
+  documents_received: "Documents Received",
   under_review: "Under Review",
   in_progress: "In Progress",
   action_required: "Action Required",
   invoice_pending: "Invoice Pending",
   completed: "Completed",
+  on_hold: "On Hold",
   cancelled: "Cancelled",
 };
 
 const SERVICE_STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
   pending:            { fg: "#b45309", bg: "#fef3c7" },
   documents_required: { fg: "#b45309", bg: "#fef3c7" },
+  documents_received: { fg: "#15803d", bg: "#dcfce7" },
   under_review:       { fg: "#1d4ed8", bg: "#dbeafe" },
   in_progress:        { fg: "#1d4ed8", bg: "#dbeafe" },
   action_required:    { fg: "#be123c", bg: "#ffe4e6" },
   invoice_pending:    { fg: "#b45309", bg: "#fef3c7" },
   completed:          { fg: "#15803d", bg: "#dcfce7" },
+  on_hold:            { fg: "#4b5563", bg: "#f3f4f6" },
   cancelled:          { fg: "#6b7280", bg: "#f3f4f6" },
 };
 
@@ -76,6 +81,7 @@ export default function MyServicesPage() {
           <h1 className="cs-heading">My Services</h1>
           <p className="cs-sub">Track and manage every service assigned to your account.</p>
         </div>
+        <AddServiceModal />
       </div>
 
       {error && <div className="db-alert-error">{(error as any).message}</div>}
@@ -134,7 +140,7 @@ export default function MyServicesPage() {
                   )}
 
                   <div className="cs-milestone-wrap">
-                    <MilestoneBar status={cs.status as ServiceStatus} />
+                    <MilestoneBar status={cs.status as ServiceStatus} compact={true} />
                   </div>
 
                   {stats && (
