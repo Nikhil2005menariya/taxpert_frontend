@@ -44,3 +44,24 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Payment service client — same JWT auth, port 4001
+export const paymentClient = axios.create({
+  baseURL: import.meta.env.VITE_PAYMENT_SERVICE_URL ?? 'http://localhost:4001/api',
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
+});
+
+paymentClient.interceptors.request.use(async (config) => {
+  try {
+    const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 5000));
+    const result  = await Promise.race([supabase.auth.getSession(), timeout]);
+    if (result) {
+      const session = (result as any).data?.session;
+      if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+      }
+    }
+  } catch {}
+  return config;
+}, (error) => Promise.reject(error));

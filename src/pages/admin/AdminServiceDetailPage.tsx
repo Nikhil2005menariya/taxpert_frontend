@@ -188,6 +188,9 @@ export default function AdminServiceDetailPage() {
   // Settings form
   const [settingsStatus, setSettingsStatus] = useState('');
   const [settingsNotes, setSettingsNotes] = useState('');
+  const [settingsPinned, setSettingsPinned] = useState('');
+  const [settingsBlocked, setSettingsBlocked] = useState(false);
+  const [settingsBlockedReason, setSettingsBlockedReason] = useState('');
   const [settingsDirty, setSettingsDirty] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -279,6 +282,9 @@ export default function AdminServiceDetailPage() {
   function initSettings() {
     setSettingsStatus(data.status ?? '');
     setSettingsNotes(data.notes ?? '');
+    setSettingsPinned(data.pinned_message ?? '');
+    setSettingsBlocked(data.is_blocked ?? false);
+    setSettingsBlockedReason(data.blocked_reason ?? '');
     setSettingsDirty(true);
   }
 
@@ -735,6 +741,22 @@ export default function AdminServiceDetailPage() {
                 <span>{data.notes ?? '—'}</span>
               </div>
               <div className="aq-profile-row">
+                <span className="aq-profile-label">Pinned Message</span>
+                <span>{data.pinned_message ?? '—'}</span>
+              </div>
+              <div className="aq-profile-row">
+                <span className="aq-profile-label">Blocked</span>
+                <span className={`aq-badge ${data.is_blocked ? 'aq-badge-hold' : 'aq-badge-done'}`}>
+                  {data.is_blocked ? 'Yes' : 'No'}
+                </span>
+              </div>
+              {data.blocked_reason && (
+                <div className="aq-profile-row">
+                  <span className="aq-profile-label">Block Reason</span>
+                  <span>{data.blocked_reason}</span>
+                </div>
+              )}
+              <div className="aq-profile-row">
                 <span className="aq-profile-label">Created</span>
                 <span>{fmtDate(data.created_at)}</span>
               </div>
@@ -760,6 +782,22 @@ export default function AdminServiceDetailPage() {
                 <label className="form-label">Internal Notes</label>
                 <textarea className="form-input" rows={3} value={settingsNotes} onChange={e => setSettingsNotes(e.target.value)} />
               </div>
+              <div className="form-group">
+                <label className="form-label">Pinned Message <span style={{ fontWeight: 400, color: 'var(--ink-400)' }}>(shown to client)</span></label>
+                <input className="form-input" value={settingsPinned} onChange={e => setSettingsPinned(e.target.value)}
+                  placeholder="e.g. Awaiting GST portal access from client" />
+              </div>
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input type="checkbox" id="svc-blocked" checked={settingsBlocked} onChange={e => setSettingsBlocked(e.target.checked)} />
+                <label htmlFor="svc-blocked" className="form-label" style={{ marginBottom: 0 }}>Mark as Blocked</label>
+              </div>
+              {settingsBlocked && (
+                <div className="form-group">
+                  <label className="form-label">Block Reason</label>
+                  <input className="form-input" value={settingsBlockedReason} onChange={e => setSettingsBlockedReason(e.target.value)}
+                    placeholder="Why is this service blocked?" />
+                </div>
+              )}
               {updateService.isError && (
                 <p className="aq-modal-error">{(updateService.error as any)?.response?.data?.error}</p>
               )}
@@ -771,7 +809,13 @@ export default function AdminServiceDetailPage() {
                 <button
                   className="btn btn-primary"
                   disabled={updateService.isPending}
-                  onClick={() => updateService.mutate({ status: settingsStatus, notes: settingsNotes })}
+                  onClick={() => updateService.mutate({
+                    status: settingsStatus,
+                    notes: settingsNotes,
+                    pinned_message: settingsPinned,
+                    is_blocked: settingsBlocked,
+                    blocked_reason: settingsBlockedReason,
+                  })}
                 >
                   {updateService.isPending ? 'Saving…' : 'Save Changes'}
                 </button>

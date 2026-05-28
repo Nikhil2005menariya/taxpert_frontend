@@ -37,7 +37,7 @@ export default function CouponsPage() {
   const { data: coupons = [], isLoading } = useQuery({
     queryKey: ["admin-coupons"],
     queryFn: async () => {
-      const res = await apiClient.get("/coupons");
+      const res = await apiClient.get("/coupons/admin/all");
       return res.data.data ?? [];
     },
     enabled: isAdmin,
@@ -45,7 +45,7 @@ export default function CouponsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (newCoupon: any) => {
-      await apiClient.post("/coupons", newCoupon);
+      await apiClient.post("/coupons/admin/create", newCoupon);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
@@ -60,7 +60,7 @@ export default function CouponsPage() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string, is_active: boolean }) => {
-      await apiClient.patch(`/coupons/${id}/toggle`, { is_active });
+      await apiClient.patch(`/coupons/admin/${id}/toggle`, { isActive: is_active });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
