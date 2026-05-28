@@ -9085,6 +9085,603 @@ a:hover {
   .asd-doc-actions { flex-direction: row; }
 }
 
+/* ── Texpert Dashboard (txd-*) ─────────────────────────────── */
+
+/* Greeting header */
+.txd-greeting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.txd-greeting-line {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin: 0;
+}
+.txd-name {
+  color: var(--gold-600);
+}
+.txd-greeting-sub {
+  font-size: 0.85rem;
+  color: var(--ink-500);
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.txd-dot { color: var(--ink-300); }
+
+/* KPI row — 5 cards */
+.txd-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.75rem;
+}
+@media (max-width: 1100px) { .txd-kpi-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px)  { .txd-kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+.txd-kpi {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--ink-300);
+  border-radius: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.txd-kpi:hover {
+  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+  transform: translateY(-1px);
+}
+.txd-kpi-label { font-size: 0.7rem; font-weight: 700; color: var(--ink-400); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.txd-kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--ink-900); line-height: 1.1; }
+.txd-kpi-sub   { font-size: 0.72rem; color: var(--ink-400); margin-top: 4px; }
+
+/* Two-column body */
+.txd-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 900px) { .txd-cols { grid-template-columns: 1fr; } }
+
+.txd-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.txd-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ink-50);
+}
+.txd-panel-title { font-size: 0.85rem; font-weight: 700; color: var(--ink-800); margin: 0; }
+.txd-panel-count { font-size: 0.78rem; color: var(--ink-400); }
+
+/* Empty state inside panel */
+.txd-empty {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+.txd-empty-title { font-size: 0.95rem; font-weight: 700; color: var(--ink-700); margin: 0 0 4px; }
+.txd-empty-sub   { font-size: 0.82rem; color: var(--ink-400); margin: 0; }
+
+/* Needs Attention list */
+.txd-attention-list { display: flex; flex-direction: column; gap: 0; }
+
+.txd-attention-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-soft, #f1f5f9);
+  cursor: pointer;
+  transition: background 0.1s;
+  position: relative;
+}
+.txd-attention-row:last-child { border-bottom: none; }
+.txd-attention-row:hover     { background: var(--ink-50); }
+.txd-attention-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--line);
+}
+.txd-reason-new::before       { background: #3b82f6; }
+.txd-reason-stalled::before   { background: var(--gold-500); }
+.txd-reason-overdue::before   { background: var(--danger); }
+.txd-reason-attention::before { background: #d97706; }
+
+.txd-attention-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+.txd-attention-body { flex: 1; min-width: 0; }
+.txd-attention-svc {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+.txd-attention-fy {
+  font-size: 0.72rem;
+  color: var(--ink-400);
+  font-weight: 500;
+  margin-left: 4px;
+}
+.txd-attention-client {
+  font-size: 0.78rem;
+  color: var(--ink-500);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.txd-attention-reason {
+  font-size: 0.74rem;
+  color: var(--ink-400);
+  margin-top: 4px;
+  font-weight: 500;
+}
+.txd-attention-arrow {
+  color: var(--ink-300);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* Activity list */
+.txd-activity-list { display: flex; flex-direction: column; gap: 0; }
+.txd-activity-row {
+  display: flex;
+  gap: 0.75rem;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line-soft, #f1f5f9);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.txd-activity-row:last-child { border-bottom: none; }
+.txd-activity-row:hover     { background: var(--ink-50); }
+.txd-activity-icon { font-size: 1.05rem; flex-shrink: 0; width: 24px; text-align: center; }
+.txd-activity-body { flex: 1; min-width: 0; }
+.txd-activity-msg {
+  font-size: 0.85rem;
+  color: var(--ink-800);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.txd-activity-meta {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--ink-400);
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+.txd-activity-svc { color: var(--ink-600); font-weight: 500; }
+
+/* ── Texpert Inbox (tx-svc-*, tx-mini-*, tx-filters) ──────── */
+
+/* Mini stat row */
+.tx-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+.tx-mini-stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.tx-mini-num { font-size: 1.3rem; font-weight: 800; color: var(--ink-900); line-height: 1.1; }
+.tx-mini-lbl { font-size: 0.7rem; font-weight: 600; color: var(--ink-400); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+
+@media (max-width: 700px) { .tx-mini-stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* Filter bar */
+.tx-filters {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.tx-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+}
+.tx-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--ink-400);
+  pointer-events: none;
+}
+.tx-search {
+  width: 100%;
+  padding: 7px 32px 7px 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: var(--ink-50);
+  color: var(--ink-900);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.tx-search:focus { border-color: var(--gold-400); background: var(--card); }
+.tx-search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-400);
+  font-size: 0.75rem;
+  padding: 2px 4px;
+}
+.tx-search-clear:hover { color: var(--ink-700); }
+.tx-select {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  background: var(--ink-50);
+  color: var(--ink-700);
+  outline: none;
+  cursor: pointer;
+  height: 34px;
+}
+.tx-select:focus { border-color: var(--gold-400); }
+.tx-clear-btn {
+  padding: 0 14px;
+  height: 34px;
+  background: transparent;
+  color: var(--ink-500);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tx-clear-btn:hover { background: var(--ink-50); }
+
+/* Service cards list */
+.tx-svc-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.tx-svc-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.tx-svc-card:hover {
+  border-color: var(--ink-300);
+  box-shadow: 0 4px 14px rgba(15,23,42,0.06);
+  transform: translateY(-1px);
+}
+
+.tx-svc-overdue   { border-left-color: var(--danger); }
+.tx-svc-attention { border-left-color: var(--gold-500); }
+.tx-svc-new-docs  { border-left-color: #3b82f6; }
+
+.tx-svc-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.tx-svc-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin-bottom: 4px;
+}
+.tx-svc-fy {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-500);
+  background: var(--ink-50);
+  border: 1px solid var(--line);
+  padding: 1px 7px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+.tx-svc-client {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--ink-600);
+}
+.tx-svc-client-name { font-weight: 500; }
+.tx-svc-pan {
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: var(--ink-500);
+}
+.tx-svc-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.tx-svc-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line-soft, #f1f5f9);
+  padding-top: 0.6rem;
+  margin-top: 0.4rem;
+}
+.tx-svc-stats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--ink-600);
+  align-items: center;
+}
+.tx-svc-time { font-size: 0.74rem; color: var(--ink-400); }
+
+.tx-new-badge {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+/* SLA tags shown next to status pill */
+.tx-sla-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tx-sla-overdue   { background: #fee2e2; color: #991b1b; }
+.tx-sla-attention { background: #fef3c7; color: #92400e; }
+
+/* Loading skeleton */
+.tx-skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--ink-100) 25%, var(--ink-50) 50%, var(--ink-100) 75%);
+  background-size: 200% 100%;
+  animation: pm2-shimmer 1.4s infinite;
+}
+
+/* ── Texpert Workspace (tx-*) ─────────────────────────────── */
+
+/* Sticky client info bar — sits below the page header */
+.tx-client-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.tx-client-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.95rem;
+  color: var(--ink-900);
+}
+.tx-client-meta {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--ink-700);
+  flex: 1;
+}
+.tx-client-payment {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+.tx-meta-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 4px;
+}
+
+/* Pinned banner — gold/amber, sits between stats and tabs */
+.tx-pinned-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 12px 18px;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #d97706;
+  border-radius: 10px;
+}
+
+/* Danger button variant (reject) */
+.tx-danger-btn {
+  background: #fff !important;
+  color: var(--danger) !important;
+  border: 1px solid rgba(182,69,69,0.3) !important;
+}
+.tx-danger-btn:hover:not(:disabled) {
+  background: rgba(182,69,69,0.06) !important;
+  border-color: var(--danger) !important;
+}
+
+/* Warning box inside modals */
+.tx-warn-box {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+/* Notes card — pinned & internal notes */
+.tx-notes-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.tx-notes-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-800);
+  margin-bottom: 0.75rem;
+}
+
+/* Status grid — workflow tab buttons */
+.tx-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+.tx-status-btn {
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+  text-align: left;
+  text-transform: capitalize;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tx-status-btn:hover:not(:disabled) { background: var(--ink-50); border-color: var(--ink-300); }
+.tx-status-btn:disabled { cursor: default; }
+.tx-status-current {
+  background: var(--ink-50);
+  border-color: var(--gold-400);
+  color: var(--ink-900);
+  font-weight: 700;
+}
+.tx-status-hold {
+  border-color: rgba(217,119,6,0.35);
+  color: #92400e;
+}
+
+/* Workflow pipeline (visual progress) */
+.tx-pipeline {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  padding: 1rem 0.5rem;
+  overflow-x: auto;
+}
+.tx-pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 90px;
+  position: relative;
+}
+.tx-step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ink-100);
+  color: var(--ink-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 2px solid var(--line);
+  z-index: 1;
+  position: relative;
+}
+.tx-step-label {
+  font-size: 0.72rem;
+  color: var(--ink-500);
+  margin-top: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+.tx-step-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  right: -50%;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+}
+.tx-step-reached .tx-step-dot {
+  background: var(--gold-500);
+  color: #fff;
+  border-color: var(--gold-500);
+}
+.tx-step-reached .tx-step-label { color: var(--ink-700); font-weight: 600; }
+.tx-step-reached + .tx-pipeline-step .tx-step-bar,
+.tx-step-reached .tx-step-bar { background: var(--gold-500); }
+.tx-step-current .tx-step-dot {
+  box-shadow: 0 0 0 4px rgba(196,154,58,0.18);
+  transform: scale(1.05);
+}
+.tx-pipeline-onhold {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid #fde68a;
+}
+
+@media (max-width: 700px) {
+  .tx-step-label { font-size: 0.65rem; }
+  .tx-client-meta { font-size: 0.78rem; gap: 0.75rem; }
+}
+
 /* ── Notify Page ──────────────────────────────────────────── */
 .ntf-compose {
   background: var(--card);

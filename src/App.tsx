@@ -29,6 +29,9 @@ import AdminPayoutsPage from './pages/admin/AdminPayoutsPage';
 import AdminNotifyPage from './pages/admin/AdminNotifyPage';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
 import AdminServiceDetailPage from './pages/admin/AdminServiceDetailPage';
+import TexpertServiceDetailPage from './pages/texpert/TexpertServiceDetailPage';
+import TexpertServicesPage from './pages/texpert/TexpertServicesPage';
+import TexpertDashboardPage from './pages/texpert/TexpertDashboardPage';
 import PaymentsPage from './pages/client/payments/PaymentsPage';
 import DueDatesPage from './pages/client/due-dates/DueDatesPage';
 import ReferralsPage from './pages/client/referrals/ReferralsPage';
@@ -91,6 +94,10 @@ function App() {
           <Route path="/admin/notify" element={<AdminNotifyPage />} />
           <Route path="/admin/audit" element={<AdminAuditPage />} />
           <Route path="/admin/client-services/:id" element={<AdminServiceDetailPage />} />
+          {/* Texpert workspace — Phase 2/3/5 (full sidebar/nav comes in Phase 7) */}
+          <Route path="/texpert" element={<TexpertDashboardPage />} />
+          <Route path="/texpert/services" element={<TexpertServicesPage />} />
+          <Route path="/texpert/services/:id" element={<TexpertServiceDetailPage />} />
           {/* Shared queue — accessible to admin and taxpert */}
           <Route path="/queue" element={<AdminQueuePage />} />
           <Route path="/payments" element={<PaymentsPage />} />

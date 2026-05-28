@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { apiClient } from "../../../api/client";
 import AddServiceModal from "../../../components/dashboard/AddServiceModal";
+import TexpertDashboardPage from "../../texpert/TexpertDashboardPage";
 
 // Types
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "completed" | "cancelled";
