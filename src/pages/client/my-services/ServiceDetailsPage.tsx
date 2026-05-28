@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
-import { apiClient } from "../../api/client";
-import MilestoneBar from "../../components/dashboard/MilestoneBar";
-import StaffWorkflowControls from "../../components/staff/StaffWorkflowControls";
+import { useAuth } from "../../../contexts/AuthContext";
+import { apiClient } from "../../../api/client";
+import MilestoneBar from "../../../components/dashboard/MilestoneBar";
+import StaffWorkflowControls from "../../../components/staff/StaffWorkflowControls";
 
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
 

@@ -7,6 +7,7 @@ interface SidebarProps {
   roleLabel: string;
   isAdmin: boolean;
   isClient: boolean;
+  isTexpert: boolean;
   expertFirstName?: string | null;
   expertLastName?: string | null;
   expertRole?: string | null;
@@ -97,6 +98,51 @@ function IconDiscount() {
     </svg>
   );
 }
+function IconUsers() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  );
+}
+function IconClipboard() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="2" width="6" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+      <path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/>
+    </svg>
+  );
+}
+function IconDollar() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+    </svg>
+  );
+}
+function IconBell() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9Z"/><path d="M10 21a2 2 0 0 0 4 0"/>
+    </svg>
+  );
+}
+function IconActivity() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  );
+}
+function IconInbox() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+    </svg>
+  );
+}
 function IconUser() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -127,6 +173,7 @@ const Logo = () => (
 export default function DashboardSidebar({
   isAdmin,
   isClient,
+  isTexpert,
   expertFirstName,
   expertLastName,
   expertRole,
@@ -145,22 +192,36 @@ export default function DashboardSidebar({
     ...(isClient ? [{ href: "/referrals",   label: "Refer & Earn",Icon: IconGift,      exact: false, badge: null }] : []),
     ...(isClient ? [{ href: "/profile",     label: "Profile",     Icon: IconUser,      exact: false, badge: null }] : []),
 
-    // Staff items
+    // Taxpert items
+    ...(isTexpert
+      ? [
+          { href: "/texpert/services", label: "My Services",  Icon: IconClipboard, exact: false, badge: null },
+          { href: "/queue",            label: "Queue",         Icon: IconInbox,     exact: false, badge: null },
+        ]
+      : []),
+
+    // Staff (legacy) items
     ...(expertRole === "staff" || expertRole === "admin" || expertRole === "super_admin"
       ? [
-          { href: "/work-queue", label: "Work Queue", Icon: IconTasks, exact: false, badge: null },
+          { href: "/work-queue", label: "Work Queue", Icon: IconTasks,       exact: false, badge: null },
           { href: "/workload",   label: "Workload",   Icon: IconCheckSquare, exact: false, badge: null },
         ]
       : []),
 
-    // Admin-only items
+    // Admin items
     ...(isAdmin
       ? [
-          { href: "/admin/services",        label: "Services",  Icon: IconGlobe,      exact: false, badge: null },
-          { href: "/admin/document-types",  label: "Doc Types", Icon: IconFolder,     exact: false, badge: null },
-          { href: "/admin/pricing",         label: "Pricing",   Icon: IconTag,        exact: false, badge: null },
-          { href: "/admin/coupons",         label: "Coupons",   Icon: IconDiscount,   exact: false, badge: null },
-          { href: "/admin/settings/invoice",label: "Invoice Settings", Icon: IconBuilding, exact: false, badge: null },
+          { href: "/admin/taxperts",         label: "Taxperts",       Icon: IconUsers,     exact: false, badge: null },
+          { href: "/admin/clients",          label: "Clients",        Icon: IconUser,      exact: false, badge: null },
+          { href: "/queue",                  label: "Queue",          Icon: IconInbox,     exact: true,  badge: null },
+          { href: "/admin/payouts",          label: "Payouts",        Icon: IconDollar,    exact: false, badge: null },
+          { href: "/admin/services",         label: "Services",       Icon: IconGlobe,     exact: false, badge: null },
+          { href: "/admin/document-types",   label: "Doc Types",      Icon: IconFolder,    exact: false, badge: null },
+          { href: "/admin/pricing",          label: "Pricing",        Icon: IconTag,       exact: false, badge: null },
+          { href: "/admin/coupons",          label: "Coupons",        Icon: IconDiscount,  exact: false, badge: null },
+          { href: "/admin/settings/invoice", label: "Invoice",        Icon: IconBuilding,  exact: false, badge: null },
+          { href: "/admin/notify",           label: "Notify",         Icon: IconBell,      exact: false, badge: null },
+          { href: "/admin/audit",            label: "Audit Log",      Icon: IconActivity,  exact: false, badge: null },
         ]
       : []),
     ...(isAdmin ? [{ href: "/admin", label: "Users & Ops", Icon: IconBuilding, exact: true, badge: null }] : []),

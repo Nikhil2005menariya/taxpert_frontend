@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useAuth } from "../../contexts/AuthContext";
-import { apiClient } from "../../api/client";
+import { useAuth } from "../../../contexts/AuthContext";
+import { apiClient } from "../../../api/client";
 
 type TabId = "account" | "security";
 

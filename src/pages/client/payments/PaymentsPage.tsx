@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../../api/client";
-import { useAuth } from "../../contexts/AuthContext";
+import { apiClient } from "../../../api/client";
+import { useAuth } from "../../../contexts/AuthContext";
 import { Link, useSearchParams, Navigate } from "react-router-dom";
-import { formatRupees, calcGst } from "../../shared/finance-utils";
+import { formatRupees, calcGst } from "../../../shared/finance-utils";
 
 interface ServiceRef {
   name?: string;

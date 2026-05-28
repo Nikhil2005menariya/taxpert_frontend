@@ -5,11 +5,11 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ResetPassword from './pages/auth/ResetPassword';
 import DashboardLayout from './layouts/DashboardLayout';
-import ProfilePage from './pages/profile/ProfilePage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import MyServicesPage from './pages/my-services/MyServicesPage';
-import ServiceDetailsPage from './pages/my-services/ServiceDetailsPage';
-import VaultPage from './pages/vault/VaultPage';
+import ProfilePage from './pages/client/profile/ProfilePage';
+import DashboardPage from './pages/client/dashboard/DashboardPage';
+import MyServicesPage from './pages/client/my-services/MyServicesPage';
+import ServiceDetailsPage from './pages/client/my-services/ServiceDetailsPage';
+import VaultPage from './pages/client/vault/VaultPage';
 import WorkloadPage from './pages/workload/WorkloadPage';
 import WorkQueuePage from './pages/work-queue/WorkQueuePage';
 import AdminPage from './pages/admin/AdminPage';
@@ -20,10 +20,19 @@ import ServiceEditPage from './pages/admin/ServiceEditPage';
 import PricingPage from './pages/admin/PricingPage';
 import CouponsPage from './pages/admin/CouponsPage';
 import InvoiceSettingsPage from './pages/admin/InvoiceSettingsPage';
-import PaymentsPage from './pages/payments/PaymentsPage';
-import DueDatesPage from './pages/due-dates/DueDatesPage';
-import ReferralsPage from './pages/referrals/ReferralsPage';
-import InvoicePage from './pages/invoices/InvoicePage';
+import AdminTaxpertsPage from './pages/admin/AdminTaxpertsPage';
+import AdminTexpertDetailPage from './pages/admin/AdminTexpertDetailPage';
+import AdminClientsPage from './pages/admin/AdminClientsPage';
+import AdminClientDetailPage from './pages/admin/AdminClientDetailPage';
+import AdminQueuePage from './pages/admin/AdminQueuePage';
+import AdminPayoutsPage from './pages/admin/AdminPayoutsPage';
+import AdminNotifyPage from './pages/admin/AdminNotifyPage';
+import AdminAuditPage from './pages/admin/AdminAuditPage';
+import AdminServiceDetailPage from './pages/admin/AdminServiceDetailPage';
+import PaymentsPage from './pages/client/payments/PaymentsPage';
+import DueDatesPage from './pages/client/due-dates/DueDatesPage';
+import ReferralsPage from './pages/client/referrals/ReferralsPage';
+import InvoicePage from './pages/client/invoices/InvoicePage';
 
 import HomePage from './pages/public/HomePage';
 import ServicesCatalogPage from './pages/public/ServicesCatalogPage';
@@ -73,6 +82,17 @@ function App() {
           <Route path="/admin/pricing" element={<PricingPage />} />
           <Route path="/admin/coupons" element={<CouponsPage />} />
           <Route path="/admin/settings/invoice" element={<InvoiceSettingsPage />} />
+          {/* Phase 2: Admin */}
+          <Route path="/admin/taxperts" element={<AdminTaxpertsPage />} />
+          <Route path="/admin/taxperts/:id" element={<AdminTexpertDetailPage />} />
+          <Route path="/admin/clients" element={<AdminClientsPage />} />
+          <Route path="/admin/clients/:id" element={<AdminClientDetailPage />} />
+          <Route path="/admin/payouts" element={<AdminPayoutsPage />} />
+          <Route path="/admin/notify" element={<AdminNotifyPage />} />
+          <Route path="/admin/audit" element={<AdminAuditPage />} />
+          <Route path="/admin/client-services/:id" element={<AdminServiceDetailPage />} />
+          {/* Shared queue — accessible to admin and taxpert */}
+          <Route path="/queue" element={<AdminQueuePage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/invoices/:id" element={<InvoicePage />} />
           <Route path="/due-dates" element={<DueDatesPage />} />

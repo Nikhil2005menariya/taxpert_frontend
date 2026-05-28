@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
-import { apiClient } from "../../api/client";
-import AddServiceModal from "../../components/dashboard/AddServiceModal";
+import { useAuth } from "../../../contexts/AuthContext";
+import { apiClient } from "../../../api/client";
+import AddServiceModal from "../../../components/dashboard/AddServiceModal";
 
 // Types
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "completed" | "cancelled";

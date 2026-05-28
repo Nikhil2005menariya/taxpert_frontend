@@ -8,6 +8,7 @@ interface MobileNavProps {
   roleLabel: string;
   isAdmin: boolean;
   isClient: boolean;
+  isTexpert?: boolean;
   expertFirstName?: string | null;
   expertLastName?: string | null;
   expertRole?: string | null;
@@ -124,6 +125,7 @@ export default function MobileNav({
   roleLabel,
   isAdmin,
   isClient,
+  isTexpert,
   expertFirstName,
   expertLastName,
   expertRole,
@@ -160,16 +162,25 @@ export default function MobileNav({
       { href: "/referrals",   label: "Refer & Earn", Icon: IconGift,       exact: false },
       { href: "/profile",     label: "Profile",      Icon: IconUser,       exact: false },
     ] : []),
-    // Staff / Expert items
-    ...(isStaffOrAdmin ? [
+    // Taxpert items
+    ...(isTexpert ? [
+      { href: "/texpert/services", label: "My Services", Icon: IconFolder,   exact: false },
+      { href: "/queue",            label: "Queue",        Icon: IconCalendar, exact: false },
+    ] : []),
+    // Staff / Expert items (legacy)
+    ...(!isClient && !isTexpert && !isAdmin ? [
       { href: "/workload",   label: "Workload",   Icon: IconFolder,   exact: false },
       { href: "/work-queue", label: "Work Queue", Icon: IconCalendar, exact: false },
     ] : []),
-    // Admin-only (not taxpert/staff)
+    // Admin-only
     ...(isAdmin ? [
-      { href: "/payments",      label: "Payments", Icon: IconCreditCard, exact: false },
-      { href: "/admin/pricing", label: "Pricing",  Icon: IconTag,        exact: false },
-      { href: "/admin/coupons", label: "Coupons",  Icon: IconDiscount,   exact: false },
+      { href: "/admin/taxperts", label: "Taxperts",    Icon: IconFolder,     exact: false },
+      { href: "/admin/clients",  label: "Clients",     Icon: IconGift,       exact: false },
+      { href: "/queue",          label: "Queue",        Icon: IconCalendar,  exact: false },
+      { href: "/admin/payouts",  label: "Payouts",     Icon: IconCreditCard, exact: false },
+      { href: "/payments",       label: "Payments",    Icon: IconCreditCard, exact: false },
+      { href: "/admin/pricing",  label: "Pricing",     Icon: IconTag,        exact: false },
+      { href: "/admin/coupons",  label: "Coupons",     Icon: IconDiscount,   exact: false },
     ] : []),
     ...(isAdmin ? [{ href: "/admin", label: "Users & Ops", Icon: IconBuilding, exact: false }] : []),
   ];

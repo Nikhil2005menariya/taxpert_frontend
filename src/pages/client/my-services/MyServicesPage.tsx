@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Navigate } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
-import { apiClient } from "../../api/client";
-import MilestoneBar from "../../components/dashboard/MilestoneBar";
-import AddServiceModal from "../../components/dashboard/AddServiceModal";
+import { useAuth } from "../../../contexts/AuthContext";
+import { apiClient } from "../../../api/client";
+import MilestoneBar from "../../../components/dashboard/MilestoneBar";
+import AddServiceModal from "../../../components/dashboard/AddServiceModal";
 
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
 

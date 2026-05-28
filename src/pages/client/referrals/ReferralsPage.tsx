@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../../api/client";
-import { useAuth } from "../../contexts/AuthContext";
-import { formatRupees } from "../../shared/finance-utils";
+import { apiClient } from "../../../api/client";
+import { useAuth } from "../../../contexts/AuthContext";
+import { formatRupees } from "../../../shared/finance-utils";
 
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);

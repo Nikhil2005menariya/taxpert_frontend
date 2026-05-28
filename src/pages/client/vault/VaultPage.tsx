@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiClient } from "../../api/client";
+import { apiClient } from "../../../api/client";
 
 // Fetches a signed URL from the backend then opens it in a new tab.
 // Direct links to /api/documents/:id/download don't work because the browser

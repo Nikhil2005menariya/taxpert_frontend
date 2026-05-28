@@ -21,12 +21,17 @@ function isAdminRole(role: string): boolean {
   return role === 'admin' || role === 'super_admin';
 }
 
+function isTexpertRole(role: string): boolean {
+  return role === 'expert' || role === 'ca';
+}
+
 export default function DashboardLayout() {
   const { profile, user } = useAuth();
 
   const role = profile?.role ?? "client";
   const isAdmin = isAdminRole(role);
   const isClient = role === "client";
+  const isTexpert = isTexpertRole(role);
   const roleLabel = getRoleLabel(role);
 
   // In the real app, we might want to fetch expert assignments using TanStack Query.
@@ -43,6 +48,7 @@ export default function DashboardLayout() {
     roleLabel,
     isAdmin,
     isClient,
+    isTexpert,
     expertFirstName,
     expertLastName,
     expertRole,
@@ -63,6 +69,7 @@ export default function DashboardLayout() {
               roleLabel={sharedProps.roleLabel}
               isAdmin={sharedProps.isAdmin}
               isClient={sharedProps.isClient}
+              isTexpert={sharedProps.isTexpert}
               expertFirstName={sharedProps.expertFirstName}
               expertLastName={sharedProps.expertLastName}
               expertRole={sharedProps.expertRole}

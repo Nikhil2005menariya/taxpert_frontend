@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../../api/client";
-import { formatRupees } from "../../shared/finance-utils";
+import { apiClient } from "../../../api/client";
+import { formatRupees } from "../../../shared/finance-utils";
 
 declare global {
   interface Window {

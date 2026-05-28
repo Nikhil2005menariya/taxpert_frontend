@@ -1,207 +1,349 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "../../api/client";
-import { useAuth } from "../../contexts/AuthContext";
-import { Navigate } from "react-router-dom";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
+
+type DocType = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  is_common_document: boolean;
+  is_active: boolean;
+  allowed_extensions: string[];
+  max_file_size_mb: number;
+};
+
+function EditModal({ doc, onClose, onToggled }: { doc: DocType; onClose: () => void; onToggled: (name: string, active: boolean) => void }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(doc.name);
+  const [desc, setDesc] = useState(doc.description ?? '');
+  const [exts, setExts] = useState(doc.allowed_extensions.join(', '));
+  const [maxMb, setMaxMb] = useState(String(doc.max_file_size_mb));
+  const [isCommon, setIsCommon] = useState(doc.is_common_document);
+
+  const save = useMutation({
+    mutationFn: () => apiClient.patch(`/config/document-types/${doc.id}`, {
+      name: name.trim(),
+      description: desc.trim() || null,
+      is_common_document: isCommon,
+      allowed_extensions: exts.split(',').map(e => e.trim()).filter(Boolean),
+      max_file_size_mb: parseInt(maxMb) || 10,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-doc-types'] });
+      onClose();
+    },
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: () => apiClient.patch(`/config/document-types/${doc.id}`, { is_active: !doc.is_active }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-doc-types'] });
+      onToggled(doc.name, !doc.is_active);
+      onClose();
+    },
+  });
+
+  return (
+    <div className="aq-modal-overlay" onClick={onClose}>
+      <div className="aq-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+        <div className="aq-modal-header">
+          <h3 className="aq-modal-title">Edit Document Type</h3>
+          <button className="aq-modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="aq-modal-body">
+          <div className="form-group">
+            <label className="form-label">Code</label>
+            <input className="form-input" value={doc.code} disabled style={{ opacity: 0.5 }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Display Name *</label>
+            <input className="form-input" value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <input className="form-input" value={desc} onChange={e => setDesc(e.target.value)} placeholder="What this document is" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Allowed Extensions (comma-separated)</label>
+            <input className="form-input" value={exts} onChange={e => setExts(e.target.value)} placeholder="pdf, jpg, jpeg, png" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Max File Size (MB)</label>
+            <input className="form-input" type="number" min="1" value={maxMb} onChange={e => setMaxMb(e.target.value)} />
+          </div>
+          <label className="dt-toggle-label">
+            <input type="checkbox" checked={isCommon} onChange={e => setIsCommon(e.target.checked)} />
+            Common document (PAN, Aadhaar, etc.)
+          </label>
+          {save.isError && <p className="aq-modal-error">{(save.error as any)?.response?.data?.error}</p>}
+          {toggleActive.isError && <p className="aq-modal-error">{(toggleActive.error as any)?.response?.data?.error}</p>}
+        </div>
+
+        <div className="aq-modal-footer" style={{ justifyContent: 'space-between' }}>
+          <button
+            className={`btn btn-sm ${doc.is_active ? 'dt-deactivate-btn' : 'dt-activate-btn'}`}
+            disabled={toggleActive.isPending}
+            onClick={() => toggleActive.mutate()}
+          >
+            {toggleActive.isPending
+              ? (doc.is_active ? 'Deactivating…' : 'Activating…')
+              : (doc.is_active ? 'Mark Inactive' : 'Mark Active')}
+          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}>
+              {save.isPending ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DocumentTypesPage() {
   const { profile, isLoading: authLoading } = useAuth();
-  const queryClient = useQueryClient();
-  const isSuperAdmin = profile?.role === "super_admin";
-  const isAdmin = profile?.role === "admin" || isSuperAdmin;
+  const qc = useQueryClient();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
-  const [search, setSearch] = useState("");
-  const [filterCommon, setFilterCommon] = useState<"all" | "common" | "service">("all");
+  const [search, setSearch] = useState('');
+  const [filterCommon, setFilterCommon] = useState<'all' | 'common' | 'service'>('all');
   const [showForm, setShowForm] = useState(false);
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [editingDoc, setEditingDoc] = useState<DocType | null>(null);
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
+  // New doc form state
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
   const [isCommon, setIsCommon] = useState(false);
-  const [maxMb, setMaxMb] = useState("10");
-  const [exts, setExts] = useState("pdf,jpg,jpeg,png");
+  const [maxMb, setMaxMb] = useState('10');
+  const [exts, setExts] = useState('pdf,jpg,jpeg,png');
 
   const { data: docTypes, isLoading } = useQuery({
-    queryKey: ["admin-doc-types"],
-    queryFn: async () => {
-      const res = await apiClient.get("/config/document-types");
-      return res.data.data ?? [];
-    },
+    queryKey: ['admin-doc-types'],
+    queryFn: async () => (await apiClient.get('/config/document-types')).data.data ?? [],
     enabled: isAdmin,
   });
 
-  const mutation = useMutation({
-    mutationFn: async (newDocType: any) => {
-      await apiClient.post("/config/document-types", newDocType);
-    },
+  const createMut = useMutation({
+    mutationFn: (payload: any) => apiClient.post('/config/document-types', payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-doc-types"] });
-      setMsg({ type: "ok", text: "Document type created." });
-      setCode(""); setName(""); setDesc(""); setIsCommon(false); setMaxMb("10"); setExts("pdf,jpg,jpeg,png");
+      qc.invalidateQueries({ queryKey: ['admin-doc-types'] });
+      flash('ok', 'Document type created.');
+      setCode(''); setName(''); setDesc(''); setIsCommon(false); setMaxMb('10'); setExts('pdf,jpg,jpeg,png');
       setShowForm(false);
-      setTimeout(() => setMsg(null), 3000);
     },
-    onError: (err: any) => {
-      setMsg({ type: "err", text: err.response?.data?.error || "Failed to create document type." });
-      setTimeout(() => setMsg(null), 3000);
-    }
+    onError: (err: any) => flash('err', err.response?.data?.error ?? 'Failed to create.'),
   });
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="page-loader"><div className="page-loader-ring" /></div>
-    );
+  const toggleCommon = useMutation({
+    mutationFn: ({ id, is_common_document }: { id: string; is_common_document: boolean }) =>
+      apiClient.patch(`/config/document-types/${id}`, { is_common_document }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-doc-types'] }),
+    onError: (err: any) => flash('err', err.response?.data?.error ?? 'Failed to update.'),
+  });
+
+  function flash(type: 'ok' | 'err', text: string) {
+    setMsg({ type, text });
+    setTimeout(() => setMsg(null), 3000);
   }
 
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (authLoading || isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
-  const allDocTypes = docTypes ?? [];
-
-  const filtered = allDocTypes.filter((d: any) => {
-    const matchSearch = !search.trim() || d.name.toLowerCase().includes(search.toLowerCase()) || d.code.toLowerCase().includes(search.toLowerCase());
-    const matchCommon = filterCommon === "all" || (filterCommon === "common" ? d.is_common_document : !d.is_common_document);
+  const all: DocType[] = docTypes ?? [];
+  const filtered = all.filter(d => {
+    const matchSearch = !search.trim() ||
+      d.name.toLowerCase().includes(search.toLowerCase()) ||
+      d.code.toLowerCase().includes(search.toLowerCase());
+    const matchCommon =
+      filterCommon === 'all' ||
+      (filterCommon === 'common' ? d.is_common_document : !d.is_common_document);
     return matchSearch && matchCommon;
   });
 
-  function handleCreate() {
-    if (!code.trim() || !name.trim()) return;
-    mutation.mutate({
-      code,
-      name,
-      description: desc || null,
-      is_common_document: isCommon,
-      allowed_extensions: exts.split(",").map(e => e.trim()).filter(Boolean),
-      max_file_size_mb: parseInt(maxMb) || 10,
-    });
-  }
+  const commonCount = all.filter(d => d.is_common_document).length;
 
   return (
-    <div style={{ paddingBottom: "3rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-      <div className="page-header" style={{ marginBottom: "0.5rem" }}>
+    <div className="db-page-new">
+      <div className="db-page-header">
         <div>
-          <p style={{ margin: "0 0 0.35rem", color: "#7c3aed", fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-            Service Configuration
-          </p>
-          <h1 className="page-title">Document Types Registry</h1>
-          <p style={{ fontSize: "0.83rem", color: "#94a3b8", margin: "0.3rem 0 0", maxWidth: "60ch" }}>
-            Normalized document type catalog. Assign these to services via the Services editor.
-          </p>
+          <h1 className="db-page-title">Document Types</h1>
+          <p className="db-page-sub">{all.length} types · {commonCount} common</p>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>
+          {showForm ? 'Cancel' : '+ New Type'}
+        </button>
       </div>
 
       {msg && (
-        <div style={{ padding: "0.65rem 1rem", borderRadius: "0.5rem", fontSize: "0.84rem", fontWeight: 600, background: msg.type === "ok" ? "#f0fdf4" : "#fef2f2", color: msg.type === "ok" ? "#059669" : "#b91c1c", border: `1px solid ${msg.type === "ok" ? "#bbf7d0" : "#fecaca"}` }}>
+        <div className={`db-alert-${msg.type === 'ok' ? 'ok' : 'error'}`} style={{ fontSize: '0.85rem' }}>
           {msg.text}
         </div>
       )}
 
-      {/* Toolbar */}
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap", background: "white", border: "1px solid #e2e8f0", borderRadius: "1rem", padding: "0.85rem 1rem" }}>
-        <input
-          type="search"
-          placeholder="Search by name or code…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ flex: 1, minWidth: 200, padding: "0.5rem 0.875rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0", fontSize: "0.875rem", outline: "none", background: "#f8fafc", color: "#0f172a" }}
-        />
-        <select value={filterCommon} onChange={e => setFilterCommon(e.target.value as typeof filterCommon)} style={{ padding: "0.5rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0", fontSize: "0.82rem", background: "#f8fafc", color: "#475569", outline: "none" }}>
-          <option value="all">All types</option>
-          <option value="common">Common docs</option>
-          <option value="service">Service-specific</option>
-        </select>
-        <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>{filtered.length} types</span>
-        {isSuperAdmin && (
-          <button onClick={() => setShowForm(v => !v)} className="btn btn-primary" style={{ fontSize: "0.85rem" }}>
-            {showForm ? "Cancel" : "+ New Type"}
-          </button>
-        )}
-      </div>
-
       {/* New type form */}
-      {showForm && isSuperAdmin && (
-        <div style={{ background: "white", border: "1px solid #e9d5ff", borderRadius: "1rem", padding: "1.5rem" }}>
-          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0f172a", marginBottom: "1rem", paddingBottom: "0.65rem", borderBottom: "1px solid #f1f5f9" }}>
-            New Document Type
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            {[
-              { label: "Code (e.g. FORM_16)", val: code, set: setCode, placeholder: "FORM_16" },
-              { label: "Display Name", val: name, set: setName, placeholder: "Form 16 (Part A & B)" },
-            ].map(f => (
-              <div key={f.label} style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</label>
-                <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ padding: "0.55rem 0.75rem", border: "1px solid #e2e8f0", borderRadius: "0.5rem", fontSize: "0.875rem", outline: "none", background: "#f8fafc", color: "#0f172a" }} />
-              </div>
-            ))}
-            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Description</label>
-              <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="What this document is" style={{ padding: "0.55rem 0.75rem", border: "1px solid #e2e8f0", borderRadius: "0.5rem", fontSize: "0.875rem", outline: "none", background: "#f8fafc", color: "#0f172a" }} />
+      {showForm && (
+        <div className="asd-section">
+          <h3 className="asd-section-title">New Document Type</h3>
+          <div className="dt-form-grid">
+            <div className="form-group">
+              <label className="form-label">Code *</label>
+              <input className="form-input" value={code} onChange={e => setCode(e.target.value)}
+                placeholder="e.g. FORM_16" />
+              <span className="dt-field-hint">Uppercase, underscores. Used internally.</span>
             </div>
-            {[
-              { label: "Allowed Extensions (comma-separated)", val: exts, set: setExts, placeholder: "pdf,jpg,jpeg,png" },
-              { label: "Max File Size (MB)", val: maxMb, set: setMaxMb, placeholder: "10" },
-            ].map(f => (
-              <div key={f.label} style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>{f.label}</label>
-                <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ padding: "0.55rem 0.75rem", border: "1px solid #e2e8f0", borderRadius: "0.5rem", fontSize: "0.875rem", outline: "none", background: "#f8fafc", color: "#0f172a" }} />
-              </div>
-            ))}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>Common Document?</label>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "#475569", cursor: "pointer" }}>
+            <div className="form-group">
+              <label className="form-label">Display Name *</label>
+              <input className="form-input" value={name} onChange={e => setName(e.target.value)}
+                placeholder="e.g. Form 16 (Part A & B)" />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Description</label>
+              <input className="form-input" value={desc} onChange={e => setDesc(e.target.value)}
+                placeholder="What this document is used for" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Allowed Extensions</label>
+              <input className="form-input" value={exts} onChange={e => setExts(e.target.value)}
+                placeholder="pdf,jpg,jpeg,png" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Max File Size (MB)</label>
+              <input className="form-input" type="number" min="1" value={maxMb}
+                onChange={e => setMaxMb(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="dt-toggle-label">
                 <input type="checkbox" checked={isCommon} onChange={e => setIsCommon(e.target.checked)} />
-                Required across many services (PAN, Aadhaar, etc.)
+                Common document — required across many services (PAN, Aadhaar, bank statements, etc.)
               </label>
             </div>
           </div>
-          <button onClick={handleCreate} disabled={mutation.isPending || !code.trim() || !name.trim()} className="btn btn-primary" style={{ fontSize: "0.875rem", marginTop: "1.25rem" }}>
-            {mutation.isPending ? "Creating…" : "Create Document Type"}
-          </button>
+          {createMut.isError && (
+            <p className="aq-modal-error">{(createMut.error as any)?.response?.data?.error}</p>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+            <button
+              className="btn btn-primary"
+              disabled={!code.trim() || !name.trim() || createMut.isPending}
+              onClick={() => createMut.mutate({
+                code,
+                name,
+                description: desc || null,
+                is_common_document: isCommon,
+                allowed_extensions: exts.split(',').map(e => e.trim()).filter(Boolean),
+                max_file_size_mb: parseInt(maxMb) || 10,
+              })}
+            >
+              {createMut.isPending ? 'Creating…' : 'Create Document Type'}
+            </button>
+          </div>
         </div>
       )}
 
+      {/* Toolbar */}
+      <div className="dt-toolbar">
+        <input
+          type="search"
+          className="form-input"
+          placeholder="Search by name or code…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 200 }}
+        />
+        <select
+          className="form-input"
+          value={filterCommon}
+          onChange={e => setFilterCommon(e.target.value as typeof filterCommon)}
+          style={{ width: 'auto' }}
+        >
+          <option value="all">All types</option>
+          <option value="common">Common docs only</option>
+          <option value="service">Service-specific only</option>
+        </select>
+        <span className="dt-count">{filtered.length} of {all.length}</span>
+      </div>
+
       {/* Table */}
-      <div style={{ border: "1px solid #e2e8f0", borderRadius: "0.875rem", overflow: "hidden", boxShadow: "0 2px 12px rgba(15,23,42,0.04)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.845rem", background: "white" }}>
+      <div className="aq-table-wrap">
+        <table className="aq-table">
           <thead>
-            <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-              {["Code", "Name", "Description", "Extensions", "Max MB", "Flags"].map(h => (
-                <th key={h} style={{ padding: "0.65rem 1rem", textAlign: "left", fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#94a3b8", whiteSpace: "nowrap" }}>{h}</th>
-              ))}
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Extensions</th>
+              <th style={{ textAlign: 'center' }}>Max MB</th>
+              <th style={{ textAlign: 'center' }}>Common Doc</th>
+              <th style={{ textAlign: 'center' }}>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((d: any) => (
-              <tr key={d.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <td style={{ padding: "0.85rem 1rem", verticalAlign: "middle" }}>
-                  <code style={{ fontFamily: "'Courier New',monospace", fontSize: "0.75rem", background: "#f1f5f9", color: "#475569", padding: "0.15rem 0.5rem", borderRadius: 4, border: "1px solid #e2e8f0" }}>{d.code}</code>
+            {filtered.map(d => (
+              <tr key={d.id} style={{ opacity: d.is_active ? 1 : 0.55 }}>
+                <td>
+                  <code className="dt-code">{d.code}</code>
                 </td>
-                <td style={{ padding: "0.85rem 1rem", fontWeight: 600, color: "#0f172a" }}>{d.name}</td>
-                <td style={{ padding: "0.85rem 1rem", color: "#64748b", fontSize: "0.8rem", maxWidth: 260 }}>{d.description ?? "—"}</td>
-                <td style={{ padding: "0.85rem 1rem" }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
-                    {d.allowed_extensions.map((e: string) => (
-                      <span key={e} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 4, fontSize: "0.68rem", padding: "0.1rem 0.4rem", color: "#64748b", fontFamily: "monospace" }}>{e}</span>
+                <td>
+                  <div className="dt-name">{d.name}</div>
+                  {d.description && <div className="dt-desc">{d.description}</div>}
+                </td>
+                <td>
+                  <div className="dt-exts">
+                    {d.allowed_extensions.map(e => (
+                      <span key={e} className="dt-ext-chip">{e}</span>
                     ))}
                   </div>
                 </td>
-                <td style={{ padding: "0.85rem 1rem", color: "#64748b" }}>{d.max_file_size_mb} MB</td>
-                <td style={{ padding: "0.85rem 1rem" }}>
-                  {d.is_common_document && (
-                    <span style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: 999, fontSize: "0.68rem", fontWeight: 700, padding: "0.15rem 0.5rem" }}>Common</span>
-                  )}
+                <td style={{ textAlign: 'center', color: 'var(--ink-500)' }}>{d.max_file_size_mb}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <button
+                    className={`dt-flag-toggle ${d.is_common_document ? 'dt-flag-on' : 'dt-flag-off'}`}
+                    title={d.is_common_document ? 'Click to remove common flag' : 'Click to mark as common'}
+                    disabled={toggleCommon.isPending}
+                    onClick={() => toggleCommon.mutate({ id: d.id, is_common_document: !d.is_common_document })}
+                  >
+                    {d.is_common_document ? 'Common' : 'Service'}
+                  </button>
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <span className={`aq-badge ${d.is_active ? 'aq-badge-done' : 'aq-badge-hold'}`}>
+                    {d.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <button className="btn btn-sm btn-secondary" onClick={() => setEditingDoc(d)}>
+                    Edit
+                  </button>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: "2.5rem", textAlign: "center", color: "#94a3b8" }}>No document types found.</td></tr>
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--ink-400)' }}>
+                  No document types found.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {editingDoc && (
+        <EditModal
+          doc={editingDoc}
+          onClose={() => setEditingDoc(null)}
+          onToggled={(name, active) =>
+            flash('ok', `"${name}" marked as ${active ? 'active' : 'inactive'}.`)
+          }
+        />
+      )}
     </div>
   );
 }

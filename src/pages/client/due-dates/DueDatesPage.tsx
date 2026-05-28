@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../../api/client";
-import { useAuth } from "../../contexts/AuthContext";
+import { apiClient } from "../../../api/client";
+import { useAuth } from "../../../contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { computeClientDueDates } from "../../shared/due-dates";
-import type { DueDate } from "../../shared/due-dates";
+import { computeClientDueDates } from "../../../shared/due-dates";
+import type { DueDate } from "../../../shared/due-dates";
 
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
