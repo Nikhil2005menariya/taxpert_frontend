@@ -214,8 +214,8 @@ export default function TexpertServiceDetailPage() {
   const isTexpert = profile?.role === 'expert' || profile?.role === 'ca';
 
   // Modal state
-  const [reuploadDoc, setReuploadDoc] = useState<{ id: string; name: string } | null>(null);
-  const [rejectDoc,   setRejectDoc]   = useState<{ id: string; name: string } | null>(null);
+  const [reuploadDoc,  setReuploadDoc]  = useState<{ id: string; name: string } | null>(null);
+  const [rejectDoc,    setRejectDoc]    = useState<{ id: string; name: string } | null>(null);
   const [statusTarget, setStatusTarget] = useState<string | null>(null);
 
   // Inline form state
@@ -238,7 +238,9 @@ export default function TexpertServiceDetailPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['tx-service-detail', id],
     queryFn: async () => (await apiClient.get(`/texpert/services/${id}`)).data.data,
-    enabled: isTexpert && !!id,
+    enabled:         isTexpert && !!id,
+    refetchInterval: 20_000,         // poll every 20s — picks up client deletion requests
+    refetchOnWindowFocus: true,
   });
 
   // Sync state with fetched data
@@ -283,6 +285,17 @@ export default function TexpertServiceDetailPage() {
     mutationFn: (taskId: string) => apiClient.delete(`/texpert/services/${id}/tasks/${taskId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }),
   });
+
+  // Deletion request: texpert can approve (cancels service) or reject (keeps it)
+  const approveDeletion = useMutation({
+    mutationFn: () => apiClient.post(`/client-services/${id}/approve-deletion`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }),
+  });
+  const rejectDeletion = useMutation({
+    mutationFn: () => apiClient.post(`/client-services/${id}/reject-deletion`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }),
+  });
+
 
   const logNote = useMutation({
     mutationFn: () => apiClient.post(`/texpert/services/${id}/notes`, { message: noteText }),
@@ -335,8 +348,9 @@ export default function TexpertServiceDetailPage() {
   const openTasks    = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').length;
 
   // Next status option for "advance" button
-  const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === data.status);
-  const nextStep   = currentIdx >= 0 && currentIdx < WORKFLOW_STEPS.length - 1 ? WORKFLOW_STEPS[currentIdx + 1] : null;
+  const currentIdx  = WORKFLOW_STEPS.findIndex(s => s.key === data.status);
+  const nextStep    = currentIdx >= 0 && currentIdx < WORKFLOW_STEPS.length - 1 ? WORKFLOW_STEPS[currentIdx + 1] : null;
+  const isCancelled = data.status === 'cancelled';
 
   return (
     <div className="db-page-new">
@@ -350,23 +364,25 @@ export default function TexpertServiceDetailPage() {
             {badge(STATUS_BADGE[data.status] ?? 'aq-badge-pending', data.status)}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {nextStep && data.status !== 'on_hold' && (
-            <button className="btn btn-primary" onClick={() => setStatusTarget(nextStep.key)}>
-              Advance → {nextStep.label}
-            </button>
-          )}
-          {data.status !== 'on_hold' && data.status !== 'completed' && (
-            <button className="btn btn-secondary" onClick={() => setStatusTarget('on_hold')}>
-              Mark On Hold
-            </button>
-          )}
-          {data.status === 'on_hold' && (
-            <button className="btn btn-primary" onClick={() => setStatusTarget('in_progress')}>
-              Resume
-            </button>
-          )}
-        </div>
+        {!isCancelled && (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {nextStep && data.status !== 'on_hold' && (
+              <button className="btn btn-primary" onClick={() => setStatusTarget(nextStep.key)}>
+                Advance → {nextStep.label}
+              </button>
+            )}
+            {data.status !== 'on_hold' && data.status !== 'completed' && (
+              <button className="btn btn-secondary" onClick={() => setStatusTarget('on_hold')}>
+                Mark On Hold
+              </button>
+            )}
+            {data.status === 'on_hold' && (
+              <button className="btn btn-primary" onClick={() => setStatusTarget('in_progress')}>
+                Resume
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Sticky Client Bar ──────────────────────────────── */}
@@ -388,6 +404,21 @@ export default function TexpertServiceDetailPage() {
           {service?.price && <span style={{ marginLeft: 8, fontSize: '0.78rem', color: 'var(--ink-500)' }}>{formatRupees(service.price)}</span>}
         </div>
       </div>
+
+      {/* ── Cancelled notice ───────────────────────────────── */}
+      {isCancelled && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.75rem',
+          background: '#f8fafc', border: '1.5px solid #e2e8f0',
+          borderLeft: '4px solid #94a3b8', borderRadius: '10px',
+          padding: '0.9rem 1.1rem', color: '#475569', fontSize: '0.875rem', fontWeight: 500,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          </svg>
+          This service has been cancelled. All actions are frozen — the record is read-only.
+        </div>
+      )}
 
       {/* ── Stats Strip ────────────────────────────────────── */}
       <div className="aq-stats-row">
@@ -425,6 +456,48 @@ export default function TexpertServiceDetailPage() {
         </div>
       )}
 
+      {/* ── Deletion request alert — always visible, above tabs ─ */}
+      {data.deletion_requested && (
+        <div className="tx-deletion-banner">
+          <div className="tx-deletion-banner-left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div>
+              <div className="tx-deletion-title">Client has requested service cancellation</div>
+              <div className="tx-deletion-sub">
+                Requested on {data.deletion_requested_at
+                  ? new Date(data.deletion_requested_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : 'unknown date'}.
+                Approving will set the status to <strong>cancelled</strong>.
+              </div>
+            </div>
+          </div>
+          <div className="tx-deletion-actions">
+            <button
+              className="tx-deletion-approve-btn"
+              onClick={() => approveDeletion.mutate()}
+              disabled={approveDeletion.isPending || rejectDeletion.isPending}
+            >
+              {approveDeletion.isPending ? 'Processing…' : 'Approve cancellation'}
+            </button>
+            <button
+              className="tx-deletion-reject-btn"
+              onClick={() => rejectDeletion.mutate()}
+              disabled={approveDeletion.isPending || rejectDeletion.isPending}
+            >
+              {rejectDeletion.isPending ? 'Processing…' : 'Reject'}
+            </button>
+          </div>
+          {(approveDeletion.isError || rejectDeletion.isError) && (
+            <div className="tx-deletion-error">
+              {((approveDeletion.error || rejectDeletion.error) as any)?.response?.data?.error ?? 'Something went wrong'}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Tabs ───────────────────────────────────────────── */}
       <div className="aq-tabs">
         {([
@@ -445,7 +518,9 @@ export default function TexpertServiceDetailPage() {
         <div>
           <div className="asd-tab-header">
             <span className="asd-tab-header-count">{uploadedDocs}/{docs.length} uploaded</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowAddDoc(v => !v)}>+ Add Document</button>
+            {!isCancelled && (
+              <button className="btn btn-sm btn-secondary" onClick={() => setShowAddDoc(v => !v)}>+ Add Document</button>
+            )}
           </div>
 
           {showAddDoc && (
@@ -489,19 +564,19 @@ export default function TexpertServiceDetailPage() {
                       {hasFile && url && (
                         <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">View</a>
                       )}
-                      {hasFile && doc.status !== 'approved' && (
+                      {!isCancelled && hasFile && doc.status !== 'approved' && (
                         <button className="btn btn-sm btn-primary" disabled={approve.isPending}
                           onClick={() => approve.mutate(doc.id)}>
                           Approve
                         </button>
                       )}
-                      {hasFile && doc.status !== 'rejected' && !doc.reupload_requested && (
+                      {!isCancelled && hasFile && doc.status !== 'rejected' && !doc.reupload_requested && (
                         <button className="btn btn-sm btn-gold"
                           onClick={() => setReuploadDoc({ id: doc.id, name: doc.document_name })}>
                           Re-upload
                         </button>
                       )}
-                      {hasFile && doc.status !== 'rejected' && (
+                      {!isCancelled && hasFile && doc.status !== 'rejected' && (
                         <button className="btn btn-sm tx-danger-btn"
                           onClick={() => setRejectDoc({ id: doc.id, name: doc.document_name })}>
                           Reject
@@ -521,7 +596,9 @@ export default function TexpertServiceDetailPage() {
         <div>
           <div className="asd-tab-header">
             <span className="asd-tab-header-count">{events.length} event{events.length !== 1 ? 's' : ''}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowLogNote(v => !v)}>+ Log Internal Note</button>
+            {!isCancelled && (
+              <button className="btn btn-sm btn-secondary" onClick={() => setShowLogNote(v => !v)}>+ Log Internal Note</button>
+            )}
           </div>
 
           {showLogNote && (
@@ -568,7 +645,9 @@ export default function TexpertServiceDetailPage() {
         <div>
           <div className="asd-tab-header">
             <span className="asd-tab-header-count">{openTasks} open · {tasks.filter(t => t.status === 'done').length} done</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowAddTask(v => !v)}>+ Add Task</button>
+            {!isCancelled && (
+              <button className="btn btn-sm btn-secondary" onClick={() => setShowAddTask(v => !v)}>+ Add Task</button>
+            )}
           </div>
 
           {showAddTask && (
@@ -609,22 +688,24 @@ export default function TexpertServiceDetailPage() {
                       {task.completed_at && <span className="asd-doc-date">Done {fmtDate(task.completed_at)}</span>}
                     </div>
                   </div>
-                  <div className="asd-task-actions">
-                    {task.status === 'todo' && (
-                      <button className="btn btn-sm btn-secondary" disabled={updTask.isPending}
-                        onClick={() => updTask.mutate({ taskId: task.id, status: 'in_progress' })}>
-                        Start
-                      </button>
-                    )}
-                    {task.status !== 'done' && task.status !== 'cancelled' && (
-                      <button className="btn btn-sm btn-primary" disabled={updTask.isPending}
-                        onClick={() => updTask.mutate({ taskId: task.id, status: 'done' })}>
-                        ✓ Done
-                      </button>
-                    )}
-                    <button className="btn btn-sm asd-task-delete-btn" disabled={delTask.isPending}
-                      onClick={() => delTask.mutate(task.id)} title="Delete task">✕</button>
-                  </div>
+                  {!isCancelled && (
+                    <div className="asd-task-actions">
+                      {task.status === 'todo' && (
+                        <button className="btn btn-sm btn-secondary" disabled={updTask.isPending}
+                          onClick={() => updTask.mutate({ taskId: task.id, status: 'in_progress' })}>
+                          Start
+                        </button>
+                      )}
+                      {task.status !== 'done' && task.status !== 'cancelled' && (
+                        <button className="btn btn-sm btn-primary" disabled={updTask.isPending}
+                          onClick={() => updTask.mutate({ taskId: task.id, status: 'done' })}>
+                          ✓ Done
+                        </button>
+                      )}
+                      <button className="btn btn-sm asd-task-delete-btn" disabled={delTask.isPending}
+                        onClick={() => delTask.mutate(task.id)} title="Delete task">✕</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -641,16 +722,20 @@ export default function TexpertServiceDetailPage() {
               <span>📌 Pinned Message <span style={{ fontWeight: 400, color: 'var(--ink-400)' }}>· visible to client</span></span>
               {pinnedSaved && <span style={{ fontSize: '0.78rem', color: 'var(--green-600)' }}>✓ Saved</span>}
             </div>
-            <input className="form-input" value={pinnedMsg} onChange={e => setPinnedMsg(e.target.value)}
+            <input className="form-input" value={pinnedMsg}
+              onChange={e => !isCancelled && setPinnedMsg(e.target.value)}
+              readOnly={isCancelled}
               placeholder="e.g. Please upload bank statements for Q4. We need them by Friday."
-              maxLength={200} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--ink-400)' }}>{pinnedMsg.length}/200 characters</span>
-              <button className="btn btn-primary btn-sm" disabled={savePinned.isPending || pinnedMsg === (data.pinned_message ?? '')}
-                onClick={() => savePinned.mutate()}>
-                {savePinned.isPending ? 'Saving…' : 'Save Pinned Message'}
-              </button>
-            </div>
+              maxLength={200} style={isCancelled ? { opacity: 0.6, cursor: 'not-allowed' } : undefined} />
+            {!isCancelled && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--ink-400)' }}>{pinnedMsg.length}/200 characters</span>
+                <button className="btn btn-primary btn-sm" disabled={savePinned.isPending || pinnedMsg === (data.pinned_message ?? '')}
+                  onClick={() => savePinned.mutate()}>
+                  {savePinned.isPending ? 'Saving…' : 'Save Pinned Message'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Internal scratchpad — private */}
@@ -661,9 +746,10 @@ export default function TexpertServiceDetailPage() {
               {saveNotes.isPending && <span style={{ fontSize: '0.78rem', color: 'var(--ink-400)' }}>Saving…</span>}
             </div>
             <textarea className="form-input" rows={10} value={scratchNotes}
-              onChange={e => onNotesChange(e.target.value)}
-              placeholder="Your private notes. Auto-saves as you type. Use for: reminders, calculations, things to verify, etc."
-              style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }} />
+              onChange={e => !isCancelled && onNotesChange(e.target.value)}
+              readOnly={isCancelled}
+              placeholder="Your private notes. Auto-saves as you type."
+              style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6, ...(isCancelled ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }} />
           </div>
         </div>
       )}
@@ -674,24 +760,28 @@ export default function TexpertServiceDetailPage() {
           <h3 className="asd-section-title">Current Status</h3>
           <WorkflowPipeline status={data.status} />
 
-          <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Manual Status Change</h3>
-          <div className="tx-status-grid">
-            {WORKFLOW_STEPS.map(s => (
-              <button key={s.key}
-                className={`tx-status-btn ${data.status === s.key ? 'tx-status-current' : ''}`}
-                disabled={data.status === s.key}
-                onClick={() => setStatusTarget(s.key)}>
-                {s.label}
-                {data.status === s.key && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
-              </button>
-            ))}
-            <button className="tx-status-btn tx-status-hold"
-              disabled={data.status === 'on_hold'}
-              onClick={() => setStatusTarget('on_hold')}>
-              On Hold
-              {data.status === 'on_hold' && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
-            </button>
-          </div>
+          {!isCancelled && (
+            <>
+              <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Manual Status Change</h3>
+              <div className="tx-status-grid">
+                {WORKFLOW_STEPS.map(s => (
+                  <button key={s.key}
+                    className={`tx-status-btn ${data.status === s.key ? 'tx-status-current' : ''}`}
+                    disabled={data.status === s.key}
+                    onClick={() => setStatusTarget(s.key)}>
+                    {s.label}
+                    {data.status === s.key && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
+                  </button>
+                ))}
+                <button className="tx-status-btn tx-status-hold"
+                  disabled={data.status === 'on_hold'}
+                  onClick={() => setStatusTarget('on_hold')}>
+                  On Hold
+                  {data.status === 'on_hold' && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
+                </button>
+              </div>
+            </>
+          )}
 
           <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Service Metadata</h3>
           <div className="aq-profile-card">
@@ -723,6 +813,7 @@ export default function TexpertServiceDetailPage() {
       {statusTarget && (
         <StatusModal serviceId={id} targetStatus={statusTarget} onClose={() => setStatusTarget(null)} />
       )}
+
     </div>
   );
 }

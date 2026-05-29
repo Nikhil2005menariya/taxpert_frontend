@@ -52,7 +52,7 @@ function PaymentButton({
               serviceSlug: slug,
             });
             setState("success");
-            setTimeout(() => navigate(`/my-services/${clientServiceId}`), 2000);
+            setTimeout(() => navigate(`/client/services/${clientServiceId}`), 2000);
           } catch (err: any) {
             setState("error");
             setError(err.response?.data?.error ?? "Payment verification failed.");
@@ -157,7 +157,7 @@ function CategoryDetailPage({
       const res = await apiClient.post("/services/assign", { slug: selected.slug });
       return res.data.data as { id: string };
     },
-    onSuccess: (data) => navigate(`/vault?svc=${data.id}`),
+    onSuccess: (data) => navigate(`/client/vault?svc=${data.id}`),
     onError: () => alert("Failed to add service. Please try again."),
   });
 
@@ -255,7 +255,7 @@ function CategoryDetailPage({
                   <div className="svc-already-added">
                     <span>✓ Already added</span>
                     <Link
-                      to={existsData.clientServiceId ? `/vault?svc=${existsData.clientServiceId}` : "/vault"}
+                      to={existsData.clientServiceId ? `/client/vault?svc=${existsData.clientServiceId}` : "/client/vault"}
                       className="btn btn-secondary"
                       style={{ width: "100%", textAlign: "center" }}
                     >

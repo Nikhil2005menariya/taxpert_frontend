@@ -152,37 +152,45 @@ export default function MobileNav({
   }, [open]);
 
   const nav: NavItem[] = [
-    { href: "/dashboard", label: "Overview", Icon: IconTrending, exact: true },
+    // Dashboard home — role-specific so active state highlights correctly
+    ...(isClient  ? [{ href: "/client/dashboard",  label: "Overview", Icon: IconTrending, exact: true }] : []),
+    ...(isTexpert ? [{ href: "/texpert/dashboard", label: "Overview", Icon: IconTrending, exact: true }] : []),
+    ...(isAdmin   ? [{ href: "/admin",             label: "Overview", Icon: IconTrending, exact: true }] : []),
+
     // Client-only items
     ...(isClient ? [
-      { href: "/my-services", label: "My Services",  Icon: IconGlobe,      exact: false },
-      { href: "/vault",       label: "Vault",        Icon: IconFolder,     exact: false },
-      { href: "/due-dates",   label: "Due Dates",    Icon: IconCalendar,   exact: false },
-      { href: "/payments",    label: "Payments",     Icon: IconCreditCard, exact: false },
-      { href: "/referrals",   label: "Refer & Earn", Icon: IconGift,       exact: false },
-      { href: "/profile",     label: "Profile",      Icon: IconUser,       exact: false },
+      { href: "/client/services",  label: "My Services",  Icon: IconGlobe,      exact: false },
+      { href: "/client/vault",     label: "Vault",        Icon: IconFolder,     exact: false },
+      { href: "/client/due-dates", label: "Due Dates",    Icon: IconCalendar,   exact: false },
+      { href: "/client/payments",  label: "Payments",     Icon: IconCreditCard, exact: false },
+      { href: "/client/referrals", label: "Refer & Earn", Icon: IconGift,       exact: false },
+      { href: "/profile",          label: "Profile",      Icon: IconUser,       exact: false },
     ] : []),
-    // Taxpert items
+
+    // Texpert items
     ...(isTexpert ? [
-      { href: "/texpert/services", label: "My Services", Icon: IconFolder,   exact: false },
-      { href: "/queue",            label: "Queue",        Icon: IconCalendar, exact: false },
+      { href: "/texpert/services", label: "My Services", Icon: IconFolder,     exact: false },
+      { href: "/texpert/queue",    label: "Queue",        Icon: IconCalendar,  exact: false },
+      { href: "/texpert/payouts",  label: "My Payouts",  Icon: IconCreditCard, exact: false },
+      { href: "/profile",          label: "Profile",      Icon: IconUser,      exact: false },
     ] : []),
+
     // Staff / Expert items (legacy)
     ...(!isClient && !isTexpert && !isAdmin ? [
       { href: "/workload",   label: "Workload",   Icon: IconFolder,   exact: false },
       { href: "/work-queue", label: "Work Queue", Icon: IconCalendar, exact: false },
     ] : []),
+
     // Admin-only
     ...(isAdmin ? [
-      { href: "/admin/taxperts", label: "Taxperts",    Icon: IconFolder,     exact: false },
-      { href: "/admin/clients",  label: "Clients",     Icon: IconGift,       exact: false },
-      { href: "/queue",          label: "Queue",        Icon: IconCalendar,  exact: false },
-      { href: "/admin/payouts",  label: "Payouts",     Icon: IconCreditCard, exact: false },
-      { href: "/payments",       label: "Payments",    Icon: IconCreditCard, exact: false },
-      { href: "/admin/pricing",  label: "Pricing",     Icon: IconTag,        exact: false },
-      { href: "/admin/coupons",  label: "Coupons",     Icon: IconDiscount,   exact: false },
+      { href: "/admin/taxperts", label: "Taxperts",  Icon: IconFolder,     exact: false },
+      { href: "/admin/clients",  label: "Clients",   Icon: IconGift,       exact: false },
+      { href: "/admin/queue",    label: "Queue",      Icon: IconCalendar,  exact: false },
+      { href: "/admin/payouts",  label: "Payouts",   Icon: IconCreditCard, exact: false },
+      { href: "/admin/payments", label: "Payments",  Icon: IconCreditCard, exact: false },
+      { href: "/admin/pricing",  label: "Pricing",   Icon: IconTag,        exact: false },
+      { href: "/admin/coupons",  label: "Coupons",   Icon: IconDiscount,   exact: false },
     ] : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Users & Ops", Icon: IconBuilding, exact: false }] : []),
   ];
 
   function isActive(href: string, exact: boolean) {

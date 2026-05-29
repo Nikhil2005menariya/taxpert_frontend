@@ -447,7 +447,7 @@ function VaultTopLevel() {
 
       <div className="vault-folder-grid">
         {/* Common docs folder */}
-        <Link to="/vault?common=1" className="vault-folder-card vault-folder-common">
+        <Link to="/client/vault?common=1" className="vault-folder-card vault-folder-common">
           <div className="vault-folder-icon"><FolderIcon /></div>
           <div className="vault-folder-body">
             <div className="vault-folder-name">Common Docs</div>
@@ -463,7 +463,7 @@ function VaultTopLevel() {
         {groups.map((g: any) => {
           const isCurrent = g.fy === activeFY;
           return (
-            <Link key={g.fy} to={`/vault?fy=${g.fy}`} className="vault-folder-card vault-folder-fy">
+            <Link key={g.fy} to={`/client/vault?fy=${g.fy}`} className="vault-folder-card vault-folder-fy">
               <div className="vault-folder-icon"><FolderIcon open={isCurrent} /></div>
               <div className="vault-folder-body">
                 <div className="vault-folder-name">
@@ -532,7 +532,7 @@ function VaultFYView({ fy }: { fy: string }) {
             const tone = SERVICE_STATUS_STYLES[svc.status] ?? SERVICE_STATUS_STYLES.pending;
             const pct = svc.docsTotal > 0 ? Math.round((svc.docsUploaded / svc.docsTotal) * 100) : 0;
             return (
-              <Link key={svc.clientServiceId} to={`/vault?fy=${fy}&svc=${svc.clientServiceId}`} className="vault-service-card">
+              <Link key={svc.clientServiceId} to={`/client/vault?fy=${fy}&svc=${svc.clientServiceId}`} className="vault-service-card">
                 <div className="vault-service-top">
                   <div>
                     <div className="vault-service-category">{svc.serviceCategory}</div>
@@ -786,7 +786,7 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
               })}
             </div>
 
-            <Link to={`/my-services/${detail.clientServiceId}`} className="vault-panel-link">
+            <Link to={`/client/services/${detail.clientServiceId}`} className="vault-panel-link">
               View full checklist →
             </Link>
           </aside>

@@ -142,7 +142,7 @@ export default function WorkQueuePage() {
                         {formatDueDate(task.due_at)}
                       </div>
                       {cs?.id && (
-                        <Link to={`/my-services/${cs.id}`} className="btn btn-secondary">
+                        <Link to={`/client/services/${cs.id}`} className="btn btn-secondary">
                           Open workspace
                         </Link>
                       )}

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { apiClient } from "../../../api/client";
 import AddServiceModal from "../../../components/dashboard/AddServiceModal";
-import TexpertDashboardPage from "../../texpert/TexpertDashboardPage";
 
 // Types
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "completed" | "cancelled";
@@ -69,6 +68,10 @@ function StatCard({ label, value, sub, tone }: {
 }
 
 export default function DashboardPage() {
+  return <ClientOrStaffDashboard />;
+}
+
+function ClientOrStaffDashboard() {
   const { profile, user } = useAuth();
 
   const { data: summary, error, isLoading } = useQuery({
@@ -133,7 +136,7 @@ export default function DashboardPage() {
                 Full client service list with search, filters, SLA risk, and doc progress.
               </p>
               <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-                <Link to="/my-services" className="btn btn-primary">
+                <Link to="/client/services" className="btn btn-primary">
                   Open Workload →
                 </Link>
                 <Link to="/work-queue" className="btn btn-secondary">
@@ -219,7 +222,7 @@ export default function DashboardPage() {
                   <span className="db-filings-title">Tax Vault — Documents Needed</span>
                   <span className="db-chip">{docsRequired.length}</span>
                 </div>
-                <Link to="/vault" className="btn btn-primary db-btn-sm">
+                <Link to="/client/vault" className="btn btn-primary db-btn-sm">
                   Open Tax Vault →
                 </Link>
               </div>
@@ -238,7 +241,7 @@ export default function DashboardPage() {
                     return (
                       <Link
                         key={cs.id}
-                        to={`/vault?fy=${cs.fiscal_year ?? currentFY()}&svc=${cs.id}`}
+                        to={`/client/vault?fy=${cs.fiscal_year ?? currentFY()}&svc=${cs.id}`}
                         className="db-filings-row"
                         style={{ borderBottom: i < docsRequired.length - 1 ? "1px solid var(--line-soft)" : "none" }}
                       >
@@ -260,7 +263,7 @@ export default function DashboardPage() {
           <div className="db-activity-card" style={{ minHeight: 0 }}>
             <div className="db-activity-header">
               <span className="db-activity-title">Active Services</span>
-              <Link to="/my-services" style={{ fontSize: "0.8rem", color: "var(--gold-600)" }}>
+              <Link to="/client/services" style={{ fontSize: "0.8rem", color: "var(--gold-600)" }}>
                 View all →
               </Link>
             </div>
@@ -274,7 +277,7 @@ export default function DashboardPage() {
                   return (
                     <Link
                       key={cs.id}
-                      to={`/my-services/${cs.id}`}
+                      to={`/client/services/${cs.id}`}
                       className="db-activity-row"
                       style={{ textDecoration: "none", color: "inherit" }}
                     >

@@ -464,7 +464,7 @@ function ClientPayments() {
                     <div className="pm2-invoice-cat">{cs.service?.category}</div>
                     {price && price > 0 && <div className="pm2-invoice-price">{formatRupees(price)}</div>}
                   </div>
-                  <Link to={`/invoices/${cs.id}`} className="btn btn-primary pm2-pay-btn">
+                  <Link to={`/client/invoices/${cs.id}`} className="btn btn-primary pm2-pay-btn">
                     Pay Now →
                   </Link>
                 </div>
@@ -517,7 +517,7 @@ function ClientPayments() {
                   )}
                   {p.client_service_id && (
                     <div className="pm2-receipt-row" style={{ borderTop: '1px solid var(--line)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-                      <Link to={`/my-services/${p.client_service_id}`} style={{ color: 'var(--gold-600)', fontWeight: 600, fontSize: '0.8rem' }}>
+                      <Link to={`/client/services/${p.client_service_id}`} style={{ color: 'var(--gold-600)', fontWeight: 600, fontSize: '0.8rem' }}>
                         View service workspace →
                       </Link>
                     </div>

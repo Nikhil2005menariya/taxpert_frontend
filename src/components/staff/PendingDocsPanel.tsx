@@ -153,7 +153,7 @@ export default function PendingDocsPanel({ data }: { data: PendingDocRow[] }) {
 
               {/* Open workspace link */}
               <Link
-                to={`/my-services/${row.clientServiceId}`}
+                to={`/client/services/${row.clientServiceId}`}
                 style={{
                   fontSize: "0.72rem",
                   fontWeight: 600,

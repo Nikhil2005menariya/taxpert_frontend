@@ -113,7 +113,7 @@ function InvoicePayButton({ serviceSlug, serviceName, clientServiceId, price, fo
               razorpay_signature:  response.razorpay_signature,
             });
             setState("success");
-            setTimeout(() => navigate(`/my-services/${clientServiceId}`), 2000);
+            setTimeout(() => navigate(`/client/services/${clientServiceId}`), 2000);
           } catch (err: any) {
             setState("error");
             setError(err.response?.data?.error ?? "Payment verification failed. Please contact support.");
@@ -261,7 +261,7 @@ export default function InvoicePage() {
   return (
     <div className="db-shell">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <Link to="/payments" style={{ color: "#475569", fontWeight: 500, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+        <Link to="/client/payments" style={{ color: "#475569", fontWeight: 500, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
           ← Back to Payments
         </Link>
         <button onClick={() => window.print()} className="bg-white border border-[#e2e8f0] text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-50 transition-colors">

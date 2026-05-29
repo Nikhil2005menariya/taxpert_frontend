@@ -1,4 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "../../api/client";
 
 interface SidebarProps {
   firstName: string;
@@ -17,7 +19,6 @@ function initials(first: string, last: string) {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
-// Inline SVG icons
 function IconTrending() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -159,7 +160,6 @@ function IconCalendar() {
   );
 }
 
-
 const Logo = () => (
   <Link to="/dashboard" className="db-sidebar-logo-link" aria-label="Go to dashboard">
     <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
@@ -181,24 +181,43 @@ export default function DashboardSidebar({
   const location = useLocation();
   const pathname = location.pathname;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  type NavItem = { href: string; label: string; Icon: any; exact: boolean; badge: null; comingSoon?: boolean };
-  const nav: NavItem[] = [
-    { href: "/dashboard",   label: "Overview",   Icon: IconTrending,  exact: true,  badge: null },
-    ...(isClient ? [{ href: "/my-services", label: "My Services", Icon: IconGlobe, exact: false, badge: null }] : []),
-    ...(isClient ? [{ href: "/vault",       label: "My Vault",    Icon: IconShield,   exact: false, badge: null }] : []),
-    ...(isClient ? [{ href: "/due-dates",   label: "Due Dates",   Icon: IconCalendar,  exact: false, badge: null }] : []),
-    ...(isClient || isAdmin ? [{ href: "/payments",  label: "Payments",  Icon: IconCreditCard, exact: false, badge: null }] : []),
-    ...(isClient ? [{ href: "/referrals",   label: "Refer & Earn",Icon: IconGift,      exact: false, badge: null }] : []),
-    ...(isClient ? [{ href: "/profile",     label: "Profile",     Icon: IconUser,      exact: false, badge: null }] : []),
+  // Live badge counts for texpert — same query key as TexpertDashboardPage, so cache is shared
+  const { data: txDash } = useQuery({
+    queryKey: ['tx-dashboard'],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    queryFn:  async (): Promise<any> => (await apiClient.get('/texpert/dashboard')).data.data,
+    enabled:   isTexpert,
+    staleTime: 60_000,
+  });
+  const pendingReview: number = txDash?.stats?.pendingReview ?? 0;
+  const queueOpen:    number = txDash?.stats?.queueOpen    ?? 0;
 
-    // Taxpert items
-    ...(isTexpert
-      ? [
-          { href: "/texpert/services", label: "My Services",  Icon: IconClipboard, exact: false, badge: null },
-          { href: "/queue",            label: "Queue",         Icon: IconInbox,     exact: false, badge: null },
-        ]
-      : []),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type NavItem = { href: string; label: string; Icon: any; exact: boolean; badge: number | null; comingSoon?: boolean };
+
+  const nav: NavItem[] = [
+    // Dashboard home — role-specific so active state highlights correctly
+    ...(isClient  ? [{ href: "/client/dashboard",  label: "Overview", Icon: IconTrending, exact: true,  badge: null }] : []),
+    ...(isTexpert ? [{ href: "/texpert/dashboard", label: "Overview", Icon: IconTrending, exact: true,  badge: null }] : []),
+    ...(isAdmin   ? [{ href: "/admin",             label: "Overview", Icon: IconTrending, exact: true,  badge: null }] : []),
+
+    // Client items
+    ...(isClient ? [
+      { href: "/client/services",  label: "My Services",  Icon: IconGlobe,       exact: false, badge: null },
+      { href: "/client/vault",     label: "My Vault",     Icon: IconShield,      exact: false, badge: null },
+      { href: "/client/due-dates", label: "Due Dates",    Icon: IconCalendar,    exact: false, badge: null },
+      { href: "/client/payments",  label: "Payments",     Icon: IconCreditCard,  exact: false, badge: null },
+      { href: "/client/referrals", label: "Refer & Earn", Icon: IconGift,        exact: false, badge: null },
+      { href: "/profile",          label: "Profile",      Icon: IconUser,        exact: false, badge: null },
+    ] : []),
+
+    // Texpert items — badges show live counts
+    ...(isTexpert ? [
+      { href: "/texpert/services", label: "My Services", Icon: IconClipboard, exact: false, badge: pendingReview || null },
+      { href: "/texpert/queue",    label: "Queue",        Icon: IconInbox,     exact: false, badge: queueOpen    || null },
+      { href: "/texpert/payouts",  label: "My Payouts",  Icon: IconDollar,    exact: false, badge: null },
+      { href: "/profile",          label: "Profile",      Icon: IconUser,      exact: false, badge: null },
+    ] : []),
 
     // Staff (legacy) items
     ...(expertRole === "staff" || expertRole === "admin" || expertRole === "super_admin"
@@ -209,27 +228,24 @@ export default function DashboardSidebar({
       : []),
 
     // Admin items
-    ...(isAdmin
-      ? [
-          { href: "/admin/taxperts",         label: "Taxperts",       Icon: IconUsers,     exact: false, badge: null },
-          { href: "/admin/clients",          label: "Clients",        Icon: IconUser,      exact: false, badge: null },
-          { href: "/queue",                  label: "Queue",          Icon: IconInbox,     exact: true,  badge: null },
-          { href: "/admin/payouts",          label: "Payouts",        Icon: IconDollar,    exact: false, badge: null },
-          { href: "/admin/services",         label: "Services",       Icon: IconGlobe,     exact: false, badge: null },
-          { href: "/admin/document-types",   label: "Doc Types",      Icon: IconFolder,    exact: false, badge: null },
-          { href: "/admin/pricing",          label: "Pricing",        Icon: IconTag,       exact: false, badge: null },
-          { href: "/admin/coupons",          label: "Coupons",        Icon: IconDiscount,  exact: false, badge: null },
-          { href: "/admin/settings/invoice", label: "Invoice",        Icon: IconBuilding,  exact: false, badge: null },
-          { href: "/admin/notify",           label: "Notify",         Icon: IconBell,      exact: false, badge: null },
-          { href: "/admin/audit",            label: "Audit Log",      Icon: IconActivity,  exact: false, badge: null },
-        ]
-      : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Users & Ops", Icon: IconBuilding, exact: true, badge: null }] : []),
+    ...(isAdmin ? [
+      { href: "/admin/taxperts",         label: "Taxperts",   Icon: IconUsers,     exact: false, badge: null },
+      { href: "/admin/clients",          label: "Clients",    Icon: IconUser,      exact: false, badge: null },
+      { href: "/admin/queue",            label: "Queue",      Icon: IconInbox,     exact: false, badge: null },
+      { href: "/admin/payouts",          label: "Payouts",    Icon: IconDollar,    exact: false, badge: null },
+      { href: "/admin/payments",         label: "Payments",   Icon: IconCreditCard,exact: false, badge: null },
+      { href: "/admin/services",         label: "Services",   Icon: IconGlobe,     exact: false, badge: null },
+      { href: "/admin/document-types",   label: "Doc Types",  Icon: IconFolder,    exact: false, badge: null },
+      { href: "/admin/pricing",          label: "Pricing",    Icon: IconTag,       exact: false, badge: null },
+      { href: "/admin/coupons",          label: "Coupons",    Icon: IconDiscount,  exact: false, badge: null },
+      { href: "/admin/settings/invoice", label: "Invoice",    Icon: IconBuilding,  exact: false, badge: null },
+      { href: "/admin/notify",           label: "Notify",     Icon: IconBell,      exact: false, badge: null },
+      { href: "/admin/audit",            label: "Audit Log",  Icon: IconActivity,  exact: false, badge: null },
+    ] : []),
   ];
 
   function isActive(href: string, exact: boolean) {
     if (exact) return pathname === href;
-    // Exact match for /admin to avoid sub-routes marking it active
     if (href === "/admin") return pathname === "/admin";
     return pathname.startsWith(href);
   }
@@ -277,7 +293,6 @@ export default function DashboardSidebar({
 
       {/* Footer */}
       <div className="db-sidebar-footer">
-        {/* Show assigned expert card only for clients who have an expert */}
         {isClient && expertFirstName && (
           <div className="db-taxpert-card">
             <span className="db-taxpert-eyebrow">Your Taxpert</span>
@@ -293,7 +308,6 @@ export default function DashboardSidebar({
             </a>
           </div>
         )}
-
       </div>
     </aside>
   );

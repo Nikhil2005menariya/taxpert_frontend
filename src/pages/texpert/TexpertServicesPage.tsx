@@ -148,7 +148,7 @@ export default function TexpertServicesPage() {
           <h1 className="db-page-title">My Services</h1>
           <p className="db-page-sub">All services assigned to you · {services.length} total</p>
         </div>
-        <button className="btn btn-secondary" onClick={() => navigate('/queue')}>
+        <button className="btn btn-secondary" onClick={() => navigate('/texpert/queue')}>
           Browse Queue →
         </button>
       </div>
@@ -238,7 +238,7 @@ export default function TexpertServicesPage() {
               : 'Once an admin assigns you services or you claim from the queue, they will appear here.'}
           </p>
           {!hasFilters && (
-            <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/queue')}>
+            <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/texpert/queue')}>
               Browse Open Queue
             </button>
           )}

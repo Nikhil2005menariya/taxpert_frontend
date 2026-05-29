@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext';
 import { PublicRoute } from './guards/PublicRoute';
 import { ProtectedRoute } from './guards/ProtectedRoute';
 import Login from './pages/auth/Login';
@@ -32,6 +33,7 @@ import AdminServiceDetailPage from './pages/admin/AdminServiceDetailPage';
 import TexpertServiceDetailPage from './pages/texpert/TexpertServiceDetailPage';
 import TexpertServicesPage from './pages/texpert/TexpertServicesPage';
 import TexpertDashboardPage from './pages/texpert/TexpertDashboardPage';
+import TexpertPayoutsPage from './pages/texpert/TexpertPayoutsPage';
 import PaymentsPage from './pages/client/payments/PaymentsPage';
 import DueDatesPage from './pages/client/due-dates/DueDatesPage';
 import ReferralsPage from './pages/client/referrals/ReferralsPage';
@@ -47,6 +49,16 @@ import TermsPage from './pages/public/legal/TermsPage';
 import RefundPolicyPage from './pages/public/legal/RefundPolicyPage';
 import DisclaimerPage from './pages/public/legal/DisclaimerPage';
 import ContactPage from './pages/public/ContactPage';
+
+// Smart redirect — sends each role to its home after login or on /dashboard visits.
+function RoleBasedRedirect() {
+  const { profile, isLoading } = useAuth();
+  if (isLoading) return <div className="page-loader page-loader--full"><div className="page-loader-ring" /></div>;
+  const role = profile?.role ?? 'client';
+  if (role === 'admin' || role === 'super_admin') return <Navigate to="/admin" replace />;
+  if (role === 'expert' || role === 'ca')         return <Navigate to="/texpert/dashboard" replace />;
+  return <Navigate to="/client/dashboard" replace />;
+}
 
 function App() {
   return (
@@ -67,47 +79,60 @@ function App() {
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/auth/reset-password" element={<ResetPassword />} />
-        
+
         {/* Protected Dashboard Routes */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/my-services" element={<MyServicesPage />} />
-          <Route path="/my-services/:id" element={<ServiceDetailsPage />} />
-          <Route path="/vault" element={<VaultPage />} />
-          <Route path="/workload" element={<WorkloadPage />} />
-          <Route path="/work-queue" element={<WorkQueuePage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/services" element={<ServicesConfigPage />} />
-          <Route path="/admin/services/new" element={<NewServicePage />} />
-          <Route path="/admin/services/:id" element={<ServiceEditPage />} />
-          <Route path="/admin/document-types" element={<DocumentTypesPage />} />
-          <Route path="/admin/pricing" element={<PricingPage />} />
-          <Route path="/admin/coupons" element={<CouponsPage />} />
-          <Route path="/admin/settings/invoice" element={<InvoiceSettingsPage />} />
-          {/* Phase 2: Admin */}
-          <Route path="/admin/taxperts" element={<AdminTaxpertsPage />} />
-          <Route path="/admin/taxperts/:id" element={<AdminTexpertDetailPage />} />
-          <Route path="/admin/clients" element={<AdminClientsPage />} />
-          <Route path="/admin/clients/:id" element={<AdminClientDetailPage />} />
-          <Route path="/admin/payouts" element={<AdminPayoutsPage />} />
-          <Route path="/admin/notify" element={<AdminNotifyPage />} />
-          <Route path="/admin/audit" element={<AdminAuditPage />} />
-          <Route path="/admin/client-services/:id" element={<AdminServiceDetailPage />} />
-          {/* Texpert workspace — Phase 2/3/5 (full sidebar/nav comes in Phase 7) */}
-          <Route path="/texpert" element={<TexpertDashboardPage />} />
-          <Route path="/texpert/services" element={<TexpertServicesPage />} />
+
+          {/* Smart redirect — /dashboard always sends to the right role home */}
+          <Route path="/dashboard" element={<RoleBasedRedirect />} />
+
+          {/* Shared profile — accessible to all roles */}
+          <Route path="/profile"             element={<ProfilePage />} />
+
+          {/* ── Client ─────────────────────────────────────────── */}
+          <Route path="/client/dashboard"    element={<DashboardPage />} />
+          <Route path="/client/services"     element={<MyServicesPage />} />
+          <Route path="/client/services/:id" element={<ServiceDetailsPage />} />
+          <Route path="/client/vault"        element={<VaultPage />} />
+          <Route path="/client/payments"     element={<PaymentsPage />} />
+          <Route path="/client/due-dates"    element={<DueDatesPage />} />
+          <Route path="/client/referrals"    element={<ReferralsPage />} />
+          <Route path="/client/invoices/:id" element={<InvoicePage />} />
+
+          {/* ── Texpert ────────────────────────────────────────── */}
+          <Route path="/texpert/dashboard"    element={<TexpertDashboardPage />} />
+          <Route path="/texpert/services"     element={<TexpertServicesPage />} />
           <Route path="/texpert/services/:id" element={<TexpertServiceDetailPage />} />
-          {/* Shared queue — accessible to admin and taxpert */}
-          <Route path="/queue" element={<AdminQueuePage />} />
-          <Route path="/payments" element={<PaymentsPage />} />
-          <Route path="/invoices/:id" element={<InvoicePage />} />
-          <Route path="/due-dates" element={<DueDatesPage />} />
-          <Route path="/referrals" element={<ReferralsPage />} />
+          <Route path="/texpert/payouts"      element={<TexpertPayoutsPage />} />
+          <Route path="/texpert/queue"        element={<AdminQueuePage />} />
+
+          {/* ── Admin ──────────────────────────────────────────── */}
+          <Route path="/admin"                        element={<AdminPage />} />
+          <Route path="/admin/queue"                  element={<AdminQueuePage />} />
+          <Route path="/admin/payments"               element={<PaymentsPage />} />
+          <Route path="/admin/services"               element={<ServicesConfigPage />} />
+          <Route path="/admin/services/new"           element={<NewServicePage />} />
+          <Route path="/admin/services/:id"           element={<ServiceEditPage />} />
+          <Route path="/admin/document-types"         element={<DocumentTypesPage />} />
+          <Route path="/admin/pricing"                element={<PricingPage />} />
+          <Route path="/admin/coupons"                element={<CouponsPage />} />
+          <Route path="/admin/settings/invoice"       element={<InvoiceSettingsPage />} />
+          <Route path="/admin/taxperts"               element={<AdminTaxpertsPage />} />
+          <Route path="/admin/taxperts/:id"           element={<AdminTexpertDetailPage />} />
+          <Route path="/admin/clients"                element={<AdminClientsPage />} />
+          <Route path="/admin/clients/:id"            element={<AdminClientDetailPage />} />
+          <Route path="/admin/payouts"                element={<AdminPayoutsPage />} />
+          <Route path="/admin/notify"                 element={<AdminNotifyPage />} />
+          <Route path="/admin/audit"                  element={<AdminAuditPage />} />
+          <Route path="/admin/client-services/:id"    element={<AdminServiceDetailPage />} />
+
+          {/* Legacy / shared */}
+          <Route path="/workload"   element={<WorkloadPage />} />
+          <Route path="/work-queue" element={<WorkQueuePage />} />
         </Route>
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

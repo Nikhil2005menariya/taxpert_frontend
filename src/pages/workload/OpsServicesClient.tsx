@@ -163,7 +163,7 @@ export default function OpsServicesClient({ rows }: { rows: OpsServiceRow[] }) {
               return (
                 <tr key={row.id} className={risk === "critical" ? "ops-row-critical" : risk === "warning" ? "ops-row-warning" : ""}>
                   <td className="ops-td-client">
-                    <Link to={`/my-services/${row.id}`} className="ops-client-link">
+                    <Link to={`/client/services/${row.id}`} className="ops-client-link">
                       <div className="ops-client-name">{clientName(row.client)}</div>
                       <div className="ops-client-sub">
                         {row.client?.email} {row.client?.pan && `· ${row.client.pan}`}

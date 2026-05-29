@@ -120,7 +120,7 @@ export default function MyServicesPage() {
 
             return (
               <div key={cs.id} className="cs-card-wrap">
-                <Link to={`/my-services/${cs.id}`} className="cs-card">
+                <Link to={`/client/services/${cs.id}`} className="cs-card">
                   <div className="cs-card-top">
                     <div className="cs-card-meta">
                       <span className="cs-card-category">{cs.service?.category}</span>

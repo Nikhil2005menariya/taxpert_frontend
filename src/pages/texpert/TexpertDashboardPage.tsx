@@ -182,7 +182,7 @@ export default function TexpertDashboardPage() {
             <div className="txd-kpi-value">{formatRupees(stats?.earningsThisMonth ?? 0)}</div>
             <div className="txd-kpi-sub">Total: {formatRupees(stats?.totalEarned ?? 0)}</div>
           </div>
-          <div className="txd-kpi" style={{ borderTop: '3px solid #3b82f6' }} onClick={() => navigate('/queue')}>
+          <div className="txd-kpi" style={{ borderTop: '3px solid #3b82f6' }} onClick={() => navigate('/texpert/queue')}>
             <div className="txd-kpi-label">In Queue</div>
             <div className="txd-kpi-value">{stats?.queueOpen ?? 0}</div>
             <div className="txd-kpi-sub">Available to claim</div>
@@ -211,7 +211,7 @@ export default function TexpertDashboardPage() {
                 {stats?.queueOpen ? 'Check the queue to claim more work.' : 'New work will appear as clients upload documents.'}
               </p>
               {(stats?.queueOpen ?? 0) > 0 && (
-                <button className="btn btn-primary btn-sm" style={{ marginTop: '1rem' }} onClick={() => navigate('/queue')}>
+                <button className="btn btn-primary btn-sm" style={{ marginTop: '1rem' }} onClick={() => navigate('/texpert/queue')}>
                   Browse Queue ({stats?.queueOpen})
                 </button>
               )}

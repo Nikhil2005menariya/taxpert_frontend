@@ -39,7 +39,7 @@ export default function AddServiceModal() {
       if (result.data) {
         setOpen(false);
         const fy = (result.data as Record<string, unknown>).fiscal_year as string | null;
-        navigate(`/vault?fy=${fy ?? ""}&svc=${result.data.id}`);
+        navigate(`/client/vault?fy=${fy ?? ""}&svc=${result.data.id}`);
       }
     } catch (err: any) {
       setMessage({ type: "error", text: err.response?.data?.error || "Failed to add service. Please try again." });
@@ -80,7 +80,7 @@ export default function AddServiceModal() {
                   {message.type === "exists" && message.svcId && (
                     <button
                       className="add-svc-msg-link"
-                      onClick={() => { setOpen(false); navigate(`/vault?svc=${message.svcId}`); }}
+                      onClick={() => { setOpen(false); navigate(`/client/vault?svc=${message.svcId}`); }}
                     >
                       Go to Vault →
                     </button>
