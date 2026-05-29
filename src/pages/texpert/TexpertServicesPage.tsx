@@ -27,7 +27,7 @@ interface ServiceRow {
 
 const STATUS_OPTIONS = [
   'documents_required', 'documents_received', 'in_progress',
-  'under_review', 'invoice_pending', 'completed', 'on_hold',
+  'under_review', 'invoice_pending', 'completed', 'on_hold', 'cancelled',
 ];
 
 const STATUS_BADGE: Record<string, string> = {

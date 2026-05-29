@@ -200,6 +200,11 @@ export default function AdminServiceDetailPage() {
   });
 
   // Mutations
+  const addToQueue = useMutation({
+    mutationFn: () => apiClient.post('/admin/queue', { clientServiceId: id }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }),
+  });
+
   const updateService = useMutation({
     mutationFn: (payload: Record<string, unknown>) => apiClient.patch(`/admin/client-services/${id}`, payload),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setSettingsDirty(false); },
@@ -303,6 +308,16 @@ export default function AdminServiceDetailPage() {
           </p>
         </div>
         <div className="aq-header-actions">
+          {!texpert && !['completed', 'cancelled'].includes(data.status) && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => addToQueue.mutate()}
+              disabled={addToQueue.isPending}
+              title="Add this service to the open queue so a texpert can self-assign"
+            >
+              {addToQueue.isPending ? 'Adding…' : addToQueue.isError ? '⚠ Failed — retry' : '+ Add to Queue'}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => setShowAssign(true)}>
             {texpert ? 'Reassign Taxpert' : 'Assign Taxpert'}
           </button>
