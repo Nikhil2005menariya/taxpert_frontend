@@ -8614,235 +8614,563 @@ a:hover {
    INVOICE PAGE  (inv-*)
    ============================================================ */
 
+/* ═══════════════════════════════════════════════════════════════
+   INVOICE PAGE — Premium two-column layout
+   ═══════════════════════════════════════════════════════════════ */
+
 .inv-shell {
-  max-width: 780px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 4rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  padding: 1.75rem 1.5rem 5rem;
 }
 
-/* ── Toolbar ────────────────────────────────────────────────── */
-.inv-toolbar {
+/* Top bar */
+.inv-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  margin-bottom: 1.75rem;
 }
-.inv-back-link {
-  font-size: 0.83rem;
-  color: var(--ink-500);
+.inv-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-400);
   text-decoration: none;
+  transition: color 0.15s;
 }
-.inv-back-link:hover { color: var(--ink-900); }
-.inv-print-btn { font-size: 0.83rem; }
-
-/* ── Invoice card ───────────────────────────────────────────── */
-.inv-card {
+.inv-back:hover { color: var(--ink-700); }
+.inv-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-600);
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 2.5rem 2.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.inv-print-btn:hover { background: var(--ink-50); color: var(--ink-900); }
+
+/* Two-column layout */
+.inv-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .inv-layout { grid-template-columns: 1fr; }
 }
 
-/* ── Header ─────────────────────────────────────────────────── */
-.inv-header {
+/* ── Invoice document (left) ──────────────────────────────── */
+.inv-doc {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.04);
+}
+.inv-doc-accent {
+  height: 4px;
+  background: linear-gradient(90deg, var(--gold-500) 0%, var(--gold-400,#d4ad5a) 100%);
+}
+.inv-doc-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+  padding: 2rem 2.5rem 1.75rem;
 }
-.inv-brand { display: flex; flex-direction: column; gap: 0.2rem; }
-.inv-brand-name {
-  font-size: 1.35rem;
-  font-weight: 700;
+.inv-doc-biz-name {
+  font-size: 1.4rem;
+  font-weight: 800;
   color: var(--ink-900);
   letter-spacing: -0.02em;
+  margin-bottom: 0.3rem;
 }
-.inv-brand-web { font-size: 0.78rem; color: var(--ink-400); }
-
-.inv-meta-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
-.inv-number {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--ink-700);
-  font-family: var(--font-mono);
+.inv-doc-biz-meta {
+  font-size: 0.8rem;
+  color: var(--ink-400);
+  line-height: 1.6;
 }
-.inv-status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+.inv-doc-biz-pan {
   font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--ink-300);
+  margin-top: 4px;
+  font-family: monospace;
 }
-.inv-status-pending  { background: rgba(196,154,58,0.12); color: var(--gold-700); }
-.inv-status-paid     { background: rgba(47,122,91,0.10);  color: var(--green-600); }
-.inv-status-overdue  { background: rgba(182,69,69,0.08);  color: var(--red-600); }
-.inv-status-cancelled{ background: var(--ink-50);          color: var(--ink-500); }
-
-.inv-divider { border: none; border-top: 1px solid var(--line-soft); }
-
-/* ── Bill To + Dates ────────────────────────────────────────── */
-.inv-info-row {
+.inv-doc-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+.inv-doc-num {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-500);
+  font-family: monospace;
+  letter-spacing: 0.03em;
+}
+.inv-doc-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.inv-doc-status--paid {
+  background: rgba(47,122,91,0.1);
+  color: var(--green-600);
+  border: 1px solid rgba(47,122,91,0.2);
+}
+.inv-doc-status--due {
+  background: rgba(196,154,58,0.1);
+  color: var(--gold-700);
+  border: 1px solid rgba(196,154,58,0.25);
+}
+.inv-doc-rule {
+  height: 1px;
+  background: var(--line);
+  margin: 0 2.5rem;
+}
+.inv-doc-parties {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 2rem;
+  padding: 1.75rem 2.5rem;
 }
-.inv-bill-to { display: flex; flex-direction: column; gap: 0.2rem; }
-.inv-client-name { font-size: 1rem; font-weight: 600; color: var(--ink-900); }
-.inv-client-pan  { font-size: 0.78rem; color: var(--ink-500); font-family: var(--font-mono); }
-.inv-client-email{ font-size: 0.78rem; color: var(--ink-400); }
+.inv-doc-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-300);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.6rem;
+}
+.inv-doc-client-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin-bottom: 0.3rem;
+}
+.inv-doc-client-detail {
+  font-size: 0.82rem;
+  color: var(--ink-500);
+  line-height: 1.6;
+}
+.inv-doc-dates { text-align: right; }
+.inv-doc-date-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.25rem;
+  align-items: baseline;
+  margin-bottom: 0.4rem;
+}
+.inv-doc-date-label {
+  font-size: 0.78rem;
+  color: var(--ink-400);
+  min-width: 70px;
+  text-align: right;
+}
+.inv-doc-date-val {
+  font-size: 0.82rem;
+  color: var(--ink-700);
+  font-weight: 500;
+  min-width: 140px;
+  text-align: right;
+}
+.inv-doc-date-val--due  { color: #b45309; font-weight: 600; }
+.inv-doc-date-val--paid { color: var(--green-600); font-weight: 600; }
 
-.inv-label {
+/* Line items table */
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 0;
+}
+.inv-th {
+  padding: 0.65rem 1rem;
+  background: var(--ink-50);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: right;
+  white-space: nowrap;
+}
+.inv-th--left { text-align: left; }
+.inv-th--right { text-align: right; }
+.inv-th:first-child { padding-left: 2.5rem; }
+.inv-th:last-child  { padding-right: 2.5rem; }
+.inv-tr {
+  border-top: 1px solid var(--line-soft, #f1f5f9);
+  transition: background 0.1s;
+}
+.inv-tr:hover { background: var(--ink-50); }
+.inv-td {
+  padding: 1rem 1rem;
+  font-size: 0.875rem;
+  color: var(--ink-700);
+  text-align: right;
+  vertical-align: top;
+}
+.inv-td:first-child { padding-left: 2.5rem; }
+.inv-td:last-child  { padding-right: 2.5rem; }
+.inv-td--left   { text-align: left; }
+.inv-td--center { text-align: center; }
+.inv-td--right  { text-align: right; }
+.inv-td--bold   { font-weight: 600; color: var(--ink-900); }
+.inv-td-desc { font-weight: 500; color: var(--ink-900); margin-bottom: 2px; }
+.inv-td-cat  { font-size: 0.78rem; color: var(--ink-400); }
+
+/* Totals */
+.inv-totals {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1.25rem 2.5rem 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.inv-totals-inner { width: 260px; display: flex; flex-direction: column; gap: 0; }
+.inv-totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--ink-500);
+  border-bottom: 1px solid var(--line-soft, #f1f5f9);
+}
+.inv-totals-row:last-child { border-bottom: none; }
+.inv-totals-row--total {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink-900);
+  padding: 0.9rem 0 0.5rem;
+  border-bottom: none;
+}
+.inv-totals-row--paid {
+  color: var(--green-600);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding-top: 0.5rem;
+  border-top: 1.5px solid rgba(47,122,91,0.2);
+}
+
+/* Banking details */
+.inv-banking {
+  margin: 0 2.5rem 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--ink-50);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.inv-section-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-300);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+}
+.inv-banking-grid { display: flex; flex-direction: column; gap: 0.35rem; }
+.inv-banking-item {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.82rem;
+  align-items: baseline;
+}
+.inv-banking-item span {
+  color: var(--ink-400);
+  min-width: 110px;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+}
+
+/* Footer */
+.inv-footer {
+  padding: 1.25rem 2.5rem 2rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.inv-footer-line {
+  font-size: 0.75rem;
+  color: var(--ink-400);
+  line-height: 1.5;
+  margin: 0;
+}
+.inv-footer-line strong { color: var(--ink-500); }
+.inv-footer-brand {
+  font-size: 0.72rem;
+  color: var(--ink-300);
+  text-align: center;
+  margin: 0.5rem 0 0;
+}
+
+/* ── Payment panel (right, sticky) ───────────────────────── */
+.inv-panel-col {
+  position: sticky;
+  top: 1.5rem;
+}
+.inv-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.05);
+}
+.inv-panel-head {
+  padding: 1.75rem 1.5rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inv-panel-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.inv-panel-amount {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--ink-900);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.inv-panel-saved {
+  font-size: 0.78rem;
+  color: var(--green-600);
+  font-weight: 500;
+}
+
+/* Breakdown rows */
+.inv-panel-breakdown {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.inv-panel-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--ink-500);
+}
+.inv-panel-row--discount { color: var(--green-600); }
+.inv-panel-row--total {
+  font-weight: 700;
+  color: var(--ink-900);
+  font-size: 0.9rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  margin-top: 0.25rem;
+}
+
+/* Coupon section */
+.inv-coupon-section {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.inv-coupon-label {
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--ink-400);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.6rem;
 }
-.inv-dates { display: flex; flex-direction: column; gap: 0.5rem; text-align: right; }
-.inv-date-row { display: flex; flex-direction: column; gap: 0.1rem; }
-.inv-date-val  { font-size: 0.85rem; color: var(--ink-700); }
-.inv-due-date  { color: var(--gold-700); font-weight: 600; }
-.inv-paid-date { color: var(--green-600); }
-
-/* ── Line items table ───────────────────────────────────────── */
-.inv-items-wrap { overflow-x: auto; }
-.inv-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-.inv-th {
-  padding: 0.6rem 0.75rem;
-  background: var(--ink-50);
-  color: var(--ink-500);
-  font-size: 0.72rem;
-  font-weight: 600;
+.inv-coupon-row { display: flex; gap: 0.5rem; }
+.inv-coupon-input {
+  flex: 1;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: var(--ink-900);
+  background: var(--card);
+  outline: none;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--line);
+  transition: border-color 0.15s;
+  font-weight: 500;
 }
-.inv-th-desc  { text-align: left; border-radius: 6px 0 0 0; }
-.inv-th-qty, .inv-th-price, .inv-th-total { text-align: right; }
-.inv-th-total { border-radius: 0 6px 0 0; }
-.inv-tr + .inv-tr { border-top: 1px solid var(--line-soft); }
-.inv-td { padding: 0.9rem 0.75rem; color: var(--ink-800); vertical-align: top; }
-.inv-td-desc  { text-align: left; }
-.inv-td-num   { text-align: right; font-family: var(--font-mono); color: var(--ink-700); }
-.inv-td-total { font-weight: 600; color: var(--ink-900); }
-.inv-item-name { font-weight: 500; color: var(--ink-900); }
-.inv-item-cat  { font-size: 0.75rem; color: var(--ink-400); margin-top: 0.15rem; }
-
-/* ── Totals ─────────────────────────────────────────────────── */
-.inv-totals {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  align-items: flex-end;
-}
-.inv-total-row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 2.5rem;
-  font-size: 0.85rem;
-  color: var(--ink-600);
-}
-.inv-total-label { min-width: 100px; text-align: right; }
-.inv-total-val   { min-width: 110px; text-align: right; font-family: var(--font-mono); }
-.inv-total-grand { padding-top: 0.6rem; border-top: 1.5px solid var(--line); }
-.inv-grand-label { font-weight: 700; font-size: 0.95rem; color: var(--ink-900); }
-.inv-grand-val   { font-weight: 700; font-size: 1.15rem; color: var(--ink-900); }
-.inv-total-paid-row { margin-top: 0.25rem; }
-.inv-paid-amount { color: var(--green-600); font-weight: 600; }
-
-/* ── Notes / Terms / Pay instructions ──────────────────────── */
-.inv-notes, .inv-terms, .inv-pay-instructions {
-  padding: 1rem 1.25rem;
-  background: var(--ink-50);
-  border-radius: 6px;
-}
-.inv-notes-text, .inv-terms-text, .inv-pi-text {
+.inv-coupon-input:focus { border-color: var(--gold-400, #d4ad5a); }
+.inv-coupon-input--error { border-color: #fca5a5; }
+.inv-coupon-btn {
+  padding: 8px 14px;
+  background: var(--ink-900);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
   font-size: 0.82rem;
-  color: var(--ink-600);
-  margin: 0;
-  line-height: 1.55;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
 }
-
-/* ── Bank details ───────────────────────────────────────────── */
-.inv-bank-section { display: flex; flex-direction: column; gap: 0.5rem; }
-.inv-bank-grid { display: flex; flex-direction: column; gap: 0.35rem; }
-.inv-bank-row {
+.inv-coupon-btn:disabled { opacity: 0.45; cursor: default; }
+.inv-coupon-btn:hover:not(:disabled) { opacity: 0.85; }
+.inv-coupon-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: #b91c1c;
+}
+.inv-coupon-applied {
   display: flex;
-  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(47,122,91,0.06);
+  border: 1px solid rgba(47,122,91,0.2);
+  border-radius: 8px;
+}
+.inv-coupon-applied-code {
   font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--green-600);
+  font-family: monospace;
+  letter-spacing: 0.04em;
 }
-.inv-bank-row span:first-child { color: var(--ink-400); min-width: 130px; }
-.inv-bank-row span:last-child  { color: var(--ink-800); }
-.inv-mono { font-family: var(--font-mono); }
-
-/* ── Footer ─────────────────────────────────────────────────── */
-.inv-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+.inv-coupon-applied-desc {
+  font-size: 0.75rem;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+.inv-coupon-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
   font-size: 0.75rem;
   color: var(--ink-400);
-  border-top: 1px solid var(--line-soft);
-  padding-top: 1.25rem;
+  text-decoration: underline;
+  padding: 0;
+  flex-shrink: 0;
 }
+.inv-coupon-remove:hover { color: var(--ink-700); }
 
-/* ── CTA area ───────────────────────────────────────────────── */
-.inv-cta-wrap {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 1.5rem 2rem;
-}
-.inv-pay-wrap { display: flex; flex-direction: column; gap: 0.75rem; }
-.inv-pay-btn  { width: 100%; padding: 0.9rem 1.5rem; font-size: 1rem; }
-.inv-pay-note { font-size: 0.75rem; color: var(--ink-400); text-align: center; margin: 0; }
+/* Pay button area */
 .inv-pay-error {
-  background: rgba(182,69,69,0.07);
-  border: 1px solid rgba(182,69,69,0.2);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  font-size: 0.83rem;
-  color: var(--red-600);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  margin: 1.25rem 1.5rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(182,69,69,0.06);
+  border: 1px solid rgba(182,69,69,0.18);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #b91c1c;
 }
-.inv-pay-retry {
+.inv-pay-error button {
   background: none; border: none; cursor: pointer;
-  color: var(--red-600); font-size: 0.8rem; text-decoration: underline;
+  font-size: 0.78rem; color: #991b1b; text-decoration: underline; flex-shrink: 0; padding: 0;
 }
-.inv-pay-success {
-  text-align: center;
-  padding: 1.5rem;
+.inv-pay-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 3rem);
+  margin: 1.25rem 1.5rem;
+  padding: 14px;
+  background: var(--ink-900);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  letter-spacing: 0.01em;
+}
+.inv-pay-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.inv-pay-btn:disabled,
+.inv-pay-btn--busy { opacity: 0.55; cursor: not-allowed; transform: none; }
+.inv-pay-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: inv-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes inv-spin { to { transform: rotate(360deg); } }
+.inv-pay-secure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 1.5rem 1.5rem;
+  font-size: 0.7rem;
+  color: var(--ink-300);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+/* Success state */
+.inv-panel-success {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
 }
-.inv-pay-success-icon {
-  width: 52px; height: 52px;
+.inv-panel-success svg {
+  width: 44px; height: 44px;
+  padding: 10px;
   background: rgba(47,122,91,0.1);
   border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
   color: var(--green-600);
 }
-.inv-pay-success-title { font-size: 1rem; font-weight: 600; color: var(--ink-900); margin: 0; }
-.inv-pay-success-sub   { font-size: 0.82rem; color: var(--ink-500); margin: 0; }
+.inv-panel-success-title { font-size: 1rem; font-weight: 700; color: var(--ink-900); }
+.inv-panel-success-sub   { font-size: 0.82rem; color: var(--ink-400); }
+
+/* Paid panel state */
+.inv-panel--paid {
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+.inv-panel-paid-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px;
+  background: rgba(47,122,91,0.1);
+  border-radius: 50%;
+  color: var(--green-600);
+  margin: 0 auto 0.75rem;
+}
+.inv-panel-paid-title  { font-size: 0.8rem; font-weight: 600; color: var(--ink-500); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+.inv-panel-paid-amount { font-size: 1.6rem; font-weight: 800; color: var(--green-600); letter-spacing: -0.02em; }
+.inv-panel-paid-date   { font-size: 0.78rem; color: var(--ink-400); margin-top: 0.25rem; }
+
+/* Not found state */
+.inv-not-found {
+  max-width: 400px;
+  margin: 4rem auto;
+  text-align: center;
+  color: var(--ink-500);
+}
+.inv-not-found-title { font-size: 1.1rem; font-weight: 700; color: var(--ink-700); margin-bottom: 0.5rem; }
+
+
 
 /* ── Paid banner ────────────────────────────────────────────── */
 .inv-paid-banner {
@@ -8946,10 +9274,68 @@ a:hover {
 
 /* ── Print styles ───────────────────────────────────────────── */
 @media print {
-  .inv-toolbar, .inv-cta-wrap, .inv-paid-banner { display: none !important; }
-  .inv-shell { padding: 0; max-width: none; }
-  .inv-card { border: none; border-radius: 0; padding: 0; box-shadow: none; }
-  body { background: white; }
+  /* ── Page setup ──────────────────────────────────────────────── */
+  @page {
+    size: A4 portrait;
+    margin: 18mm 20mm 18mm 20mm;
+  }
+
+  /* Hide everything except the invoice document */
+  body * { visibility: hidden; }
+  #invoice-printable,
+  #invoice-printable * { visibility: visible; }
+
+  /* Render the doc full-page, no offset */
+  #invoice-printable {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Reset chrome */
+  .inv-doc {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Gold accent bar — keep it visible in print */
+  .inv-doc-accent {
+    height: 3px !important;
+    background: #c49a3a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure backgrounds print */
+  .inv-th,
+  .inv-banking,
+  .inv-doc-status {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Tighter spacing on paper */
+  .inv-doc-header  { padding: 1.25rem 1.75rem 1rem !important; }
+  .inv-doc-rule    { margin: 0 1.75rem !important; }
+  .inv-doc-parties { padding: 1rem 1.75rem !important; }
+  .inv-th:first-child,
+  .inv-td:first-child { padding-left: 1.75rem !important; }
+  .inv-th:last-child,
+  .inv-td:last-child  { padding-right: 1.75rem !important; }
+  .inv-totals  { padding: 0.75rem 1.75rem 1rem !important; }
+  .inv-banking { margin: 0 1.75rem 1rem !important; }
+  .inv-footer  { padding: 0.75rem 1.75rem 1.25rem !important; }
+
+  /* Prevent orphan rows across page breaks */
+  .inv-tr { page-break-inside: avoid; }
+  .inv-totals-inner,
+  .inv-banking,
+  .inv-footer { page-break-inside: avoid; }
+
+  body, html { background: white !important; }
 }
 
 /* ── Phase 2 Admin / Queue / Taxpert pages ─────────────────── */

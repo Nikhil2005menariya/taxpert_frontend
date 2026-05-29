@@ -5,137 +5,106 @@ import { apiClient, paymentClient } from "../../../api/client";
 import { formatRupees } from "../../../shared/finance-utils";
 
 declare global {
-  interface Window {
-    Razorpay: new (options: any) => { open(): void };
-  }
+  interface Window { Razorpay: new (options: any) => { open(): void }; }
 }
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise(resolve => {
     if (document.getElementById("razorpay-script")) { resolve(true); return; }
-    const script = document.createElement("script");
-    script.id = "razorpay-script";
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+    const s = document.createElement("script");
+    s.id = "razorpay-script";
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
   });
 }
 
 type AppliedDiscount = {
-  codeType: "coupon" | "referral";
-  couponId?: string;
-  referrerId?: string;
-  referralCode?: string;
+  codeType: "coupon";
+  couponId: string;
   discountAmount: number;
   finalAmount: number;
   description: string;
 };
 
-function InvoicePayButton({ serviceSlug, serviceName, clientServiceId, price, formattedPrice }: any) {
+// ── Payment sidebar ───────────────────────────────────────────
+
+function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price, invoice }: any) {
   const navigate = useNavigate();
   const [state, setState] = useState<"idle" | "loading" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
-
-  // Coupon / referral state
-  const [codeInput, setCodeInput] = useState("");
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [couponError, setCouponError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [code, setCode] = useState("");
+  const [cLoading, setCLoading] = useState(false);
+  const [cError, setCError] = useState<string | null>(null);
   const [applied, setApplied] = useState<AppliedDiscount | null>(null);
 
-  useEffect(() => {
-    loadRazorpayScript().then(setScriptReady);
-  }, []);
-
-  async function applyCode() {
-    if (!codeInput.trim()) return;
-    setCouponLoading(true);
-    setCouponError(null);
-    try {
-      const res = await apiClient.post("/coupons/validate", {
-        code: codeInput.trim().toUpperCase(),
-        servicePrice: price,
-      });
-      const d = res.data;
-      if (!d.valid) {
-        setCouponError(d.error ?? "Invalid code");
-        setApplied(null);
-      } else {
-        setApplied(d);
-        setCouponError(null);
-      }
-    } catch (err: any) {
-      setCouponError(err.response?.data?.error ?? "Could not validate code");
-    } finally {
-      setCouponLoading(false);
-    }
-  }
-
-  function removeCode() {
-    setApplied(null);
-    setCodeInput("");
-    setCouponError(null);
-  }
+  useEffect(() => { loadRazorpayScript().then(setReady); }, []);
 
   const finalPrice = applied ? applied.finalAmount : price;
-  const finalFormatted = applied ? formatRupees(applied.finalAmount) : formattedPrice;
+  const finalFmt = applied ? formatRupees(applied.finalAmount) : formatRupees(price);
 
-  async function handlePayment() {
-    setError(null);
-    setState("loading");
-
+  async function applyCode() {
+    if (!code.trim()) return;
+    setCLoading(true); setCError(null);
     try {
-      const orderRes = await paymentClient.post("/orders", {
-        slug:            serviceSlug,
-        coupon_id:       applied?.couponId,
-        referrer_id:     applied?.referrerId,
-        referral_code:   applied?.referralCode,
+      const res = await apiClient.post("/coupons/validate", { code: code.trim().toUpperCase(), servicePrice: price });
+      const d = res.data;
+      if (!d.valid) { setCError(d.error ?? "Invalid code"); setApplied(null); }
+      else { setApplied(d); setCError(null); }
+    } catch (e: any) { setCError(e.response?.data?.error ?? "Could not validate code"); }
+    finally { setCLoading(false); }
+  }
+
+  async function handlePay() {
+    setError(null); setState("loading");
+    try {
+      const { data: { data: ord } } = await paymentClient.post("/orders", {
+        slug: serviceSlug,
+        client_service_id: clientServiceId,
+        coupon_id: applied?.couponId,
         discount_amount: applied?.discountAmount,
       });
-      const { orderId, amount, currency, keyId } = orderRes.data.data;
-
       setState("idle");
-
       const rzp = new window.Razorpay({
-        key: keyId,
-        amount: amount ?? finalPrice,
-        currency,
-        name: "TheTaxpert",
-        description: serviceName,
-        order_id: orderId,
-        handler: async function (response: any) {
+        key: ord.keyId, amount: ord.amount, currency: ord.currency,
+        name: "TheTaxpert", description: serviceName, order_id: ord.orderId,
+        handler: async (r: any) => {
           setState("verifying");
           try {
             await paymentClient.post("/verify", {
-              razorpay_order_id:   response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature:  response.razorpay_signature,
+              razorpay_order_id: r.razorpay_order_id,
+              razorpay_payment_id: r.razorpay_payment_id,
+              razorpay_signature: r.razorpay_signature,
             });
             setState("success");
-            setTimeout(() => navigate(`/client/services/${clientServiceId}`), 2000);
-          } catch (err: any) {
+            setTimeout(() => navigate(`/client/services/${clientServiceId}`), 2500);
+          } catch (e: any) {
             setState("error");
-            setError(err.response?.data?.error ?? "Payment verification failed. Please contact support.");
+            setError(e.response?.data?.error ?? "Payment verification failed. Contact support.");
           }
         },
         modal: { ondismiss() { setState("idle"); } },
         theme: { color: "#c49a3a" },
       });
-
       rzp.open();
-    } catch (err: any) {
+    } catch (e: any) {
       setState("error");
-      setError(err.response?.data?.error ?? "Failed to create payment order");
+      setError(e.response?.data?.error ?? "Failed to create payment order");
     }
   }
 
   if (state === "success") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", padding: "1.5rem", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "0.5rem", color: "#166534" }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-        <p style={{ fontWeight: 700, fontSize: "1.1rem" }}>Payment received!</p>
-        <p style={{ fontSize: "0.875rem", color: "#15803d" }}>Redirecting to your service workspace…</p>
+      <div className="inv-panel">
+        <div className="inv-panel-success">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" />
+          </svg>
+          <div className="inv-panel-success-title">Payment confirmed</div>
+          <div className="inv-panel-success-sub">Redirecting to your service workspace…</div>
+        </div>
       </div>
     );
   }
@@ -143,212 +112,274 @@ function InvoicePayButton({ serviceSlug, serviceName, clientServiceId, price, fo
   const busy = state === "loading" || state === "verifying";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1.5rem", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "0.5rem" }}>
+    <div className="inv-panel">
+      <div className="inv-panel-head">
+        <span className="inv-panel-label">Amount due</span>
+        <span className="inv-panel-amount">{finalFmt}</span>
+        {applied && (
+          <span className="inv-panel-saved">You save {formatRupees(applied.discountAmount)}</span>
+        )}
+      </div>
 
-      {/* Coupon / referral input */}
-      {!applied ? (
-        <div>
-          <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
-            Have a coupon or referral code?
+      {/* Amount breakdown if coupon applied */}
+      {applied && (
+        <div className="inv-panel-breakdown">
+          <div className="inv-panel-row"><span>Subtotal</span><span>{formatRupees(price)}</span></div>
+          <div className="inv-panel-row inv-panel-row--discount">
+            <span>{applied.codeType === "referral" ? "Referral discount" : "Coupon discount"}</span>
+            <span>−{formatRupees(applied.discountAmount)}</span>
           </div>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input
-              type="text"
-              value={codeInput}
-              onChange={e => { setCodeInput(e.target.value.toUpperCase()); setCouponError(null); }}
-              onKeyDown={e => e.key === "Enter" && applyCode()}
-              placeholder="e.g. SAVE500 or TAXPERT-XXXXXX"
-              style={{ flex: 1, padding: "0.55rem 0.75rem", border: `1px solid ${couponError ? "#fca5a5" : "#e2e8f0"}`, borderRadius: "0.5rem", fontSize: "0.875rem", outline: "none", background: "white", textTransform: "uppercase" }}
-            />
-            <button
-              onClick={applyCode}
-              disabled={!codeInput.trim() || couponLoading}
-              style={{ padding: "0.55rem 1rem", background: "#1e293b", color: "white", border: "none", borderRadius: "0.5rem", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", opacity: !codeInput.trim() || couponLoading ? 0.5 : 1 }}
-            >
-              {couponLoading ? "…" : "Apply"}
+          <div className="inv-panel-row inv-panel-row--total">
+            <span>Total payable</span>
+            <span>{formatRupees(applied.finalAmount)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Coupon / referral code */}
+      <div className="inv-coupon-section">
+        {!applied ? (
+          <>
+            <div className="inv-coupon-label">Have a coupon code?</div>
+            <div className="inv-coupon-row">
+              <input
+                className={`inv-coupon-input${cError ? " inv-coupon-input--error" : ""}`}
+                type="text"
+                value={code}
+                onChange={e => { setCode(e.target.value.toUpperCase()); setCError(null); }}
+                onKeyDown={e => e.key === "Enter" && applyCode()}
+                placeholder="e.g. SAVE500"
+                disabled={busy}
+              />
+              <button
+                className="inv-coupon-btn"
+                onClick={applyCode}
+                disabled={!code.trim() || cLoading || busy}
+              >
+                {cLoading ? "…" : "Apply"}
+              </button>
+            </div>
+            {cError && <p className="inv-coupon-error">{cError}</p>}
+          </>
+        ) : (
+          <div className="inv-coupon-applied">
+            <div>
+              <div className="inv-coupon-applied-code">{code || applied.description}</div>
+              <div className="inv-coupon-applied-desc">{applied.description}</div>
+            </div>
+            <button className="inv-coupon-remove" onClick={() => { setApplied(null); setCode(""); setCError(null); }}>
+              Remove
             </button>
           </div>
-          {couponError && (
-            <p style={{ margin: "0.35rem 0 0", fontSize: "0.8rem", color: "#b91c1c" }}>{couponError}</p>
-          )}
-        </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem 1rem", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "0.5rem" }}>
-          <div>
-            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#166534" }}>
-              {applied.codeType === "referral" ? "Referral code" : "Coupon"} applied — {applied.description}
-            </div>
-            <div style={{ fontSize: "0.75rem", color: "#15803d", marginTop: "2px" }}>
-              You save {formatRupees(applied.discountAmount)}
-            </div>
-          </div>
-          <button onClick={removeCode} style={{ background: "none", border: "none", cursor: "pointer", color: "#166534", fontWeight: 700, fontSize: "0.8rem", textDecoration: "underline" }}>
-            Remove
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Amount summary */}
-      {applied && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", padding: "0.75rem 1rem", background: "white", border: "1px solid #e2e8f0", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#64748b" }}>
-            <span>Original amount</span><span>{formattedPrice}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#166534" }}>
-            <span>Discount</span><span>−{formatRupees(applied.discountAmount)}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, color: "#0f172a", borderTop: "1px solid #e2e8f0", paddingTop: "0.5rem", marginTop: "0.25rem", fontSize: "1rem" }}>
-            <span>Total payable</span><span>{finalFormatted}</span>
-          </div>
-        </div>
-      )}
-
+      {/* Error state */}
       {error && (
-        <div style={{ padding: "0.75rem 1rem", background: "#fef2f2", color: "#b91c1c", borderRadius: "0.375rem", fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="inv-pay-error">
           <span>{error}</span>
-          <button onClick={() => { setState("idle"); setError(null); }} style={{ fontWeight: 600, textDecoration: "underline", background: "none", border: "none", cursor: "pointer", color: "#991b1b" }}>Retry</button>
+          <button onClick={() => { setState("idle"); setError(null); }}>Retry</button>
         </div>
       )}
 
+      {/* Pay button */}
       <button
-        onClick={handlePayment}
-        disabled={busy || !scriptReady}
-        style={{ width: "100%", padding: "0.85rem", background: busy ? "#94a3b8" : "#1e293b", color: "white", border: "none", borderRadius: "0.5rem", fontSize: "1rem", fontWeight: 700, cursor: busy ? "not-allowed" : "pointer", transition: "background 0.15s" }}
+        className={`inv-pay-btn${busy ? " inv-pay-btn--busy" : ""}`}
+        onClick={handlePay}
+        disabled={busy || !ready}
       >
-        {state === "loading" ? "Preparing…" : state === "verifying" ? "Confirming payment…" : `Pay Now · ${finalFormatted}`}
+        {state === "loading" ? (
+          <><span className="inv-pay-spinner" /> Preparing order…</>
+        ) : state === "verifying" ? (
+          <><span className="inv-pay-spinner" /> Confirming payment…</>
+        ) : (
+          <>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" />
+            </svg>
+            Pay {finalFmt}
+          </>
+        )}
       </button>
-      <p style={{ fontSize: "0.72rem", color: "#94a3b8", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, margin: 0 }}>
-        Secure payment via Razorpay · One-time charge
-      </p>
+
+      <div className="inv-pay-secure">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        Secured by Razorpay · One-time charge
+      </div>
     </div>
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────
+
 export default function InvoicePage() {
   const { id } = useParams();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: queryError } = useQuery({
     queryKey: ["invoice", id],
     queryFn: async () => {
-      const [invoiceRes, settingsRes] = await Promise.all([
+      const [invRes, setRes] = await Promise.all([
         apiClient.get(`/payments/invoices/${id}`),
-        apiClient.get('/payments/invoice-settings').catch(() => ({ data: { data: null } })),
+        apiClient.get("/payments/invoice-settings").catch(() => ({ data: { data: null } })),
       ]);
-      return { invoice: invoiceRes.data.data, settings: settingsRes.data.data };
-    }
+      return { invoice: invRes.data.data, settings: setRes.data.data };
+    },
   });
 
   if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
-  if (!data?.invoice) return <div className="p-8 text-center text-red-500">Invoice not found</div>;
 
-  const invoice  = data.invoice;
-  const s        = data.settings;
+  if (queryError || !data?.invoice) {
+    return (
+      <div className="inv-shell">
+        <Link to="/client/payments" className="inv-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          Back to Payments
+        </Link>
+        <div className="inv-not-found">
+          <div className="inv-not-found-title">Invoice not found</div>
+          <p>This invoice may have been removed or you may not have access to it.</p>
+          <Link to="/client/payments" className="btn btn-secondary" style={{ marginTop: "1rem" }}>Back to Payments</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const invoice = data.invoice;
+  const s = data.settings;
+
   const isPending = invoice.status === "pending";
-  const isPaid    = invoice.status === "paid" || invoice.status === "captured";
+  const isPaid = invoice.status === "paid" || invoice.status === "captured";
 
-  const issueDate = new Date(invoice.issued_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-  const dueDate   = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : null;
-  const paidDate  = invoice.paid_at  ? new Date(invoice.paid_at).toLocaleDateString("en-IN",  { day: "numeric", month: "long", year: "numeric" }) : null;
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
-  const clientName    = invoice.client ? `${invoice.client.first_name} ${invoice.client.last_name}` : "Client";
-  const businessName  = s?.business_name  ?? "TheTaxpert";
-  const supportEmail  = s?.support_email  ?? "info@thetaxpert.com";
-  const website       = s?.website        ?? "https://thetaxpert.com";
-  const defaultTerms  = s?.default_terms  ?? "Payment is due within 7 days of invoice date.";
-  const payInstr      = s?.payment_instructions ?? null;
-  const hasBanking    = s?.bank_name || s?.upi_id || s?.account_number;
+  const clientName = invoice.client ? `${invoice.client.first_name} ${invoice.client.last_name}`.trim() : "Client";
+  const bizName = s?.business_name ?? "TheTaxpert";
+  const bizEmail = s?.support_email ?? "info@thetaxpert.com";
+  const bizWebsite = s?.website ?? "https://thetaxpert.com";
+  const bizPhone = s?.support_phone ?? null;
+  const bizPan = s?.pan ?? null;
+  const terms = s?.default_terms ?? "Payment is due within 7 days of invoice date.";
+  const payInstr = s?.payment_instructions ?? null;
+  const hasBanking = !!(s?.bank_name || s?.upi_id || s?.account_number);
 
   return (
-    <div className="db-shell">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <Link to="/client/payments" style={{ color: "#475569", fontWeight: 500, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-          ← Back to Payments
+    <div className="inv-shell">
+
+      {/* Top bar */}
+      <div className="inv-topbar">
+        <Link to="/client/payments" className="inv-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          Payments
         </Link>
-        <button onClick={() => window.print()} className="bg-white border border-[#e2e8f0] text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-50 transition-colors">
-          ↓ Download / Print
+        <button className="inv-print-btn" onClick={() => window.print()}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          Download / Print
         </button>
       </div>
 
-      <div style={{ display: "grid", gap: "2rem", gridTemplateColumns: "1fr", maxWidth: "900px", margin: "0 auto" }}>
-        {/* Printable Invoice Card */}
-        <div className="card" style={{ padding: "3rem", background: "white" }} id="invoice-printable">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2rem" }}>
-            <div>
-              <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f172a", letterSpacing: "0.05em" }}>{businessName}</div>
-              {website && <div style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.25rem" }}>{website}</div>}
-              {supportEmail && <div style={{ fontSize: "0.875rem", color: "#64748b" }}>{supportEmail}</div>}
-              {s?.support_phone && <div style={{ fontSize: "0.875rem", color: "#64748b" }}>{s.support_phone}</div>}
-              {s?.pan && <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: 2 }}>PAN: {s.pan}</div>}
+      {/* Two-column layout */}
+      <div className="inv-layout">
+
+        {/* ── Left: Printable invoice document ─────────────── */}
+        <div className="inv-doc" id="invoice-printable">
+
+          {/* Gold accent bar */}
+          <div className="inv-doc-accent" />
+
+          {/* Header: business + invoice meta */}
+          <div className="inv-doc-header">
+            <div className="inv-doc-biz">
+              <div className="inv-doc-biz-name">{bizName}</div>
+              {bizWebsite && <div className="inv-doc-biz-meta">{bizWebsite}</div>}
+              {bizEmail && <div className="inv-doc-biz-meta">{bizEmail}</div>}
+              {bizPhone && <div className="inv-doc-biz-meta">{bizPhone}</div>}
+              {bizPan && <div className="inv-doc-biz-pan">PAN: {bizPan}</div>}
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#475569" }}>Invoice #{invoice.invoice_number}</div>
-              <div style={{ display: "inline-block", marginTop: "0.5rem", padding: "0.25rem 0.75rem", borderRadius: "9999px", fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", ...(isPaid ? { background: "#dcfce7", color: "#166534" } : { background: "#fef3c7", color: "#b45309" }) }}>
-                {isPaid ? "Paid" : isPending ? "Due" : invoice.status}
+            <div className="inv-doc-meta">
+              <div className="inv-doc-num">Invoice #{invoice.invoice_number}</div>
+              <div className={`inv-doc-status inv-doc-status--${isPaid ? "paid" : "due"}`}>
+                {isPaid ? "Paid" : "Due"}
               </div>
             </div>
           </div>
 
-          <div style={{ height: "1px", background: "#e2e8f0", margin: "2rem 0" }} />
+          <div className="inv-doc-rule" />
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3rem" }}>
+          {/* Bill To + Dates */}
+          <div className="inv-doc-parties">
             <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>Bill To</div>
-              <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "1.1rem", marginBottom: "0.25rem" }}>{clientName}</div>
-              {invoice.client?.pan && <div style={{ fontSize: "0.875rem", color: "#475569" }}>PAN: {invoice.client.pan}</div>}
-              {invoice.client?.email && <div style={{ fontSize: "0.875rem", color: "#475569" }}>{invoice.client.email}</div>}
+              <div className="inv-doc-section-label">Bill To</div>
+              <div className="inv-doc-client-name">{clientName}</div>
+              {invoice.client?.pan && <div className="inv-doc-client-detail">PAN: {invoice.client.pan}</div>}
+              {invoice.client?.email && <div className="inv-doc-client-detail">{invoice.client.email}</div>}
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "1rem", fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: 500 }}>Issue Date:</span><span>{issueDate}</span>
+            <div className="inv-doc-dates">
+              <div className="inv-doc-date-row">
+                <span className="inv-doc-date-label">Issue date</span>
+                <span className="inv-doc-date-val">{fmt(invoice.issued_at)}</span>
               </div>
-              {dueDate && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "1rem", fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
-                  <span style={{ fontWeight: 500 }}>{isPaid ? "Was Due:" : "Due Date:"}</span><span style={{ color: isPaid ? "inherit" : "#b91c1c", fontWeight: isPaid ? "normal" : 600 }}>{dueDate}</span>
+              {invoice.due_date && (
+                <div className="inv-doc-date-row">
+                  <span className="inv-doc-date-label">{isPaid ? "Was due" : "Due date"}</span>
+                  <span className={`inv-doc-date-val${!isPaid ? " inv-doc-date-val--due" : ""}`}>{fmt(invoice.due_date)}</span>
                 </div>
               )}
-              {paidDate && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "1rem", fontSize: "0.875rem", color: "#166534", fontWeight: 500 }}>
-                  <span>Paid On:</span><span>{paidDate}</span>
+              {invoice.paid_at && (
+                <div className="inv-doc-date-row">
+                  <span className="inv-doc-date-label">Paid on</span>
+                  <span className="inv-doc-date-val inv-doc-date-val--paid">{fmt(invoice.paid_at)}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "2rem" }}>
+          {/* Line items */}
+          <table className="inv-table">
             <thead>
-              <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
-                <th style={{ textAlign: "left", padding: "0.75rem 0", fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Description</th>
-                <th style={{ textAlign: "right", padding: "0.75rem 0", fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Qty</th>
-                <th style={{ textAlign: "right", padding: "0.75rem 0", fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Unit Price</th>
-                <th style={{ textAlign: "right", padding: "0.75rem 0", fontSize: "0.75rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Amount</th>
+              <tr>
+                <th className="inv-th inv-th--left">Description</th>
+                <th className="inv-th">Qty</th>
+                <th className="inv-th">Unit price</th>
+                <th className="inv-th inv-th--right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {invoice.invoice_items?.map((item: any) => (
-                <tr key={item.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "1rem 0" }}>
-                    <div style={{ fontWeight: 600, color: "#0f172a" }}>{item.description}</div>
-                    {invoice.service?.category && <div style={{ fontSize: "0.875rem", color: "#64748b", marginTop: "0.15rem" }}>{invoice.service.category}</div>}
+              {(invoice.invoice_items ?? []).map((item: any, i: number) => (
+                <tr key={item.id ?? i} className="inv-tr">
+                  <td className="inv-td inv-td--left">
+                    <div className="inv-td-desc">{item.description}</div>
+                    {invoice.service?.category && <div className="inv-td-cat">{invoice.service.category}</div>}
                   </td>
-                  <td style={{ padding: "1rem 0", textAlign: "right", color: "#475569" }}>{item.quantity}</td>
-                  <td style={{ padding: "1rem 0", textAlign: "right", color: "#475569" }}>{formatRupees(item.unit_price)}</td>
-                  <td style={{ padding: "1rem 0", textAlign: "right", fontWeight: 600, color: "#0f172a" }}>{formatRupees(item.line_total)}</td>
+                  <td className="inv-td inv-td--center">{item.quantity}</td>
+                  <td className="inv-td">{formatRupees(item.unit_price)}</td>
+                  <td className="inv-td inv-td--right inv-td--bold">{formatRupees(item.line_total)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "3rem" }}>
-            <div style={{ width: "300px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0", borderBottom: "1px solid #f1f5f9", color: "#475569", fontSize: "0.875rem" }}>
-                <span>Subtotal</span><span>{formatRupees(invoice.subtotal)}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "1rem 0", fontWeight: 800, color: "#0f172a", fontSize: "1.25rem" }}>
-                <span>Total</span><span>{formatRupees(invoice.total_amount)}</span>
+          {/* Totals */}
+          <div className="inv-totals">
+            <div className="inv-totals-inner">
+              {invoice.subtotal !== invoice.total_amount && (
+                <div className="inv-totals-row">
+                  <span>Subtotal</span>
+                  <span>{formatRupees(invoice.subtotal)}</span>
+                </div>
+              )}
+              <div className="inv-totals-row inv-totals-row--total">
+                <span>Total</span>
+                <span>{formatRupees(invoice.total_amount)}</span>
               </div>
               {isPaid && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0", color: "#166534", fontSize: "0.95rem", fontWeight: 600, borderTop: "2px solid #bbf7d0", marginTop: "0.5rem" }}>
-                  <span>Amount Paid</span><span>{formatRupees(invoice.total_amount)}</span>
+                <div className="inv-totals-row inv-totals-row--paid">
+                  <span>Amount paid</span>
+                  <span>{formatRupees(invoice.total_amount)}</span>
                 </div>
               )}
             </div>
@@ -356,51 +387,51 @@ export default function InvoicePage() {
 
           {/* Banking details */}
           {hasBanking && (
-            <div style={{ marginBottom: "2rem", padding: "1rem 1.25rem", background: "#f8fafc", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.75rem" }}>Payment Details</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "0.5rem 1.5rem", fontSize: "0.8rem" }}>
-                {s?.bank_name && <div><span style={{ color: "#94a3b8" }}>Bank: </span>{s.bank_name}</div>}
-                {s?.account_holder_name && <div><span style={{ color: "#94a3b8" }}>A/C Name: </span>{s.account_holder_name}</div>}
-                {s?.account_number && <div><span style={{ color: "#94a3b8" }}>A/C No: </span>{s.account_number}</div>}
-                {s?.ifsc && <div><span style={{ color: "#94a3b8" }}>IFSC: </span>{s.ifsc}</div>}
-                {s?.upi_id && <div><span style={{ color: "#94a3b8" }}>UPI: </span>{s.upi_id}</div>}
+            <div className="inv-banking">
+              <div className="inv-section-label">Payment Details</div>
+              <div className="inv-banking-grid">
+                {s?.bank_name && <div className="inv-banking-item"><span>Bank</span>{s.bank_name}</div>}
+                {s?.account_holder_name && <div className="inv-banking-item"><span>Account name</span>{s.account_holder_name}</div>}
+                {s?.account_number && <div className="inv-banking-item"><span>Account no.</span>{s.account_number}</div>}
+                {s?.ifsc && <div className="inv-banking-item"><span>IFSC</span>{s.ifsc}</div>}
+                {s?.upi_id && <div className="inv-banking-item"><span>UPI ID</span>{s.upi_id}</div>}
               </div>
             </div>
           )}
 
-          {/* Terms & footer */}
-          <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "1.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {defaultTerms && (
-              <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: 0 }}><strong style={{ color: "#64748b" }}>Terms:</strong> {defaultTerms}</p>
-            )}
-            {payInstr && (
-              <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: 0 }}><strong style={{ color: "#64748b" }}>Payment:</strong> {payInstr}</p>
-            )}
-            <p style={{ fontSize: "0.75rem", color: "#94a3b8", margin: 0, textAlign: "center", marginTop: "0.5rem" }}>
-              {businessName} · {supportEmail}{website ? ` · ${website}` : ""}
-            </p>
+          {/* Footer */}
+          <div className="inv-footer">
+            {terms && <p className="inv-footer-line"><strong>Terms:</strong> {terms}</p>}
+            {payInstr && <p className="inv-footer-line"><strong>Payment:</strong> {payInstr}</p>}
+            <p className="inv-footer-brand">{bizName} · {bizEmail}{bizWebsite ? ` · ${bizWebsite}` : ""}</p>
           </div>
         </div>
 
-        {/* CTA (Outside print area) */}
-        {isPending && invoice.service?.slug && (
-          <InvoicePayButton
-            serviceSlug={invoice.service.slug}
-            price={invoice.total_amount}
-            serviceName={invoice.service.name ?? "Professional Service"}
-            clientServiceId={id}
-            formattedPrice={formatRupees(invoice.total_amount)}
-          />
-        )}
+        {/* ── Right: Payment panel (sticky) ─────────────────── */}
+        <div className="inv-panel-col">
+          {isPending && invoice.service?.slug ? (
+            <PaymentPanel
+              serviceSlug={invoice.service.slug}
+              serviceName={invoice.service.name ?? "Professional Service"}
+              clientServiceId={id}
+              price={invoice.total_amount}
+              invoice={invoice}
+            />
+          ) : isPaid ? (
+            <div className="inv-panel inv-panel--paid">
+              <div className="inv-panel-paid-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" />
+                </svg>
+              </div>
+              <div className="inv-panel-paid-title">Invoice paid</div>
+              <div className="inv-panel-paid-amount">{formatRupees(invoice.total_amount)}</div>
+              {invoice.paid_at && <div className="inv-panel-paid-date">on {fmt(invoice.paid_at)}</div>}
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #invoice-printable, #invoice-printable * { visibility: visible; }
-          #invoice-printable { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
-        }
-      `}</style>
     </div>
   );
 }
