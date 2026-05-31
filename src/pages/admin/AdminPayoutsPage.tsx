@@ -161,9 +161,11 @@ export default function AdminPayoutsPage() {
               <tbody>
                 {payouts.map((p: any) => (
                   <tr key={p.id}>
-                    <td className="aq-td-name">{p.texpert?.first_name} {p.texpert?.last_name}</td>
+                    <td className="aq-td-name">{p.texpert?.first_name} {p.texpert?.last_name}
+                      <div className="aq-client-email">{p.texpert?.email}</div>
+                    </td>
                     <td>{p.client_service?.service?.name ?? '—'}{p.client_service?.fiscal_year ? ` (${p.client_service.fiscal_year})` : ''}</td>
-                    <td className="aq-client-email">{p.texpert?.email}</td>
+                    <td className="aq-td-name">{p.client ? `${p.client.first_name} ${p.client.last_name}` : '—'}</td>
                     <td className="aq-td-amount">₹{(p.amount / 100).toLocaleString('en-IN')}</td>
                     <td>{new Date(p.paid_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
                     <td>{p.recorded_by_user?.first_name} {p.recorded_by_user?.last_name}</td>

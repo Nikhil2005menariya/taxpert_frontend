@@ -3,10 +3,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../api/client";
 import { Navigate, useSearchParams } from "react-router-dom";
 import CreateUserForm from "../../components/admin/CreateUserForm";
-import AssignClientForm from "../../components/admin/AssignClientForm";
 import UserRoleBadge from "../../components/admin/UserRoleBadge";
 import ResetPasswordButton from "../../components/admin/ResetPasswordButton";
-import AssignmentsPanel from "../../components/admin/AssignmentsPanel";
 
 type ValidRole = "super_admin" | "admin" | "expert" | "ca" | "staff" | "client";
 
@@ -27,15 +25,6 @@ export default function AdminPage() {
     enabled: isAdmin,
   });
 
-  const { data: assignmentsData, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ["admin-assignments"],
-    queryFn: async () => {
-      const res = await apiClient.get("/admin/assignments");
-      return res.data.data ?? [];
-    },
-    enabled: isAdmin,
-  });
-
   const { data: filingCountsData, isLoading: filingLoading } = useQuery({
     queryKey: ["admin-filing-counts"],
     queryFn: async () => {
@@ -45,7 +34,7 @@ export default function AdminPage() {
     enabled: isAdmin,
   });
 
-  if (authLoading || usersLoading || assignmentsLoading || filingLoading) {
+  if (authLoading || usersLoading || filingLoading) {
     return (
       <div className="page-loader"><div className="page-loader-ring" /></div>
     );
@@ -56,35 +45,19 @@ export default function AdminPage() {
   }
 
   if (tab === "permissions" && !isSuperAdmin) {
-    return <Navigate to="/admin?tab=clients" replace />;
+    return <Navigate to="/admin/users" replace />;
   }
 
   const allUsers = usersData ?? [];
-  const assignments = assignmentsData ?? [];
   const filingCounts = filingCountsData ?? {};
 
   const clientUsers = allUsers.filter((u: any) => u.role === "client");
   const staffUsers = allUsers.filter((u: any) => u.role !== "client");
-  const expertUsers = allUsers.filter(
-    (u: any) => u.role === "expert" || u.role === "ca" || u.role === "staff"
-  );
-
-  const expertForClient: Record<string, any> = {};
-  const clientsForExpert: Record<string, number> = {};
-
-  for (const a of assignments) {
-    const ca = Array.isArray(a.ca) ? a.ca[0] : a.ca;
-    if (ca) {
-      expertForClient[a.client_id] = ca;
-      clientsForExpert[a.ca_id] = (clientsForExpert[a.ca_id] ?? 0) + 1;
-    }
-  }
 
   const tabs = [
-    { id: "clients",     label: `Clients (${clientUsers.length})` },
-    { id: "staff",       label: `Staff & Experts (${staffUsers.length})` },
-    { id: "assignments", label: `Assignments (${assignments.length})` },
-    { id: "create",      label: "+ Create User" },
+    { id: "clients", label: `Clients (${clientUsers.length})` },
+    { id: "staff",   label: `Staff & Experts (${staffUsers.length})` },
+    { id: "create",  label: "+ Create User" },
   ];
 
   return (
@@ -105,9 +78,6 @@ export default function AdminPage() {
           </div>
           <div className="adm-hstat">
             <span>{staffUsers.length}</span>Staff
-          </div>
-          <div className="adm-hstat">
-            <span>{assignments.length}</span>Assignments
           </div>
         </div>
       </div>
@@ -158,7 +128,6 @@ export default function AdminPage() {
                     <th>Mobile</th>
                     <th>Services</th>
                     <th>Completed</th>
-                    <th>Assigned Expert</th>
                     <th>Since</th>
                     <th>Password</th>
                   </tr>
@@ -166,7 +135,6 @@ export default function AdminPage() {
                 <tbody>
                   {clientUsers.map((u: any) => {
                     const fc = filingCounts[u.id];
-                    const expert = expertForClient[u.id];
                     return (
                       <tr key={u.id}>
                         <td className="adm-name">
@@ -190,15 +158,6 @@ export default function AdminPage() {
                           >
                             {fc?.filed ?? 0}
                           </span>
-                        </td>
-                        <td>
-                          {expert ? (
-                            <span className="adm-expert-pill">
-                              {expert.first_name} {expert.last_name}
-                            </span>
-                          ) : (
-                            <span className="adm-unassigned">Unassigned</span>
-                          )}
                         </td>
                         <td className="adm-muted">
                           {new Date(u.created_at).toLocaleDateString("en-IN", {
@@ -250,14 +209,12 @@ export default function AdminPage() {
                     <th>PAN</th>
                     <th>Mobile</th>
                     <th>Role</th>
-                    <th>Clients Assigned</th>
                     <th>Since</th>
                     <th>Password</th>
                   </tr>
                 </thead>
                 <tbody>
                   {staffUsers.map((u: any) => {
-                    const isExpert = u.role === "expert" || u.role === "ca";
                     return (
                       <tr key={u.id}>
                         <td className="adm-name">
@@ -277,15 +234,6 @@ export default function AdminPage() {
                             currentRole={u.role as ValidRole}
                             viewerRole={(profile?.role ?? "admin") as ValidRole}
                           />
-                        </td>
-                        <td>
-                          {isExpert ? (
-                            <span className="adm-count">
-                              {clientsForExpert[u.id] ?? 0}
-                            </span>
-                          ) : (
-                            <span className="adm-muted">—</span>
-                          )}
                         </td>
                         <td className="adm-muted">
                           {new Date(u.created_at).toLocaleDateString("en-IN", {
@@ -308,33 +256,6 @@ export default function AdminPage() {
         </section>
       )}
 
-      {tab === "assignments" && (
-        <section className="adm-section">
-          <div className="adm-asgn-layout">
-            <div className="adm-asgn-sidebar">
-              <div className="card" style={{ position: "sticky", top: "88px" }}>
-                <h3 className="adm-card-title">New Assignment</h3>
-                <AssignClientForm caUsers={expertUsers} clientUsers={clientUsers} />
-              </div>
-            </div>
-
-            <div className="adm-asgn-main">
-              <div className="adm-section-header">
-                <div>
-                  <h2 className="adm-section-title">Active Assignments</h2>
-                  <p className="adm-section-desc">
-                    All client–Taxpert relationships with full details and service summary.
-                  </p>
-                </div>
-              </div>
-              <AssignmentsPanel
-                assignments={assignments}
-                filingCounts={filingCounts}
-              />
-            </div>
-          </div>
-        </section>
-      )}
 
       {tab === "create" && (
         <section className="adm-section">

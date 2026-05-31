@@ -14,6 +14,7 @@ import VaultPage from './pages/client/vault/VaultPage';
 import WorkloadPage from './pages/workload/WorkloadPage';
 import WorkQueuePage from './pages/work-queue/WorkQueuePage';
 import AdminPage from './pages/admin/AdminPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import ServicesConfigPage from './pages/admin/ServicesConfigPage';
 import DocumentTypesPage from './pages/admin/DocumentTypesPage';
 import NewServicePage from './pages/admin/NewServicePage';
@@ -107,7 +108,8 @@ function App() {
           <Route path="/texpert/queue"        element={<AdminQueuePage />} />
 
           {/* ── Admin ──────────────────────────────────────────── */}
-          <Route path="/admin"                        element={<AdminPage />} />
+          <Route path="/admin"                        element={<AdminDashboardPage />} />
+          <Route path="/admin/users"                  element={<AdminPage />} />
           <Route path="/admin/queue"                  element={<AdminQueuePage />} />
           <Route path="/admin/payments"               element={<PaymentsPage />} />
           <Route path="/admin/services"               element={<ServicesConfigPage />} />

@@ -8738,6 +8738,25 @@ a:hover {
   color: var(--gold-700);
   border: 1px solid rgba(196,154,58,0.25);
 }
+.inv-doc-status--overdue {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+.inv-overdue-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: #fff5f5;
+  border: 1px solid #fca5a5;
+  border-radius: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.85rem;
+  color: #7f1d1d;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.inv-overdue-banner svg { flex-shrink: 0; margin-top: 1px; color: #dc2626; }
 .inv-doc-rule {
   height: 1px;
   background: var(--line);

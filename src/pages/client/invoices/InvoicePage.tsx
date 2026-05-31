@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, paymentClient } from "../../../api/client";
 import { formatRupees } from "../../../shared/finance-utils";
 
@@ -32,6 +32,7 @@ type AppliedDiscount = {
 
 function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price, invoice }: any) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [state, setState] = useState<"idle" | "loading" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -79,6 +80,8 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price, invoic
               razorpay_signature: r.razorpay_signature,
             });
             setState("success");
+            // Invalidate so the invoice shows "Paid" if user navigates back before webhook processes
+            queryClient.invalidateQueries({ queryKey: ["invoice", clientServiceId] });
             setTimeout(() => navigate(`/client/services/${clientServiceId}`), 2500);
           } catch (e: any) {
             setState("error");
@@ -249,8 +252,10 @@ export default function InvoicePage() {
   const invoice = data.invoice;
   const s = data.settings;
 
-  const isPending = invoice.status === "pending";
-  const isPaid = invoice.status === "paid" || invoice.status === "captured";
+  const isPaid    = invoice.status === "paid" || invoice.status === "captured";
+  const isPending = invoice.status === "pending" || invoice.status === "overdue";
+  const isOverdue = invoice.status === "overdue" ||
+    (!isPaid && !!invoice.due_date && new Date(invoice.due_date) < new Date());
 
   const fmt = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
@@ -282,6 +287,19 @@ export default function InvoicePage() {
         </button>
       </div>
 
+      {/* Overdue banner */}
+      {isOverdue && !isPaid && (
+        <div className="inv-overdue-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>
+            <strong>Payment overdue.</strong> This invoice was due on {fmt(invoice.due_date)} and has not been settled.
+            Please complete payment to avoid any disruption to your service.
+          </span>
+        </div>
+      )}
+
       {/* Two-column layout */}
       <div className="inv-layout">
 
@@ -302,8 +320,8 @@ export default function InvoicePage() {
             </div>
             <div className="inv-doc-meta">
               <div className="inv-doc-num">Invoice #{invoice.invoice_number}</div>
-              <div className={`inv-doc-status inv-doc-status--${isPaid ? "paid" : "due"}`}>
-                {isPaid ? "Paid" : "Due"}
+              <div className={`inv-doc-status inv-doc-status--${isPaid ? "paid" : isOverdue ? "overdue" : "due"}`}>
+                {isPaid ? "Paid" : isOverdue ? "Overdue" : "Due"}
               </div>
             </div>
           </div>

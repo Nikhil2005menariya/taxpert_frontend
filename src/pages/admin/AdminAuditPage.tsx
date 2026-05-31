@@ -5,17 +5,27 @@ import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
 
 const ACTION_LABELS: Record<string, string> = {
-  create_texpert: 'Created Taxpert',
-  update_texpert: 'Updated Taxpert',
-  deactivate_texpert: 'Deactivated Taxpert',
-  remove_texpert: 'Removed Taxpert',
-  assign_texpert: 'Assigned Taxpert',
-  unassign_texpert: 'Unassigned Taxpert',
-  add_to_queue: 'Added to Queue',
-  record_payout: 'Recorded Payout',
-  send_notification: 'Sent Notification',
-  self_assign_service: 'Self-Assigned Service',
+  // Admin / staff actions
+  create_texpert:        'Created Taxpert',
+  update_texpert:        'Updated Taxpert',
+  deactivate_texpert:    'Deactivated Taxpert',
+  remove_texpert:        'Removed Taxpert',
+  assign_texpert:        'Assigned Taxpert',
+  unassign_texpert:      'Unassigned Taxpert',
+  add_to_queue:          'Added to Queue',
+  record_payout:         'Recorded Payout',
+  send_notification:     'Sent Notification',
+  self_assign_service:   'Self-Assigned Service',
   update_service_status: 'Updated Service Status',
+  // Payment events (from payment microservice)
+  order_created:              'Order Created',
+  payment_captured:           'Payment Captured',
+  payment_failed:             'Payment Failed',
+  coupon_consumed:            'Coupon Used',
+  referral_rewarded:          'Referral Rewarded',
+  // Invoice overdue (daily reminders worker)
+  invoice_overdue_notified:   'Invoice Marked Overdue',
+  invoice_overdue_escalated:  'Overdue Escalation Sent',
 };
 
 export default function AdminAuditPage() {

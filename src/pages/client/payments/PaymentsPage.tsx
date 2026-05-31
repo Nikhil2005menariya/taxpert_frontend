@@ -416,27 +416,206 @@ function AdminPayments() {
 // ── Client view ───────────────────────────────────────────────
 
 interface ClientPaymentRow {
-  id: string; amount: number; gst_rate: number; status: string;
-  captured_at: string | null; created_at: string;
-  razorpay_payment_id: string | null; client_service_id: string | null;
+  id: string;
+  amount: number;
+  base_amount: number | null;
+  gst_amount: number | null;
+  gst_rate: number;
+  discount_amount: number | null;
+  original_amount: number | null;
+  payment_method: string | null;
+  status: string;
+  captured_at: string | null;
+  created_at: string;
+  razorpay_payment_id: string | null;
+  client_service_id: string | null;
   service: { name?: string; category?: string } | null;
 }
 
+// ── Receipt generator ─────────────────────────────────────────
+
+const METHOD_LABELS: Record<string, string> = {
+  upi: 'UPI', card: 'Card', netbanking: 'Net Banking', wallet: 'Wallet',
+};
+
+function buildReceiptHtml(p: ClientPaymentRow, biz: any, clientName: string): string {
+  const base     = p.base_amount     ?? calcGst(p.amount, p.gst_rate ?? 18).base;
+  const gst      = p.gst_amount      ?? calcGst(p.amount, p.gst_rate ?? 18).gst;
+  const discount = p.discount_amount ?? 0;
+  const original = p.original_amount ?? p.amount;
+  const method   = p.payment_method ? (METHOD_LABELS[p.payment_method.toLowerCase()] ?? p.payment_method.toUpperCase()) : null;
+  const dateStr  = p.captured_at
+    ? new Date(p.captured_at).toLocaleString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : new Date(p.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const bizName    = biz?.business_name ?? 'TheTaxpert';
+  const bizEmail   = biz?.support_email ?? 'info@thetaxpert.com';
+  const bizWebsite = biz?.website       ?? 'https://thetaxpert.com';
+  const bizPhone   = biz?.support_phone ?? '';
+  const bizPan     = biz?.pan           ?? '';
+
+  const fmt = (paise: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(paise / 100);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Payment Receipt — ${p.razorpay_payment_id ?? p.id}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #0f172a; }
+  @page { size: A4 portrait; margin: 18mm 20mm; }
+  .page { max-width: 600px; margin: 0 auto; padding: 40px 0; }
+  .accent { height: 5px; background: linear-gradient(90deg, #c49a3a 0%, #e8c97a 100%); border-radius: 3px; margin-bottom: 28px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .biz-name { font-size: 1.35rem; font-weight: 800; color: #0f172a; }
+  .biz-meta { font-size: 0.78rem; color: #64748b; margin-top: 3px; line-height: 1.6; }
+  .receipt-badge { text-align: right; }
+  .receipt-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; }
+  .receipt-id { font-size: 0.85rem; font-weight: 700; font-family: 'Courier New', monospace; color: #0f172a; margin-top: 4px; }
+  .paid-stamp { display: inline-block; border: 2.5px solid #16a34a; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; font-weight: 800; color: #16a34a; letter-spacing: 0.1em; margin-top: 6px; }
+  .rule { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .meta-block .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 4px; }
+  .meta-block .value { font-size: 0.9rem; color: #0f172a; font-weight: 600; }
+  .meta-block .sub { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-bottom: 20px; }
+  thead tr { background: #f8fafc; }
+  th { text-align: left; padding: 9px 12px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; border-bottom: 1px solid #e2e8f0; }
+  th:last-child { text-align: right; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  td:last-child { text-align: right; font-weight: 600; }
+  .svc-name { font-weight: 600; color: #0f172a; }
+  .svc-cat { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+  .totals { margin-left: auto; width: 260px; }
+  .totals-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.85rem; color: #64748b; }
+  .totals-row.total { border-top: 1.5px solid #e2e8f0; margin-top: 6px; padding-top: 8px; font-weight: 700; font-size: 0.95rem; color: #0f172a; }
+  .totals-row.discount { color: #16a34a; }
+  .totals-row.paid { color: #166534; background: #f0fdf4; border-radius: 6px; padding: 6px 8px; margin-top: 4px; font-weight: 700; }
+  .method-row { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-top: 16px; font-size: 0.85rem; }
+  .method-row .label { color: #64748b; }
+  .method-row .value { font-weight: 600; color: #0f172a; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #f1f5f9; font-size: 0.75rem; color: #94a3b8; text-align: center; line-height: 1.6; }
+  @media print {
+    body { background: #fff; }
+    .page { padding: 0; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="accent"></div>
+  <div class="header">
+    <div>
+      <div class="biz-name">${bizName}</div>
+      <div class="biz-meta">
+        ${bizEmail ? `${bizEmail}<br>` : ''}${bizWebsite ? `${bizWebsite}<br>` : ''}${bizPhone ? `${bizPhone}<br>` : ''}${bizPan ? `PAN: ${bizPan}` : ''}
+      </div>
+    </div>
+    <div class="receipt-badge">
+      <div class="receipt-title">Payment Receipt</div>
+      ${p.razorpay_payment_id ? `<div class="receipt-id">${p.razorpay_payment_id}</div>` : ''}
+      <div class="paid-stamp">✓ PAID</div>
+    </div>
+  </div>
+
+  <hr class="rule" />
+
+  <div class="meta-grid">
+    <div class="meta-block">
+      <div class="label">Billed To</div>
+      <div class="value">${clientName}</div>
+    </div>
+    <div class="meta-block">
+      <div class="label">Payment Date</div>
+      <div class="value">${dateStr}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th>Category</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="svc-name">${p.service?.name ?? 'Professional Tax Service'}</div>
+        </td>
+        <td><span class="svc-cat">${p.service?.category ?? '—'}</span></td>
+        <td>${fmt(original)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-row"><span>Base amount</span><span>${fmt(base)}</span></div>
+    <div class="totals-row"><span>GST (${p.gst_rate ?? 18}%)</span><span>${fmt(gst)}</span></div>
+    ${discount > 0 ? `<div class="totals-row discount"><span>Discount applied</span><span>−${fmt(discount)}</span></div>` : ''}
+    <div class="totals-row total"><span>Total paid</span><span>${fmt(p.amount)}</span></div>
+    <div class="totals-row paid"><span>Amount paid</span><span>${fmt(p.amount)}</span></div>
+  </div>
+
+  ${method ? `
+  <div class="method-row">
+    <span class="label">Payment method</span>
+    <span class="value">${method}</span>
+  </div>` : ''}
+
+  <div class="footer">
+    ${bizName} · ${bizEmail}${bizWebsite ? ` · ${bizWebsite}` : ''}<br>
+    This is a computer-generated receipt and does not require a signature.
+  </div>
+</div>
+<script>window.onload = () => window.print();</script>
+</body>
+</html>`;
+}
+
+function downloadReceipt(p: ClientPaymentRow, biz: any, clientName: string) {
+  const html = buildReceiptHtml(p, biz, clientName);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if (win) {
+    win.addEventListener('load', () => URL.revokeObjectURL(url));
+  } else {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ── Client payments view ──────────────────────────────────────
+
 function ClientPayments() {
+  const { profile } = useAuth();
+  const clientName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : '';
+
   const { data: clientData, isLoading } = useQuery({
     queryKey: ['client-payments'],
     queryFn: async () => {
-      const [myRes, pendingRes] = await Promise.all([
+      const [myRes, pendingRes, settingsRes] = await Promise.all([
         apiClient.get('/payments/my-payments'),
         apiClient.get('/payments/pending-invoices'),
+        apiClient.get('/payments/invoice-settings').catch(() => ({ data: { data: null } })),
       ]);
-      return { myPayments: myRes.data.data as ClientPaymentRow[], pendingInvoices: pendingRes.data.data as any[] };
+      return {
+        myPayments:      myRes.data.data     as ClientPaymentRow[],
+        pendingInvoices: pendingRes.data.data as any[],
+        bizSettings:     settingsRes.data.data,
+      };
     },
   });
 
   if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
 
-  const { myPayments = [], pendingInvoices = [] } = clientData ?? {};
+  const { myPayments = [], pendingInvoices = [], bizSettings } = clientData ?? {};
+  const captured = myPayments.filter(p => p.status === 'captured' || p.status === 'paid');
+  const failed   = myPayments.filter(p => p.status === 'failed');
 
   return (
     <div className="pm2-shell">
@@ -445,6 +624,12 @@ function ClientPayments() {
           <h1 className="pm2-title">Payments</h1>
           <p className="pm2-subtitle">Your invoices and payment history</p>
         </div>
+        {captured.length > 0 && (
+          <div className="pm2-client-stat">
+            <div className="pm2-client-stat-val">{formatRupees(captured.reduce((s, p) => s + p.amount, 0))}</div>
+            <div className="pm2-client-stat-label">Total paid</div>
+          </div>
+        )}
       </div>
 
       {/* Pending invoices */}
@@ -456,16 +641,29 @@ function ClientPayments() {
           </div>
           <div className="pm2-invoice-list">
             {pendingInvoices.map((cs: any) => {
-              const price = cs.service?.price ?? null;
+              const price     = cs.service?.price ?? null;
+              const isOverdue = cs.invoice_status === 'overdue' ||
+                (cs.invoice_due_date && new Date(cs.invoice_due_date) < new Date());
+              const dueDate   = cs.invoice_due_date
+                ? new Date(cs.invoice_due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                : null;
               return (
-                <div key={cs.id} className="pm2-invoice-card">
+                <div key={cs.id} className={`pm2-invoice-card${isOverdue ? ' pm2-invoice-card--overdue' : ''}`}>
                   <div>
-                    <div className="pm2-invoice-svc">{cs.service?.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div className="pm2-invoice-svc">{cs.service?.name}</div>
+                      {isOverdue && <span className="pm2-overdue-badge">Overdue</span>}
+                    </div>
                     <div className="pm2-invoice-cat">{cs.service?.category}</div>
                     {price && price > 0 && <div className="pm2-invoice-price">{formatRupees(price)}</div>}
+                    {dueDate && (
+                      <div className={`pm2-due-date${isOverdue ? ' pm2-due-date--overdue' : ''}`}>
+                        {isOverdue ? `Was due ${dueDate}` : `Due ${dueDate}`}
+                      </div>
+                    )}
                   </div>
-                  <Link to={`/client/invoices/${cs.id}`} className="btn btn-primary pm2-pay-btn">
-                    Pay Now →
+                  <Link to={`/client/invoices/${cs.id}`} className={`btn pm2-pay-btn${isOverdue ? ' btn-danger' : ' btn-primary'}`}>
+                    {isOverdue ? 'Pay Now (Overdue)' : 'Pay Now →'}
                   </Link>
                 </div>
               );
@@ -474,13 +672,17 @@ function ClientPayments() {
         </div>
       )}
 
-      {/* Payment history */}
-      <div className="pm2-section-head" style={{ marginTop: pendingInvoices.length > 0 ? '1.5rem' : 0 }}>
+      {/* Successful transactions */}
+      <div className="pm2-section-head" style={{ marginTop: pendingInvoices.length > 0 ? '1.75rem' : 0 }}>
         <span className="pm2-section-title">Payment History</span>
-        {myPayments.length > 0 && <span style={{ fontSize: '0.8rem', color: 'var(--ink-400)' }}>{myPayments.length} transaction{myPayments.length !== 1 ? 's' : ''}</span>}
+        {captured.length > 0 && (
+          <span style={{ fontSize: '0.8rem', color: 'var(--ink-400)' }}>
+            {captured.length} transaction{captured.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
-      {myPayments.length === 0 ? (
+      {captured.length === 0 && failed.length === 0 ? (
         <div className="pm2-empty" style={{ marginTop: '1rem' }}>
           <div className="pm2-empty-icon">💳</div>
           <p className="pm2-empty-title">No payments yet</p>
@@ -488,46 +690,166 @@ function ClientPayments() {
         </div>
       ) : (
         <div className="pm2-receipt-list">
-          {myPayments.map(p => {
-            const { base, gst } = calcGst(p.amount, p.gst_rate ?? 18);
+          {captured.map(p => {
+            const base     = p.base_amount     ?? calcGst(p.amount, p.gst_rate ?? 18).base;
+            const gst      = p.gst_amount      ?? calcGst(p.amount, p.gst_rate ?? 18).gst;
+            const discount = p.discount_amount ?? 0;
+            const original = p.original_amount ?? p.amount;
+            const method   = p.payment_method ? (METHOD_LABELS[p.payment_method.toLowerCase()] ?? p.payment_method.toUpperCase()) : null;
+
             return (
-              <div key={p.id} className="pm2-receipt">
+              <div key={p.id} className="pm2-receipt pm2-receipt--success">
+                {/* Top row */}
                 <div className="pm2-receipt-top">
-                  <div>
-                    <div className="pm2-svc-name">{p.service?.name ?? '—'}</div>
-                    {p.service?.category && <div className="pm2-svc-cat">{p.service.category}</div>}
-                    <div className="pm2-time-cell" style={{ marginTop: 4 }}>{fmtDate(p.captured_at ?? p.created_at)}</div>
+                  <div className="pm2-receipt-left">
+                    <div className="pm2-receipt-status-dot" />
+                    <div>
+                      <div className="pm2-svc-name">{p.service?.name ?? 'Professional Service'}</div>
+                      {p.service?.category && <div className="pm2-svc-cat">{p.service.category}</div>}
+                      <div className="pm2-receipt-date">{fmtDate(p.captured_at ?? p.created_at)} · {fmtTime(p.captured_at ?? p.created_at)}</div>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="pm2-amount">{formatRupees(p.amount)}</div>
+                  <div className="pm2-receipt-right">
+                    <div className="pm2-receipt-amount">{formatRupees(p.amount)}</div>
                     <StatusPill status={p.status} />
                   </div>
                 </div>
+
+                {/* Breakdown */}
                 <div className="pm2-receipt-breakdown">
-                  <div className="pm2-receipt-row"><span>Base</span><span>{formatRupees(base)}</span></div>
-                  <div className="pm2-receipt-row"><span>GST ({p.gst_rate ?? 18}%)</span><span>{formatRupees(gst)}</span></div>
+                  <div className="pm2-receipt-row">
+                    <span>Base amount</span>
+                    <span>{formatRupees(base)}</span>
+                  </div>
+                  <div className="pm2-receipt-row">
+                    <span>GST ({p.gst_rate ?? 18}%)</span>
+                    <span>{formatRupees(gst)}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="pm2-receipt-row pm2-receipt-row--discount">
+                      <span>Discount applied</span>
+                      <span>−{formatRupees(discount)}</span>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="pm2-receipt-row pm2-receipt-row--original">
+                      <span>Original price</span>
+                      <span style={{ textDecoration: 'line-through', color: 'var(--ink-300)' }}>{formatRupees(original)}</span>
+                    </div>
+                  )}
+                  {method && (
+                    <div className="pm2-receipt-row">
+                      <span>Paid via</span>
+                      <span><MethodChip method={p.payment_method} /></span>
+                    </div>
+                  )}
                   {p.razorpay_payment_id && (
                     <div className="pm2-receipt-row">
-                      <span>Payment ID</span>
+                      <span>Transaction ID</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span className="pm2-pid">{p.razorpay_payment_id}</span>
                         <CopyBtn text={p.razorpay_payment_id} />
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Footer actions */}
+                <div className="pm2-receipt-actions">
                   {p.client_service_id && (
-                    <div className="pm2-receipt-row" style={{ borderTop: '1px solid var(--line)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-                      <Link to={`/client/services/${p.client_service_id}`} style={{ color: 'var(--gold-600)', fontWeight: 600, fontSize: '0.8rem' }}>
-                        View service workspace →
-                      </Link>
-                    </div>
+                    <Link to={`/client/services/${p.client_service_id}`} className="pm2-receipt-link">
+                      View service →
+                    </Link>
                   )}
+                  <button
+                    className="pm2-receipt-download"
+                    onClick={() => downloadReceipt(p, bizSettings, clientName)}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Receipt
+                  </button>
                 </div>
               </div>
             );
           })}
+
+          {/* Failed payments — shown below successful ones */}
+          {failed.length > 0 && (
+            <>
+              <div className="pm2-section-head" style={{ marginTop: '1.5rem' }}>
+                <span className="pm2-section-title" style={{ color: 'var(--ink-400)', fontSize: '0.82rem' }}>
+                  Failed attempts
+                </span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--ink-300)' }}>{failed.length}</span>
+              </div>
+              {failed.map(p => (
+                <div key={p.id} className="pm2-receipt pm2-receipt--failed">
+                  <div className="pm2-receipt-top">
+                    <div className="pm2-receipt-left">
+                      <div className="pm2-receipt-status-dot pm2-receipt-status-dot--failed" />
+                      <div>
+                        <div className="pm2-svc-name" style={{ color: 'var(--ink-500)' }}>{p.service?.name ?? 'Service'}</div>
+                        <div className="pm2-receipt-date">{fmtDate(p.created_at)}</div>
+                      </div>
+                    </div>
+                    <div className="pm2-receipt-right">
+                      <StatusPill status={p.status} />
+                    </div>
+                  </div>
+                  <div style={{ padding: '0.5rem 0.75rem 0.75rem', fontSize: '0.78rem', color: 'var(--ink-400)' }}>
+                    Payment did not go through. No amount was charged. Please try again from the Payments page.
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
+
+      <style>{`
+        .pm2-overdue-badge { background: #fee2e2; color: #991b1b; font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: 0.05em; text-transform: uppercase; }
+        .pm2-due-date { font-size: 0.75rem; color: var(--ink-400); margin-top: 3px; }
+        .pm2-due-date--overdue { color: #dc2626; font-weight: 600; }
+        .pm2-invoice-card--overdue { border-color: #fca5a5; background: #fff8f8; }
+        .btn-danger { background: #dc2626; color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-danger:hover { background: #b91c1c; }
+        .pm2-client-stat { text-align: right; }
+        .pm2-client-stat-val { font-size: 1.5rem; font-weight: 800; color: var(--gold-600, #b45309); line-height: 1; }
+        .pm2-client-stat-label { font-size: 0.72rem; color: var(--ink-400); margin-top: 3px; }
+
+        .pm2-receipt { border: 1px solid #e2e8f0; border-radius: 1rem; overflow: hidden; background: #fff; box-shadow: 0 1px 6px rgba(15,23,42,0.04); }
+        .pm2-receipt + .pm2-receipt { margin-top: 0.85rem; }
+        .pm2-receipt--failed { opacity: 0.7; }
+
+        .pm2-receipt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.1rem 0.75rem; }
+        .pm2-receipt-left { display: flex; align-items: flex-start; gap: 0.65rem; }
+        .pm2-receipt-right { text-align: right; flex-shrink: 0; }
+        .pm2-receipt-amount { font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1; margin-bottom: 5px; }
+        .pm2-receipt-date { font-size: 0.75rem; color: var(--ink-400); margin-top: 3px; }
+
+        .pm2-receipt-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex-shrink: 0; margin-top: 5px; }
+        .pm2-receipt-status-dot--failed { background: #dc2626; }
+
+        .pm2-receipt-breakdown { padding: 0 1.1rem 0.75rem; border-top: 1px solid #f1f5f9; margin: 0 0.1rem; }
+        .pm2-receipt-row { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; font-size: 0.82rem; color: var(--ink-600, #475569); border-bottom: 1px solid #f8fafc; }
+        .pm2-receipt-row:last-child { border-bottom: none; }
+        .pm2-receipt-row--discount { color: #16a34a; font-weight: 600; }
+        .pm2-receipt-row--original { color: var(--ink-300); }
+
+        .pm2-receipt-actions { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1.1rem; border-top: 1px solid #f1f5f9; background: #fafafa; gap: 0.75rem; }
+        .pm2-receipt-link { font-size: 0.8rem; font-weight: 600; color: var(--gold-600, #b45309); text-decoration: none; }
+        .pm2-receipt-link:hover { text-decoration: underline; }
+        .pm2-receipt-download {
+          display: flex; align-items: center; gap: 5px;
+          font-size: 0.78rem; font-weight: 600; color: #1d4ed8;
+          background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+          padding: 0.3rem 0.75rem; cursor: pointer; transition: background 0.15s;
+          margin-left: auto;
+        }
+        .pm2-receipt-download:hover { background: #dbeafe; }
+      `}</style>
     </div>
   );
 }

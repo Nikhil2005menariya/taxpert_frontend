@@ -229,6 +229,7 @@ export default function DashboardSidebar({
 
     // Admin items
     ...(isAdmin ? [
+      { href: "/admin/users",            label: "Users",      Icon: IconUsers,     exact: false, badge: null },
       { href: "/admin/taxperts",         label: "Taxperts",   Icon: IconUsers,     exact: false, badge: null },
       { href: "/admin/clients",          label: "Clients",    Icon: IconUser,      exact: false, badge: null },
       { href: "/admin/queue",            label: "Queue",      Icon: IconInbox,     exact: false, badge: null },
