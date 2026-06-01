@@ -69,6 +69,12 @@ export default function LoginForm() {
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
       <div className="auth-form-fields">
 
+        {searchParams.get("verified") === "1" && (
+          <div className="auth-success-banner">
+            Your account is verified. Please sign in.
+          </div>
+        )}
+
         <div className="form-group">
           <label className="form-label">Email</label>
           <input
