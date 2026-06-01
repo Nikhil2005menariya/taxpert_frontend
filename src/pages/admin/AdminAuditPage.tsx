@@ -4,6 +4,30 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
 
+// Keys whose values are stored in paise and should be shown as ₹ in audit details
+const PAISE_KEYS = new Set([
+  'amountPaise', 'amount', 'rewardAmount', 'discountAmount',
+  'originalAmount', 'finalAmount', 'totalAmount',
+]);
+
+function fmtRupees(paise: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+  }).format(paise / 100);
+}
+
+function formatAuditMetadata(meta: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [key, val] of Object.entries(meta ?? {})) {
+    if (PAISE_KEYS.has(key) && typeof val === 'number' && val > 0) {
+      out[key] = `${fmtRupees(val)} (${val} paise)`;
+    } else {
+      out[key] = val;
+    }
+  }
+  return out;
+}
+
 const ACTION_LABELS: Record<string, string> = {
   // Admin / staff actions
   create_texpert:        'Created Taxpert',
@@ -115,7 +139,10 @@ export default function AdminAuditPage() {
                       {Object.keys(e.metadata ?? {}).length > 0 && (
                         <details className="aq-audit-meta">
                           <summary>details</summary>
-                          <pre>{JSON.stringify(e.metadata, null, 2)}</pre>
+                          <pre>{JSON.stringify(
+                            formatAuditMetadata(e.metadata),
+                            null, 2
+                          )}</pre>
                         </details>
                       )}
                     </td>
