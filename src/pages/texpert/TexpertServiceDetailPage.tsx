@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -221,6 +221,14 @@ export default function TexpertServiceDetailPage() {
   // Inline form state
   const [showAddDoc, setShowAddDoc] = useState(false);
   const [docName, setDocName] = useState('');
+
+  // Output docs state
+  const [showOutputUpload, setShowOutputUpload] = useState(false);
+  const [outputDocName,    setOutputDocName]    = useState('');
+  const [outputDocDesc,    setOutputDocDesc]    = useState('');
+  const [outputUploading,  setOutputUploading]  = useState(false);
+  const [outputUploadErr,  setOutputUploadErr]  = useState<string | null>(null);
+  const outputFileRef = useRef<HTMLInputElement>(null);
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
@@ -329,16 +337,44 @@ export default function TexpertServiceDetailPage() {
     notesTimer.current = setTimeout(() => saveNotes.mutate(val), 800);
   }
 
+  // Output doc upload handler
+  const handleOutputUpload = useCallback(async (file: File) => {
+    if (!outputDocName.trim()) { setOutputUploadErr('Enter a document name first'); return; }
+    setOutputUploading(true); setOutputUploadErr(null);
+    const form = new FormData();
+    form.append('file', file);
+    form.append('document_name', outputDocName.trim());
+    if (outputDocDesc.trim()) form.append('description', outputDocDesc.trim());
+    try {
+      await apiClient.post(`/texpert/services/${id}/output-docs`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      qc.invalidateQueries({ queryKey: ['tx-service-detail', id] });
+      setOutputDocName(''); setOutputDocDesc(''); setShowOutputUpload(false);
+    } catch (e: any) {
+      setOutputUploadErr(e.response?.data?.error ?? 'Upload failed');
+    } finally {
+      setOutputUploading(false);
+      if (outputFileRef.current) outputFileRef.current.value = '';
+    }
+  }, [outputDocName, outputDocDesc, id, qc]);
+
+  const deleteOutputDoc = useMutation({
+    mutationFn: (docId: string) => apiClient.delete(`/texpert/services/${id}/output-docs/${docId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }),
+  });
+
   if (authLoading || isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
   if (!isTexpert) return <Navigate to="/dashboard" replace />;
   if (error || !data) return <div className="db-page-new"><div className="db-alert-error">Service not found or not assigned to you.</div></div>;
 
   const client    = data.client as any;
   const service   = data.service as any;
-  const docs      = (data.client_documents ?? []) as any[];
-  const events    = (data.service_events ?? []) as any[];
-  const tasks     = (data.service_tasks ?? []) as any[];
-  const payouts   = (data.payouts ?? []) as any[];
+  const docs        = (data.client_documents ?? []) as any[];
+  const outputDocs  = (data.output_documents ?? []) as any[];
+  const events      = (data.service_events ?? []) as any[];
+  const tasks       = (data.service_tasks ?? []) as any[];
+  const payouts     = (data.payouts ?? []) as any[];
   const totalPaid = payouts.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
 
   const uploadedDocs = docs.filter(d => d.file_path || d.file_url).length;
@@ -588,6 +624,95 @@ export default function TexpertServiceDetailPage() {
               })}
             </div>
           )}
+
+          {/* ── Output Documents Section ─────────────────────── */}
+          <div style={{ marginTop: '1.75rem', borderTop: '1.5px solid var(--line, #e2e8f0)', paddingTop: '1.25rem' }}>
+            <div className="asd-tab-header">
+              <div>
+                <span className="asd-tab-header-count" style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--ink-800)' }}>
+                  Output Documents
+                </span>
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--ink-400)' }}>
+                  Documents you generate for this client
+                </span>
+              </div>
+              {!isCancelled && (
+                <button className="btn btn-sm btn-secondary" onClick={() => setShowOutputUpload(v => !v)}>
+                  + Upload Output Doc
+                </button>
+              )}
+            </div>
+
+            {showOutputUpload && (
+              <div className="asd-add-form">
+                <input
+                  className="form-input"
+                  placeholder="Document name (e.g. ITR Filing Receipt, GST Certificate)"
+                  value={outputDocName}
+                  onChange={e => { setOutputDocName(e.target.value); setOutputUploadErr(null); }}
+                />
+                <input
+                  className="form-input"
+                  placeholder="Description (optional)"
+                  value={outputDocDesc}
+                  onChange={e => setOutputDocDesc(e.target.value)}
+                />
+                {outputUploadErr && <p className="aq-modal-error">{outputUploadErr}</p>}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={!outputDocName.trim() || outputUploading}
+                    onClick={() => outputFileRef.current?.click()}
+                  >
+                    {outputUploading ? 'Uploading…' : 'Choose file & upload'}
+                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setShowOutputUpload(false); setOutputDocName(''); setOutputDocDesc(''); setOutputUploadErr(null); }}>
+                    Cancel
+                  </button>
+                </div>
+                <input
+                  ref={outputFileRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleOutputUpload(f); }}
+                />
+              </div>
+            )}
+
+            {outputDocs.length === 0 ? (
+              <div style={{ padding: '1rem', color: 'var(--ink-400)', fontSize: '0.85rem', textAlign: 'center', background: 'var(--surface-50, #f9fafb)', borderRadius: '0.5rem' }}>
+                No output documents uploaded yet. Upload processed documents, certificates, or filings here.
+              </div>
+            ) : (
+              <div className="asd-doc-list">
+                {outputDocs.map((doc: any) => (
+                  <div key={doc.id} className="asd-doc-row" style={{ borderLeft: '3px solid var(--green-400, #4ade80)' }}>
+                    <div className="asd-doc-info">
+                      <div className="asd-doc-name">{doc.document_name}</div>
+                      <div className="asd-doc-meta">
+                        <span className="aq-badge aq-badge-done">Output</span>
+                        {doc.description && <span className="asd-doc-date">{doc.description}</span>}
+                        {doc.uploaded_at && <span className="asd-doc-date">Uploaded {fmtDate(doc.uploaded_at)}</span>}
+                      </div>
+                    </div>
+                    <div className="asd-doc-actions">
+                      {doc.signed_url && (
+                        <a href={doc.signed_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">View</a>
+                      )}
+                      <button
+                        className="btn btn-sm tx-danger-btn"
+                        disabled={deleteOutputDoc.isPending}
+                        onClick={() => { if (window.confirm(`Delete "${doc.document_name}"?`)) deleteOutputDoc.mutate(doc.id); }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
