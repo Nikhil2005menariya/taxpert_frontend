@@ -271,7 +271,7 @@ export default function DashboardPage() {
               <div className="lpd-empty-row">No active services right now.</div>
             ) : (
               <div>
-                {active.slice(0, 6).map((cs: any) => {
+                {active.slice(0, 5).map((cs: any) => {
                   const tone = STATUS_TONE[cs.status as ServiceStatus] ?? STATUS_TONE.pending;
                   const rel = fmtRelative(cs.updated_at);
                   return (
