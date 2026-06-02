@@ -41,38 +41,36 @@ export default function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section className="section section-alt" id="faq">
-      <div className="container">
-        <div className="faq-layout">
-          <div className="faq-header">
-            <span className="section-kicker">FAQ</span>
-            <h2 className="faq-title">Frequently Asked Questions</h2>
-            <p className="faq-sub">
+    <section className="lp-section" id="faq">
+      <div className="lp-container">
+        <div className="lp-faq-layout">
+          <div className="lp-faq-header" data-reveal>
+            <span className="lp-eyebrow">FAQ</span>
+            <h2 className="lp-h2">Frequently asked questions</h2>
+            <p className="lp-lead">
               Quick answers about tax filing, GST, compliance timelines,
               and how TheTaxpert works.
             </p>
           </div>
 
-          <div className="faq-list">
+          <div className="lp-faq-list" data-reveal>
             {faqs.map((faq, i) => {
               const isOpen = openIndex === i;
               return (
-                <div key={i} className={`faq-item${isOpen ? " faq-open" : ""}`}>
+                <div key={i} className={`lp-faq-item${isOpen ? " is-open" : ""}`}>
                   <button
-                    className="faq-trigger"
+                    className="lp-faq-trigger"
                     onClick={() => setOpenIndex(isOpen ? null : i)}
                     aria-expanded={isOpen}
                   >
-                    <span className="faq-q-text">{faq.q}</span>
-                    <span className={`faq-chevron${isOpen ? " open" : ""}`} aria-hidden="true">
-                      ▾
-                    </span>
+                    <span>{faq.q}</span>
+                    <span className="lp-faq-icon" aria-hidden="true" />
                   </button>
-                  {isOpen && (
-                    <div className="faq-body">
-                      {faq.a}
+                  <div className="lp-faq-body">
+                    <div className="lp-faq-body-inner">
+                      <p className="lp-faq-answer">{faq.a}</p>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

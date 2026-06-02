@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Loader from "../../components/ui/Loader";
 import { Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -122,7 +123,7 @@ export default function AdminAuditPage() {
     enabled: isAdmin,
   });
 
-  if (authLoading || isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const allEntries: any[] = data?.data ?? [];

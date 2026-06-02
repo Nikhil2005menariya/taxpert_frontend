@@ -1,39 +1,61 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { apiClient } from "../../../api/client";
 import AddServiceModal from "../../../components/dashboard/AddServiceModal";
+import Loader from "../../../components/ui/Loader";
 
-// Types
-type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "completed" | "cancelled";
+// ── Types + status maps ───────────────────────────────────────
 
-const SERVICE_STATUS_SHORT_LABELS: Record<ServiceStatus, string> = {
+type ServiceStatus =
+  | "pending" | "documents_required" | "under_review" | "in_progress"
+  | "action_required" | "completed" | "cancelled";
+
+const STATUS_LABELS: Record<ServiceStatus, string> = {
   pending: "Pending",
-  documents_required: "Docs Needed",
+  documents_required: "Docs needed",
   under_review: "Reviewing",
-  in_progress: "In Progress",
-  action_required: "Action Needed",
+  in_progress: "In progress",
+  action_required: "Action needed",
   completed: "Done",
   cancelled: "Cancelled",
 };
 
-const SERVICE_STATUS_STYLES: Record<ServiceStatus, { fg: string; bg: string }> = {
-  pending:            { fg: "#b45309", bg: "#fef3c7" },
-  documents_required: { fg: "#b45309", bg: "#fef3c7" },
-  under_review:       { fg: "#1d4ed8", bg: "#dbeafe" },
-  in_progress:        { fg: "#1d4ed8", bg: "#dbeafe" },
-  action_required:    { fg: "#be123c", bg: "#ffe4e6" },
-  completed:          { fg: "#15803d", bg: "#dcfce7" },
-  cancelled:          { fg: "#6b7280", bg: "#f3f4f6" },
+const STATUS_TONE: Record<ServiceStatus, { fg: string; bg: string }> = {
+  pending:            { fg: "#a96a16", bg: "#f6ecd6" },
+  documents_required: { fg: "#a96a16", bg: "#f6ecd6" },
+  under_review:       { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
+  in_progress:        { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
+  action_required:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
+  completed:          { fg: "var(--lp-green)", bg: "var(--lp-green-soft)" },
+  cancelled:          { fg: "var(--lp-ink-faint)", bg: "var(--lp-surface-2)" },
 };
+
+// ── Inline icons ──────────────────────────────────────────────
+
+const I = {
+  upload: <><path d="M12 16V4M8 8l4-4 4 4" /><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></>,
+  layers: <><path d="m12 2 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 17l9 5 9-5" /></>,
+  check: <><circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" /></>,
+  grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
+  vault: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="12" cy="12" r="3.2" /><path d="M12 8.8V7M12 17v-1.8M15.2 12H17M7 12h1.8" /></>,
+  folder: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
+  arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+  inbox: <><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z" /></>,
+};
+
+const svg = (paths: ReactNode) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths}</svg>
+);
+
+// ── Helpers ───────────────────────────────────────────────────
 
 function currentFY(): string {
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed (0 = Jan, 3 = Apr)
-  if (month >= 3) {
-    return `${year}-${String(year + 1).slice(-2)}`; // e.g. 2024-25
-  }
+  const month = now.getMonth();
+  if (month >= 3) return `${year}-${String(year + 1).slice(-2)}`;
   return `${year - 1}-${String(year).slice(-2)}`;
 }
 
@@ -41,108 +63,104 @@ function fmtRelative(iso: string | null) {
   if (!iso) return null;
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function StatCard({ label, value, sub, tone }: {
-  label: string; value: string | number; sub: string;
-  tone?: "urgent" | "gold" | "good" | "default";
+// ── Stat card ─────────────────────────────────────────────────
+
+type Tone = "urgent" | "gold" | "good" | "default";
+
+function StatCard({ label, value, sub, tone = "default", icon }: {
+  label: string; value: string | number; sub: string; tone?: Tone; icon: ReactNode;
 }) {
-  const tones = {
-    urgent:  { fg: "var(--red-600)",   bg: "rgba(182,69,69,0.08)" },
-    gold:    { fg: "var(--gold-700)",  bg: "rgba(196,154,58,0.1)" },
-    good:    { fg: "var(--green-600)", bg: "rgba(47,122,91,0.08)" },
-    default: { fg: "var(--ink-500)",   bg: "var(--ink-50)" },
-  };
-  const t = tones[tone ?? "default"];
   return (
-    <div className="db-stat-card-new">
-      <div className="db-stat-card-label">{label}</div>
-      <div className="db-stat-card-value">{value}</div>
-      <div className="db-stat-card-sub" style={{ background: t.bg, color: t.fg }}>{sub}</div>
+    <div className="lpd-stat" data-tone={tone}>
+      <div className="lpd-stat-top">
+        <span className="lpd-stat-ico">{svg(icon)}</span>
+        <span className="lpd-stat-label">{label}</span>
+      </div>
+      <div className="lpd-stat-value">{value}</div>
+      <span className="lpd-stat-sub">{sub}</span>
     </div>
   );
 }
 
-export default function DashboardPage() {
-  return <ClientOrStaffDashboard />;
-}
+// ── Page ──────────────────────────────────────────────────────
 
-function ClientOrStaffDashboard() {
+export default function DashboardPage() {
   const { profile, user } = useAuth();
 
   const { data: summary, error, isLoading } = useQuery({
-    queryKey: ['dashboard-summary'],
+    queryKey: ["dashboard-summary"],
     queryFn: async () => {
-      const { data } = await apiClient.get('/client-services/dashboard');
-      return data.data; // backend returns { data: { kind, ... } }
+      const { data } = await apiClient.get("/client-services/dashboard");
+      return data.data;
     },
   });
 
   if (isLoading) {
     return (
-      <div className="page-loader"><div className="page-loader-ring" /></div>
-    );
-  }
-
-  if (error && !summary) {
-    return (
-      <div className="db-page-new">
-        <div className="db-alert-error" style={{ marginTop: "2rem" }}>
-          Could not load dashboard data: {(error as any)?.response?.data?.error ?? (error as any)?.message ?? "Unknown error"}
-          <button onClick={() => window.location.reload()} style={{ marginLeft: "1rem", textDecoration: "underline", background: "none", border: "none", cursor: "pointer", color: "inherit" }}>Retry</button>
+      <div className="lpd-page">
+        <div className="lpd-page-loader">
+          <Loader size={42} label="Loading your dashboard…" />
         </div>
       </div>
     );
   }
 
-  const role      = profile?.role ?? "client";
-  const isClient  = role === "client";
+  if (error && !summary) {
+    return (
+      <div className="lpd-page">
+        <div className="lpd-alert">
+          Could not load dashboard data: {(error as any)?.response?.data?.error ?? (error as any)?.message ?? "Unknown error"}
+          <button onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  const role = profile?.role ?? "client";
+  const isClient = role === "client";
   const firstName = profile?.first_name || user?.user_metadata?.first_name || "there";
 
-  const hour     = new Date().getHours();
+  const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  // ── STAFF / ADMIN VIEW ─────────────────────────────────────
+  // ── STAFF / ADMIN ────────────────────────────────────────────
   if (!isClient) {
     const s = summary?.kind === "staff" ? summary : null;
     return (
-      <div className="db-page-new">
-        <div className="db-welcome">
-          <span className="db-welcome-eyebrow">{greeting}</span>
-          <h1 className="db-welcome-heading">Welcome back, <em>Team</em>.</h1>
-          <p className="db-welcome-sub">Platform overview — open Workload for the full service queue.</p>
+      <div className="lpd-page">
+        <header className="lpd-head">
+          <div>
+            <span className="lpd-eyebrow">{greeting}</span>
+            <h1 className="lpd-title">Welcome back, <em>Team</em>.</h1>
+            <p className="lpd-sub">Platform overview — open the workload for the full service queue.</p>
+          </div>
+        </header>
+
+        <div className="lpd-stat-grid">
+          <StatCard label="Total services"  value={s?.total ?? 0}          sub="All time"                                                  tone="default" icon={I.grid} />
+          <StatCard label="Active pipeline" value={s?.active ?? 0}         sub={s?.active ? "In progress" : "All clear"}                    tone={s?.active ? "gold" : "good"} icon={I.layers} />
+          <StatCard label="Docs required"   value={s?.needsDocs ?? 0}      sub={s?.needsDocs ? "Awaiting client upload" : "None pending"}   tone={s?.needsDocs ? "urgent" : "good"} icon={I.upload} />
+          <StatCard label="Invoice pending" value={s?.invoicePending ?? 0} sub={s?.invoicePending ? "Awaiting payment" : "None"}            tone={s?.invoicePending ? "gold" : "default"} icon={I.inbox} />
         </div>
 
-        {error && <div className="db-alert-error">Failed to load summary: {(error as any).message}</div>}
-
-        <div className="db-stat-grid">
-          <StatCard label="Total services"   value={s?.total ?? 0}         sub="All time"             tone="default" />
-          <StatCard label="Active pipeline"  value={s?.active ?? 0}        sub={s?.active ? "In progress" : "All clear"} tone={s?.active ? "gold" : "good"} />
-          <StatCard label="Docs required"    value={s?.needsDocs ?? 0}     sub={s?.needsDocs ? "Awaiting client upload" : "None pending"} tone={s?.needsDocs ? "urgent" : "good"} />
-          <StatCard label="Invoice pending"  value={s?.invoicePending ?? 0} sub={s?.invoicePending ? "Awaiting payment" : "None"} tone={s?.invoicePending ? "gold" : "default"} />
-        </div>
-
-        <div className="db-bottom-grid">
-          <div className="db-activity-card">
-            <div className="db-activity-header">
-              <span className="db-activity-title">Service Workload</span>
-            </div>
-            <div style={{ padding: "1.5rem", textAlign: "center" }}>
-              <p style={{ color: "var(--ink-400)", fontSize: "0.875rem", margin: "0 0 1rem" }}>
-                Full client service list with search, filters, SLA risk, and doc progress.
-              </p>
-              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
-                <Link to="/client/services" className="btn btn-primary">
-                  Open Workload →
-                </Link>
-                <Link to="/work-queue" className="btn btn-secondary">
-                  Task Queue →
-                </Link>
-              </div>
+        <div className="lpd-card lpd-workload">
+          <div className="lpd-card-head">
+            <span className="lpd-card-title">{svg(I.layers)} Service workload</span>
+          </div>
+          <div className="lpd-workload-body">
+            <p>Full client service list with search, filters, SLA risk, and document progress.</p>
+            <div className="lpd-workload-actions">
+              <Link to="/client/services" className="lp-btn lp-btn--primary">
+                Open workload <svg className="lp-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I.arrow}</svg>
+              </Link>
+              <Link to="/work-queue" className="lp-btn lp-btn--ghost">Task queue</Link>
             </div>
           </div>
         </div>
@@ -150,23 +168,20 @@ function ClientOrStaffDashboard() {
     );
   }
 
-  // ── CLIENT VIEW ────────────────────────────────────────────
+  // ── CLIENT ───────────────────────────────────────────────────
   const s = summary?.kind === "client" ? summary : null;
-  const all          = s?.all ?? [];
-  const active       = s?.active ?? [];
+  const all = s?.all ?? [];
+  const active = s?.active ?? [];
   const docsRequired = s?.docsRequired ?? [];
   const totalPendingDocs = s?.totalPendingDocs ?? 0;
 
   return (
-    <div className="db-page-new">
-      {/* Welcome & Add Service Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
-        <div className="db-welcome">
-          <span className="db-welcome-eyebrow">{greeting}</span>
-          <h1 className="db-welcome-heading">
-            Welcome back, <em>{firstName}</em>.
-          </h1>
-          <p className="db-welcome-sub">
+    <div className="lpd-page">
+      <header className="lpd-head">
+        <div>
+          <span className="lpd-eyebrow">{greeting}</span>
+          <h1 className="lpd-title">Welcome back, <em>{firstName}</em>.</h1>
+          <p className="lpd-sub">
             {totalPendingDocs > 0
               ? `${totalPendingDocs} document${totalPendingDocs !== 1 ? "s" : ""} waiting for upload.`
               : all.length > 0
@@ -174,145 +189,107 @@ function ClientOrStaffDashboard() {
                 : "Add a service to get started."}
           </p>
         </div>
-        {isClient && (
-          <div style={{ marginBottom: "0.25rem" }}>
-            <AddServiceModal />
-          </div>
-        )}
+        <AddServiceModal />
+      </header>
+
+      <div className="lpd-stat-grid">
+        <StatCard label="Docs to upload"  value={totalPendingDocs}  sub={totalPendingDocs > 0 ? "Upload via Vault" : "All uploaded"}             tone={totalPendingDocs > 0 ? "urgent" : "good"} icon={I.upload} />
+        <StatCard label="Active services" value={active.length}     sub={active.length > 0 ? `${docsRequired.length} need docs` : "None active"} tone={active.length > 0 ? "gold" : "default"} icon={I.layers} />
+        <StatCard label="Completed"       value={s?.completed ?? 0} sub={s?.completed ? "Services finalised" : "None yet"}                       tone={s?.completed ? "good" : "default"} icon={I.check} />
+        <StatCard label="Total services"  value={s?.total ?? 0}     sub="All time"                                                              tone="default" icon={I.grid} />
       </div>
 
-      {/* Stat cards */}
-      <div className="db-stat-grid">
-        <StatCard label="Docs to upload"  value={totalPendingDocs}   sub={totalPendingDocs > 0 ? "Upload via Vault" : "All uploaded"}         tone={totalPendingDocs > 0 ? "urgent" : "good"} />
-        <StatCard label="Active services" value={active.length}      sub={active.length > 0 ? `${docsRequired.length} need docs` : "None active"} tone={active.length > 0 ? "gold" : "default"} />
-        <StatCard label="Completed"       value={s?.completed ?? 0}  sub={s?.completed ? "Services finalised" : "None yet"}                   tone={s?.completed ? "good" : "default"} />
-        <StatCard label="Total services"  value={s?.total ?? 0}      sub="All time" />
-      </div>
+      {error && <div className="lpd-alert">Failed to load services: {(error as any).message}</div>}
 
-      {error && <div className="db-alert-error">Failed to load services: {(error as any).message}</div>}
-
-      {/* Client empty state */}
-      {!all.length && (
-        <div className="db-empty-card">
-          <div className="db-empty-icon">📋</div>
-          <h3 className="db-empty-title">No services yet</h3>
-          <p className="db-empty-desc">
-            Click <strong>+ Add Service</strong> in the top-right to get started. Your assigned Taxpert will guide you through the rest.
-          </p>
-          <div className="db-empty-steps">
-            <div className="db-empty-step"><span>1</span>Add a service</div>
-            <div className="db-empty-step"><span>2</span>Upload required documents in Vault</div>
-            <div className="db-empty-step"><span>3</span>We review it and complete the service</div>
+      {/* Empty state */}
+      {!all.length ? (
+        <div className="lpd-empty">
+          <span className="lpd-empty-ico">{svg(I.folder)}</span>
+          <h3>No services yet</h3>
+          <p>Add a service to begin — your assigned Taxpert will guide you through every step from there.</p>
+          <div className="lpd-empty-steps">
+            <span className="lpd-empty-step"><span>1</span>Add a service</span>
+            <span className="lpd-empty-step"><span>2</span>Upload documents in Vault</span>
+            <span className="lpd-empty-step"><span>3</span>We review &amp; complete it</span>
           </div>
-          <div className="db-empty-actions">
-            <Link to="/services" className="btn btn-primary">Browse Services →</Link>
-            <a href="mailto:info@thetaxpert.com" className="btn btn-secondary">Talk to a Taxpert</a>
+          <div className="lpd-empty-actions">
+            <Link to="/services" className="lp-btn lp-btn--primary">
+              Browse services <svg className="lp-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I.arrow}</svg>
+            </Link>
+            <a href="mailto:info@thetaxpert.com" className="lp-btn lp-btn--ghost">Talk to a Taxpert</a>
           </div>
         </div>
-      )}
-
-      {all.length > 0 && (
-        <div className="db-bottom-grid">
-
-          {/* Pending documents section */}
-          {docsRequired.length > 0 && (
-            <div className="db-filings-card">
-              <div className="db-filings-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span className="db-filings-title">Tax Vault — Documents Needed</span>
-                  <span className="db-chip">{docsRequired.length}</span>
-                </div>
-                <Link to="/client/vault" className="btn btn-primary db-btn-sm">
-                  Open Tax Vault →
-                </Link>
+      ) : (
+        <div className="lpd-grid">
+          {/* Primary: documents needed (or all-caught-up) */}
+          {docsRequired.length > 0 ? (
+            <div className="lpd-card">
+              <div className="lpd-card-head">
+                <span className="lpd-card-title">{svg(I.vault)} Documents needed <span className="lpd-chip">{docsRequired.length}</span></span>
+                <Link to="/client/vault" className="lpd-card-link">Open Vault <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I.arrow}</svg></Link>
               </div>
-              <div className="db-filings-scroll">
-                <div className="db-filings-table">
-                  <div className="db-filings-thead">
-                    <span>Service</span>
-                    <span>Pending</span>
-                    <span>Uploaded</span>
-                    <span></span>
-                  </div>
-                  {docsRequired.map((cs: any, i: number) => {
-                    const docs    = cs.client_documents ?? [];
-                    const pending = docs.filter((d: any) => d.status === "pending" || d.status === "rejected" || d.status === "expired").length;
-                    const done    = docs.filter((d: any) => d.status === "uploaded" || d.status === "under_review" || d.status === "approved").length;
-                    return (
-                      <Link
-                        key={cs.id}
-                        to={`/client/vault?fy=${cs.fiscal_year ?? currentFY()}&svc=${cs.id}`}
-                        className="db-filings-row"
-                        style={{ borderBottom: i < docsRequired.length - 1 ? "1px solid var(--line-soft)" : "none" }}
-                      >
-                        <span className="db-filings-year">{cs.service?.name}</span>
-                        <span style={{ color: pending > 0 ? "#dc2626" : "var(--green-600)", fontWeight: 500 }}>
-                          {pending} pending
+              <div>
+                {docsRequired.map((cs: any) => {
+                  const docs = cs.client_documents ?? [];
+                  const pending = docs.filter((d: any) => ["pending", "rejected", "expired"].includes(d.status)).length;
+                  const done = docs.filter((d: any) => ["uploaded", "under_review", "approved"].includes(d.status)).length;
+                  const total = pending + done;
+                  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                  return (
+                    <Link key={cs.id} to={`/client/vault?fy=${cs.fiscal_year ?? currentFY()}&svc=${cs.id}`} className="lpd-doc-row">
+                      <div className="lpd-doc-main">
+                        <span className="lpd-doc-name">{cs.service?.name ?? "Service"}</span>
+                        <span className="lpd-doc-meta">
+                          <span className="lpd-doc-pending">{pending} pending</span>
+                          <span className="lpd-doc-dot" />
+                          <span className="lpd-doc-done">{done} uploaded</span>
                         </span>
-                        <span style={{ color: "var(--ink-400)" }}>{done} uploaded</span>
-                        <span style={{ color: "var(--gold-600)", fontSize: "0.8rem" }}>Upload →</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                      </div>
+                      <span className="lpd-doc-cta">Upload <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I.arrow}</svg></span>
+                      <div className="lpd-doc-bar"><span className="lpd-doc-bar-fill" style={{ width: `${pct}%` }} /></div>
+                    </Link>
+                  );
+                })}
               </div>
+            </div>
+          ) : (
+            <div className="lpd-card lpd-allgood">
+              <span className="lpd-allgood-ico">{svg(I.check)}</span>
+              <h3>You’re all caught up</h3>
+              <p>No documents pending right now. We’ll let you know the moment something needs your attention.</p>
+              <Link to="/client/vault" className="lpd-card-link">Open Vault <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I.arrow}</svg></Link>
             </div>
           )}
 
-          {/* Active services */}
-          <div className="db-activity-card" style={{ minHeight: 0 }}>
-            <div className="db-activity-header">
-              <span className="db-activity-title">Active Services</span>
-              <Link to="/client/services" style={{ fontSize: "0.8rem", color: "var(--gold-600)" }}>
-                View all →
-              </Link>
+          {/* Secondary: active services */}
+          <div className="lpd-card">
+            <div className="lpd-card-head">
+              <span className="lpd-card-title">{svg(I.layers)} Active services</span>
+              <Link to="/client/services" className="lpd-card-link">View all <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{I.arrow}</svg></Link>
             </div>
             {active.length === 0 ? (
-              <div className="db-activity-empty">No active services</div>
+              <div className="lpd-empty-row">No active services right now.</div>
             ) : (
-              <div className="db-activity-list">
+              <div>
                 {active.slice(0, 6).map((cs: any) => {
-                  const tone = SERVICE_STATUS_STYLES[cs.status as ServiceStatus] ?? SERVICE_STATUS_STYLES.pending;
-                  const rel  = fmtRelative(cs.updated_at);
+                  const tone = STATUS_TONE[cs.status as ServiceStatus] ?? STATUS_TONE.pending;
+                  const rel = fmtRelative(cs.updated_at);
                   return (
-                    <Link
-                      key={cs.id}
-                      to={`/client/services/${cs.id}`}
-                      className="db-activity-row"
-                      style={{ textDecoration: "none", color: "inherit" }}
-                    >
-                      <div className="db-activity-icon-wrap">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                        </svg>
-                      </div>
-                      <span className="db-activity-text" style={{ flex: 1 }}>
-                        {cs.service?.name ?? "Service"}
+                    <Link key={cs.id} to={`/client/services/${cs.id}`} className="lpd-svc-row">
+                      <span className="lpd-svc-ico">{svg(I.folder)}</span>
+                      <span className="lpd-svc-name">{cs.service?.name ?? "Service"}</span>
+                      {rel && <span className="lpd-svc-time">{rel}</span>}
+                      <span className="lpd-pill" style={{ color: tone.fg, background: tone.bg }}>
+                        {STATUS_LABELS[cs.status as ServiceStatus] ?? cs.status}
                       </span>
-                      <span
-                        className="db-status-pill"
-                        style={{
-                          background: tone.bg,
-                          color: tone.fg,
-                          fontSize: "0.72rem",
-                          padding: "2px 8px",
-                          borderRadius: 20,
-                        }}
-                      >
-                        {SERVICE_STATUS_SHORT_LABELS[cs.status as ServiceStatus] ?? cs.status}
-                      </span>
-                      {rel && <span className="db-activity-time">{rel}</span>}
                     </Link>
                   );
                 })}
               </div>
             )}
-
           </div>
-
         </div>
       )}
-
     </div>
   );
 }

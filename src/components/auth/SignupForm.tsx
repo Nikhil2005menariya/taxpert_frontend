@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema } from "../../shared/validations";
 import { apiClient, supabase } from "../../api/client";
 import type { z } from "zod";
+import { TextField, PasswordField, ButtonSpinner, OtpInput } from "./fields";
 
 type SignupInput = z.infer<typeof signupSchema>;
 
@@ -167,166 +168,95 @@ export default function SignupForm() {
   // ── OTP entry screen ────────────────────────────────────────
   if (step === "otp") {
     return (
-      <form onSubmit={verifyOtp} noValidate>
-        <div className="auth-form-fields">
-          <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: "50%", background: "#f9f5ec",
-              border: "1.5px solid #c49a3a", display: "flex", alignItems: "center",
-              justifyContent: "center", margin: "0 auto 1rem", color: "#c49a3a",
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>
-              </svg>
-            </div>
-            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#0f172a", margin: "0 0 0.4rem" }}>
-              Verify your email
-            </h3>
-            <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0, lineHeight: 1.5 }}>
-              We sent a 6-digit code to<br /><strong style={{ color: "#0f172a" }}>{pendingEmail}</strong>
-            </p>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Verification code</label>
-            <input
-              className="form-input"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => { setOtp(e.target.value.replace(/\D/g, "").slice(0, 6)); setOtpError(null); }}
-              placeholder="000000"
-              autoFocus
-              style={{
-                fontSize: "1.5rem", letterSpacing: "0.5em", textAlign: "center",
-                fontFamily: "var(--font-mono, monospace)", fontWeight: 700,
-              }}
-            />
-            {otpError && <span className="error-text">{otpError}</span>}
-          </div>
-
-          <button type="submit" className="btn btn-primary auth-submit-btn" disabled={otpLoading || otp.length !== 6}>
-            {otpLoading ? "Verifying…" : "Verify & Create Account"}
-          </button>
-
-          <div style={{ textAlign: "center", fontSize: "0.85rem", color: "#64748b", marginTop: "0.25rem" }}>
-            {resendCooldown > 0 ? (
-              <span>Resend code in {resendCooldown}s</span>
-            ) : (
-              <button
-                type="button"
-                onClick={resendOtp}
-                style={{ background: "none", border: "none", padding: 0, color: "var(--gold-600, #b45309)", textDecoration: "underline", cursor: "pointer", fontSize: "0.85rem" }}
-              >
-                Resend code
-              </button>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => { setStep("form"); setOtp(""); setOtpError(null); }}
-            style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "0.82rem", cursor: "pointer", marginTop: "0.25rem" }}
-          >
-            ← Use a different email
-          </button>
+      <form onSubmit={verifyOtp} noValidate className="lp-auth-form">
+        <div className="lp-auth-otp-head">
+          <span className="lp-auth-otp-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 5L2 7" />
+            </svg>
+          </span>
+          <h2 className="lp-auth-otp-title">Verify your email</h2>
+          <p className="lp-auth-otp-sub">
+            We sent a 6-digit code to<br />
+            <strong>{pendingEmail}</strong>
+          </p>
         </div>
+
+        <OtpInput value={otp} onChange={(v) => { setOtp(v); setOtpError(null); }} autoFocus hasError={!!otpError} />
+        {otpError && <div className="lp-auth-banner lp-auth-banner--error">{otpError}</div>}
+
+        <button type="submit" className="lp-btn lp-btn--primary lp-auth-submit" disabled={otpLoading || otp.length !== 6}>
+          {otpLoading ? <><ButtonSpinner /> Verifying…</> : "Verify & create account"}
+        </button>
+
+        <div className="lp-auth-otp-resend">
+          {resendCooldown > 0 ? (
+            <span>Resend code in {resendCooldown}s</span>
+          ) : (
+            <button type="button" onClick={resendOtp} className="lp-auth-link-btn">Resend code</button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => { setStep("form"); setOtp(""); setOtpError(null); }}
+          className="lp-auth-otp-back"
+        >
+          ← Use a different email
+        </button>
       </form>
     );
   }
 
   // ── Step 1: signup form ─────────────────────────────────────
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      <div className="auth-form-fields">
-
-        {referralCode && (
-          <div className="auth-referral-banner">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            Referred by <strong>{referralCode}</strong> — your referrer earns a reward when you pay for a service.
-            <button
-              type="button"
-              className="auth-referral-remove"
-              onClick={() => { setReferralCode(""); clearRef(); }}
-            >×</button>
-          </div>
-        )}
-
-        <div className="auth-name-row">
-          <div className="form-group">
-            <label className="form-label">First Name</label>
-            <input {...register("first_name")} className="form-input" placeholder="Rajesh" />
-            {errors.first_name && <span className="error-text">{errors.first_name.message}</span>}
-          </div>
-          <div className="form-group">
-            <label className="form-label">Last Name</label>
-            <input {...register("last_name")} className="form-input" placeholder="Kumar" />
-            {errors.last_name && <span className="error-text">{errors.last_name.message}</span>}
-          </div>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="lp-auth-form">
+      {referralCode && (
+        <div className="lp-auth-ref">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          <span>Referred by <strong>{referralCode}</strong> — your referrer earns a reward when you pay for a service.</span>
+          <button type="button" className="lp-auth-ref-x" onClick={() => { setReferralCode(""); clearRef(); }} aria-label="Remove referral code">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
         </div>
+      )}
 
-        <div className="form-group">
-          <label className="form-label">Email</label>
-          <input {...register("email")} type="email" className="form-input" placeholder="you@example.com" />
-          {errors.email && <span className="error-text">{errors.email.message}</span>}
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Mobile Number</label>
-          <input {...register("mobile")} type="tel" className="form-input" placeholder="9876543210" />
-          {errors.mobile && <span className="error-text">{errors.mobile.message}</span>}
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">PAN</label>
-          <input
-            {...register("pan")}
-            className="form-input"
-            placeholder="ABCDE1234F"
-            style={{ textTransform: "uppercase" }}
-          />
-          {errors.pan && <span className="error-text">{errors.pan.message}</span>}
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Password</label>
-          <input
-            {...register("password")}
-            type="password"
-            className="form-input"
-            placeholder="Min. 8 characters"
-            autoComplete="new-password"
-          />
-          {errors.password && <span className="error-text">{errors.password.message}</span>}
-        </div>
-
-        {!referralCode && (
-          <div className="form-group">
-            <label className="form-label">
-              Referral code <span className="form-label-optional">(optional)</span>
-            </label>
-            <input
-              className="form-input"
-              placeholder="TAXPERT-XXXXXX"
-              value={referralCode}
-              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-              style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.04em" }}
-            />
-          </div>
-        )}
-
-        {serverError && <div className="auth-error-banner">{serverError}</div>}
-
-        <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
-          {loading ? "Sending code…" : "Continue"}
-        </button>
-
+      <div className="lp-auth-row">
+        <TextField label="First name" placeholder="Rajesh" error={errors.first_name?.message} {...register("first_name")} />
+        <TextField label="Last name" placeholder="Kumar" error={errors.last_name?.message} {...register("last_name")} />
       </div>
+
+      <TextField label="Email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register("email")} />
+
+      <TextField label="Mobile number" type="tel" placeholder="9876543210" error={errors.mobile?.message} {...register("mobile")} />
+
+      <TextField label="PAN" placeholder="ABCDE1234F" className="lp-af-upper" error={errors.pan?.message} {...register("pan")} />
+
+      <PasswordField label="Password" placeholder="Min. 8 characters" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
+
+      {!referralCode && (
+        <TextField
+          label="Referral code"
+          hint="(optional)"
+          placeholder="TAXPERT-XXXXXX"
+          className="lp-af-mono"
+          value={referralCode}
+          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+        />
+      )}
+
+      {serverError && <div className="lp-auth-banner lp-auth-banner--error">{serverError}</div>}
+
+      <button type="submit" className="lp-btn lp-btn--primary lp-auth-submit" disabled={loading}>
+        {loading ? <><ButtonSpinner /> Sending code…</> : "Continue"}
+      </button>
+
+      <p className="lp-auth-fineprint">
+        By continuing you agree to our <a href="/terms">Terms</a> & <a href="/privacy">Privacy Policy</a>.
+      </p>
     </form>
   );
 }

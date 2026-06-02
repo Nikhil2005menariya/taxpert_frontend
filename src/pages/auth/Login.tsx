@@ -1,15 +1,16 @@
-import Navbar from "../../components/marketing/Navbar";
-import Footer from "../../components/marketing/Footer";
+import { Helmet } from "react-helmet-async";
+import AuthLayout from "../../components/auth/AuthLayout";
 import AuthTabs from "../../components/auth/AuthTabs";
 
 export default function Login() {
   return (
-    <main className="marketing-shell">
-      <Navbar />
-      <div className="auth-shell">
+    <>
+      <Helmet>
+        <title>Sign in | TheTaxpert</title>
+      </Helmet>
+      <AuthLayout>
         <AuthTabs defaultTab="login" />
-      </div>
-      <Footer />
-    </main>
+      </AuthLayout>
+    </>
   );
 }

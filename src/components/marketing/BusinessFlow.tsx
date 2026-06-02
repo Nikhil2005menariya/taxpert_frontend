@@ -8,8 +8,8 @@ const TABS = [
     id: "start",
     label: "Start your business",
     icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h6"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="3" width="16" height="18" rx="1" /><path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M9 16h6" />
       </svg>
     ),
     group: "GROUP · 01",
@@ -23,8 +23,8 @@ const TABS = [
     id: "manage",
     label: "Manage your business",
     icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
       </svg>
     ),
     group: "GROUP · 02",
@@ -38,8 +38,8 @@ const TABS = [
     id: "comply",
     label: "Stay compliant",
     icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
       </svg>
     ),
     group: "GROUP · 03",
@@ -52,7 +52,7 @@ const TABS = [
       "AOC-4", "MGT-7 / MGT-7A",
       "DIR-3 KYC", "DSC Services",
       "ROC LLP Form 8", "ROC LLP Form 11",
-      "DPT-3",
+      "DPT-3", "Notice Handling",
     ],
   },
 ];
@@ -62,65 +62,53 @@ export default function BusinessFlow() {
   const tab = TABS[active];
 
   return (
-    <section id="services" className="section">
-      <div className="container">
-        {/* Header row */}
-        <div className="bflow-header">
-          <div>
-            <span className="section-kicker">Services</span>
-            <h2 className="bflow-heading">
-              Everything your business needs,{" "}
-              <em>in one structured platform.</em>
+    <section id="services" className="lp-section">
+      <div className="lp-container">
+        <div className="lp-svc-head">
+          <div data-reveal>
+            <span className="lp-eyebrow">Services</span>
+            <h2 className="lp-h2">
+              Everything your business needs,<br />
+              in one structured platform.
             </h2>
-            <p className="bflow-sub">
-              From registration to annual filings — handled by experienced Taxperts,
-              tracked in a clear workflow, stored in a lifetime vault.
-            </p>
           </div>
-          <Link to="/services" className="bflow-browse-link">
-            Browse all services →
+          <Link to="/services" className="lp-svc-browse" data-reveal>
+            Browse all services
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </Link>
         </div>
 
-        {/* Tabs */}
-        <div className="bflow-tabs">
+        <div className="lp-svc-tabs" data-reveal>
           {TABS.map((t, i) => (
             <button
               key={t.id}
               onClick={() => setActive(i)}
-              className={`bflow-tab${active === i ? " bflow-tab-active" : ""}`}
+              className={`lp-svc-tab${active === i ? " is-active" : ""}`}
             >
-              <span className="bflow-tab-icon">{t.icon}</span>
+              <span className="lp-svc-tab-icon">{t.icon}</span>
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* Content */}
-        <div className="bflow-content">
-          {/* Left dark card */}
-          <div className="bflow-left-card">
-            <span className="bflow-group-label">{tab.group}</span>
-            <h3 className="bflow-card-title">{tab.label}</h3>
-            <p className="bflow-card-desc">{tab.desc}</p>
-            <div className="bflow-card-meta">
+        <div className="lp-svc-content" data-reveal>
+          <div className="lp-svc-feature" key={tab.id}>
+            <span className="lp-svc-group">{tab.group}</span>
+            <h3 className="lp-svc-feature-title">{tab.label}</h3>
+            <p className="lp-svc-feature-desc">{tab.desc}</p>
+            <div className="lp-svc-feature-meta">
               <span>{tab.services.length} services</span>
-              <span className="bflow-meta-dot" />
+              <span className="lp-svc-meta-dot" />
               <span>Dedicated Taxpert</span>
             </div>
           </div>
 
-          {/* Right service list */}
-          <div className="bflow-service-list">
+          <div className="lp-svc-list" key={`${tab.id}-list`}>
             {tab.services.map((svc, i) => (
-              <div key={svc} className="bflow-service-row">
-                <span className="bflow-service-num">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="bflow-service-name">{svc}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="bflow-service-arrow">
-                  <path d="m9 18 6-6-6-6"/>
-                </svg>
+              <div key={svc} className="lp-svc-row">
+                <span className="lp-svc-num">{String(i + 1).padStart(2, "0")}</span>
+                <span className="lp-svc-name">{svc}</span>
+                <svg className="lp-svc-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
               </div>
             ))}
           </div>

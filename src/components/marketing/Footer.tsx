@@ -28,55 +28,61 @@ const legalLinks = [
 
 export default function Footer() {
   return (
-    <footer className="mkt-footer">
-      <div className="container mkt-footer-grid">
-        <div className="mkt-footer-brand">
-          <div className="mkt-footer-logo">TheTaxpert</div>
-          <p>Your Personal Taxpert + Smart Compliance Platform</p>
-          <a href="mailto:info@thetaxpert.com" className="mkt-footer-email">
-            info@thetaxpert.com
-          </a>
-          <div className="mkt-footer-legal-links">
-            {legalLinks.map((link) => (
-              <Link key={link.href} to={link.href}>
-                {link.label}
-              </Link>
-            ))}
+    <footer className="lp-footer">
+      <div className="lp-container">
+        <div className="lp-footer-grid">
+          <div className="lp-footer-brand">
+            <Link to="/" className="lp-brand lp-footer-brand-mark">
+              <span className="lp-brand-mark"><span>T</span></span>
+              TheTaxpert
+            </Link>
+            <p className="lp-footer-tag">
+              Your personal Taxpert plus a smart compliance platform — built for
+              individuals and businesses across India.
+            </p>
+            <a href="mailto:info@thetaxpert.com" className="lp-footer-email">
+              info@thetaxpert.com
+            </a>
+            <div className="lp-footer-legal">
+              {legalLinks.map((link) => (
+                <Link key={link.href} to={link.href}>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="lp-footer-heading">Services</h4>
+            <ul className="lp-footer-list">
+              {serviceLinks.map((link) => (
+                <li key={link.href}>
+                  <Link to={link.href}>{link.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="lp-footer-heading">Quick Links</h4>
+            <ul className="lp-footer-list">
+              {quickLinks.map((link) => (
+                <li key={link.href}>
+                  <Link to={link.href}>{link.label}</Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
-        <div>
-          <h4 className="mkt-footer-heading">Services</h4>
-          <ul className="mkt-footer-list">
-            {serviceLinks.map((link) => (
-              <li key={link.href}>
-                <Link to={link.href}>{link.label}</Link>
-              </li>
-            ))}
-          </ul>
+        <div className="lp-footer-bottom">
+          <p className="lp-footer-disclaimer">
+            Services are provided by qualified professionals in compliance with
+            applicable regulations. TheTaxpert is a compliance management
+            platform — not a law firm or accounting firm.
+          </p>
+          <p className="lp-footer-copy">© 2026 TheTaxpert. All rights reserved.</p>
         </div>
-
-        <div>
-          <h4 className="mkt-footer-heading">Quick Links</h4>
-          <ul className="mkt-footer-list">
-            {quickLinks.map((link) => (
-              <li key={link.href}>
-                <Link to={link.href}>{link.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className="container mkt-footer-bottom">
-        <p className="mkt-disclaimer">
-          Services are provided by qualified professionals in compliance with
-          applicable regulations. TheTaxpert is a compliance management
-          platform — not a law firm or accounting firm.
-        </p>
-        <p className="mkt-copyright">
-          &copy; 2026 TheTaxpert. All rights reserved.
-        </p>
       </div>
     </footer>
   );

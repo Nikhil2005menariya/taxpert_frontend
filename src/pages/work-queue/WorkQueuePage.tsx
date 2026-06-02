@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import Loader from "../../components/ui/Loader";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../api/client";
@@ -41,7 +42,7 @@ export default function WorkQueuePage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="page-loader"><div className="page-loader-ring" /></div>
+      <div className="page-loader"><Loader /></div>
     );
   }
 

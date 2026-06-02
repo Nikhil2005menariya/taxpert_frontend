@@ -5,18 +5,18 @@ const placeholders = [
 
 export default function LogoSection() {
   return (
-    <section className="section">
-      <div className="container">
-        <div className="logo-sec-head">
-          <span className="section-kicker">Trusted By</span>
-          <p className="logo-sec-sub">
+    <section className="lp-section lp-section--tight">
+      <div className="lp-container">
+        <div className="lp-logos-head" data-reveal>
+          <span className="lp-eyebrow">Trusted by</span>
+          <p className="lp-logos-sub">
             Trusted by 100+ businesses across India — from early-stage startups
             to established companies managing multi-entity compliance.
           </p>
         </div>
-        <div className="logo-grid">
+        <div className="lp-logos-grid" data-reveal>
           {placeholders.map((name) => (
-            <div key={name} className="logo-placeholder">
+            <div key={name} className="lp-logo-tile">
               {name}
             </div>
           ))}

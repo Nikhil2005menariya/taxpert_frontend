@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Loader from "../../components/ui/Loader";
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,7 +59,7 @@ export default function AdminTexpertDetailPage() {
     onSuccess: () => navigate('/admin/taxperts'),
   });
 
-  if (authLoading || isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
   if (error) return <div className="db-page-new"><div className="db-alert-error">Taxpert not found.</div></div>;
 

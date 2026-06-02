@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Loader from "../../components/ui/Loader";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
@@ -190,7 +191,7 @@ export default function ServiceEditPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="page-loader"><div className="page-loader-ring" /></div>
+      <div className="page-loader"><Loader /></div>
     );
   }
 

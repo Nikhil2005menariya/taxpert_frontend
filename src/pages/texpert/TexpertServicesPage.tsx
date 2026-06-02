@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Loader from "../../components/ui/Loader";
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -127,7 +128,7 @@ export default function TexpertServicesPage() {
     enabled: isTexpert,
   });
 
-  if (authLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (authLoading) return <div className="page-loader"><Loader /></div>;
   if (!isTexpert)  return <Navigate to="/dashboard" replace />;
 
   const services: ServiceRow[] = data?.data ?? [];

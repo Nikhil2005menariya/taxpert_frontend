@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router-dom';
+import Loader from "../../components/ui/Loader";
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
@@ -116,7 +117,7 @@ export default function TexpertDashboardPage() {
     refetchInterval: 60_000, // gentle 1-min refresh
   });
 
-  if (authLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (authLoading) return <div className="page-loader"><Loader /></div>;
   if (!isTexpert)  return <Navigate to="/dashboard" replace />;
 
   const stats     = data?.stats;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Loader from "../../components/ui/Loader";
 import { Link, Navigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -99,7 +100,7 @@ export default function AdminTaxpertsPage() {
     enabled: isAdmin,
   });
 
-  if (authLoading || isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const taxperts = data ?? [];

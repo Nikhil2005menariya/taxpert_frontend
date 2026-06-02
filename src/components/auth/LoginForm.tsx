@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { loginSchema } from "../../shared/validations";
 import { apiClient, supabase } from "../../api/client";
 import type { z } from "zod";
+import { TextField, PasswordField, ButtonSpinner } from "./fields";
 
 type LoginInput = z.infer<typeof loginSchema>;
 
@@ -66,61 +67,50 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      <div className="auth-form-fields">
-
-        {searchParams.get("verified") === "1" && (
-          <div className="auth-success-banner">
-            Your account is verified. Please sign in.
-          </div>
-        )}
-
-        <div className="form-group">
-          <label className="form-label">Email</label>
-          <input
-            {...register("email")}
-            type="email"
-            className="form-input"
-            placeholder="you@example.com"
-            autoComplete="email"
-          />
-          {errors.email && <span className="error-text">{errors.email.message}</span>}
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="lp-auth-form">
+      {searchParams.get("verified") === "1" && (
+        <div className="lp-auth-banner lp-auth-banner--success">
+          Your account is verified — please sign in.
         </div>
+      )}
 
-        <div className="form-group">
-          <div className="auth-label-row">
-            <label className="form-label">Password</label>
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              disabled={resetLoading}
-              className="auth-forgot-btn"
-            >
-              {resetLoading ? "Sending…" : "Forgot password?"}
-            </button>
-          </div>
-          <input
-            {...register("password")}
-            type="password"
-            className="form-input"
-            placeholder="Enter your password"
-            autoComplete="current-password"
-          />
-          {errors.password && <span className="error-text">{errors.password.message}</span>}
+      <TextField
+        label="Email"
+        type="email"
+        placeholder="you@example.com"
+        autoComplete="email"
+        error={errors.email?.message}
+        {...register("email")}
+      />
+
+      <PasswordField
+        label="Password"
+        placeholder="Enter your password"
+        autoComplete="current-password"
+        error={errors.password?.message}
+        action={
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resetLoading}
+            className="lp-auth-link-btn"
+          >
+            {resetLoading ? "Sending…" : "Forgot password?"}
+          </button>
+        }
+        {...register("password")}
+      />
+
+      {serverError && <div className="lp-auth-banner lp-auth-banner--error">{serverError}</div>}
+      {resetSent && (
+        <div className="lp-auth-banner lp-auth-banner--success">
+          Password reset email sent — check your inbox.
         </div>
+      )}
 
-        {serverError && <div className="auth-error-banner">{serverError}</div>}
-        {resetSent && (
-          <div className="auth-success-banner">
-            Password reset email sent — check your inbox.
-          </div>
-        )}
-
-        <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-
-      </div>
+      <button type="submit" className="lp-btn lp-btn--primary lp-auth-submit" disabled={loading}>
+        {loading ? <><ButtonSpinner /> Signing in…</> : "Sign in"}
+      </button>
     </form>
   );
 }

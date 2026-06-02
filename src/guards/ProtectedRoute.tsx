@@ -1,4 +1,5 @@
 import React from 'react';
+import Loader from "../components/ui/Loader";
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import IdleSessionGuard from './IdleSessionGuard';
@@ -10,7 +11,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (isLoading) {
     return (
       <div className="page-loader page-loader--full">
-        <div className="page-loader-ring" />
+        <Loader />
       </div>
     );
   }

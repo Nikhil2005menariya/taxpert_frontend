@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Loader from "./components/ui/Loader";
 import { useAuth } from './contexts/AuthContext';
 import { PublicRoute } from './guards/PublicRoute';
 import { ProtectedRoute } from './guards/ProtectedRoute';
@@ -54,7 +55,7 @@ import ContactPage from './pages/public/ContactPage';
 // Smart redirect — sends each role to its home after login or on /dashboard visits.
 function RoleBasedRedirect() {
   const { profile, isLoading } = useAuth();
-  if (isLoading) return <div className="page-loader page-loader--full"><div className="page-loader-ring" /></div>;
+  if (isLoading) return <div className="page-loader page-loader--full"><Loader /></div>;
   const role = profile?.role ?? 'client';
   if (role === 'admin' || role === 'super_admin') return <Navigate to="/admin" replace />;
   if (role === 'expert' || role === 'ca')         return <Navigate to="/texpert/dashboard" replace />;

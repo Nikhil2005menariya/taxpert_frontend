@@ -1,63 +1,69 @@
 import { useState, useRef, useEffect } from "react";
+import type { ReactNode } from "react";
+import Loader from "../../../components/ui/Loader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { apiClient } from "../../../api/client";
+import UploadButton from "../../../components/ui/UploadButton";
+import DownloadButton from "../../../components/ui/DownloadButton";
 
-// Fetches a signed URL from the backend then opens it in a new tab.
-// Direct links to /api/documents/:id/download don't work because the browser
-// sends no Authorization header.
-function ViewDocButton({ documentId, isCommon = false }: { documentId: string; isCommon?: boolean }) {
-  const [loading, setLoading] = useState(false);
-  async function handleView() {
-    setLoading(true);
-    try {
-      const path = isCommon
-        ? `/common-documents/${documentId}/download`
-        : `/documents/${documentId}/download`;
-      const { data } = await apiClient.get(path);
-      if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
-    } catch (e: any) {
-      alert(e.response?.data?.error ?? "Could not load document");
-    } finally {
-      setLoading(false);
-    }
-  }
-  return (
-    <button onClick={handleView} disabled={loading} className="vault-view-link">
-      {loading ? "…" : "View"}
-    </button>
-  );
+// ── Premium icon set ──────────────────────────────────────────
+const ICONS: Record<string, ReactNode> = {
+  folder:    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
+  file:      <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></>,
+  fileCheck: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="m9.5 14.5 2 2 3.5-3.5" /></>,
+  check:     <path d="M20 6 9 17l-5-5" />,
+  clock:     <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" /></>,
+  x:         <path d="M18 6 6 18M6 6l12 12" />,
+  eye:       <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
+  upload:    <><path d="M12 15V3M8 7l4-4 4 4" /><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4" /></>,
+  download:  <><path d="M12 3v12M8 11l4 4 4-4" /><path d="M3 21h18" /></>,
+  plus:      <path d="M12 5v14M5 12h14" />,
+  chevron:   <path d="m9 18 6-6-6-6" />,
+  id:        <><rect x="2" y="5" width="20" height="14" rx="2.5" /><circle cx="8.5" cy="11.5" r="2" /><path d="M14 10h4M14 14h4M5.2 16.5a2.5 2.5 0 0 1 5 0" /></>,
+  vault:     <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="12" cy="12" r="3.2" /><path d="M12 8.8V7M12 17v-1.8M15.2 12H17M7 12h1.8" /></>,
+  inbox:     <><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z" /></>,
+  archive:   <><rect x="2" y="4" width="20" height="5" rx="1.5" /><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9M10 13h4" /></>,
+};
+function Ico({ k, sw = 1.8 }: { k: string; sw?: number }) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{ICONS[k]}</svg>;
 }
 
-const SERVICE_STATUS_SHORT_LABELS: Record<string, string> = {
+// ── Status helpers ────────────────────────────────────────────
+const SERVICE_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
-  documents_required: "Docs Needed",
+  documents_required: "Docs needed",
   under_review: "Reviewing",
-  in_progress: "In Progress",
-  action_required: "Action Needed",
+  in_progress: "In progress",
+  action_required: "Action needed",
   completed: "Done",
   cancelled: "Cancelled",
 };
-
-const SERVICE_STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
-  pending:            { fg: "#b45309", bg: "#fef3c7" },
-  documents_required: { fg: "#b45309", bg: "#fef3c7" },
-  under_review:       { fg: "#1d4ed8", bg: "#dbeafe" },
-  in_progress:        { fg: "#1d4ed8", bg: "#dbeafe" },
-  action_required:    { fg: "#be123c", bg: "#ffe4e6" },
-  completed:          { fg: "#15803d", bg: "#dcfce7" },
-  cancelled:          { fg: "#6b7280", bg: "#f3f4f6" },
+const STATUS_TONE: Record<string, { fg: string; bg: string }> = {
+  pending:            { fg: "#a96a16", bg: "#f6ecd6" },
+  documents_required: { fg: "#a96a16", bg: "#f6ecd6" },
+  under_review:       { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
+  in_progress:        { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
+  action_required:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
+  completed:          { fg: "var(--lp-green)", bg: "var(--lp-green-soft)" },
+  cancelled:          { fg: "var(--lp-ink-faint)", bg: "var(--lp-surface-2)" },
+};
+// Document status → premium icon + tone + label
+const DOC_META: Record<string, { key: string; tone: string; label: string }> = {
+  approved:     { key: "check", tone: "green", label: "Approved" },
+  uploaded:     { key: "file",  tone: "ink",   label: "Uploaded" },
+  under_review: { key: "eye",   tone: "amber", label: "Under review" },
+  rejected:     { key: "x",     tone: "red",   label: "Rejected" },
+  pending:      { key: "clock", tone: "faint", label: "Pending" },
 };
 
 function fmtDate(iso: string | null) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
-
 function normalize(s: string) {
   return s.toLowerCase().replace(/[\s_-]/g, "");
 }
-
 function isCommonDocAvailable(templateName: string, commonDocs: any[]): boolean {
   const tn = normalize(templateName);
   return commonDocs.some(cd => {
@@ -68,80 +74,72 @@ function isCommonDocAvailable(templateName: string, commonDocs: any[]): boolean 
   });
 }
 
-// ── Output doc view button ────────────────────────────────────
-
-function VaultOutputDocViewButton({ docId, signedUrl }: { docId: string; signedUrl?: string | null }) {
+// ── View / download buttons ───────────────────────────────────
+function ViewDocButton({ documentId, isCommon = false }: { documentId: string; isCommon?: boolean }) {
   const [loading, setLoading] = useState(false);
-  async function handle() {
-    if (signedUrl) { window.open(signedUrl, '_blank', 'noopener,noreferrer'); return; }
+  async function handleView() {
     setLoading(true);
     try {
-      const { data } = await apiClient.get(`/documents/output/${docId}/download`);
-      if (data?.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+      const path = isCommon ? `/common-documents/${documentId}/download` : `/documents/${documentId}/download`;
+      const { data } = await apiClient.get(path);
+      if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
     } catch (e: any) {
-      alert(e.response?.data?.error ?? 'Could not load document');
-    } finally { setLoading(false); }
+      alert(e.response?.data?.error ?? "Could not load document");
+    } finally {
+      setLoading(false);
+    }
   }
   return (
-    <button onClick={handle} disabled={loading} className="vault-view-link"
-      style={{ background: 'var(--green-600, #16a34a)', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.25rem 0.65rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-      {loading ? '…' : 'Download'}
+    <button onClick={handleView} disabled={loading} className="sv-btn sv-btn--ghost sv-btn--sm">
+      {loading ? <span className="vlt-spin vlt-spin--ink" /> : <><Ico k="eye" /> View</>}
     </button>
   );
 }
 
-// ── Icons ─────────────────────────────────────────────────────
+function VaultOutputDocViewButton({ docId, signedUrl }: { docId: string; signedUrl?: string | null }) {
+  const [loading, setLoading] = useState(false);
+  async function handle() {
+    if (signedUrl) { window.open(signedUrl, "_blank", "noopener,noreferrer"); return; }
+    setLoading(true);
+    try {
+      const { data } = await apiClient.get(`/documents/output/${docId}/download`);
+      if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      alert(e.response?.data?.error ?? "Could not load document");
+    } finally { setLoading(false); }
+  }
+  return <DownloadButton onClick={handle} loading={loading} />;
+}
 
-function FolderIcon({ open }: { open?: boolean }) {
+// ── Simple upload button (for "Update") ───────────────────────
+function SimpleUploadButton({ label, upload }: { label: string; upload: (file: File) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  async function handle(file: File) {
+    setBusy(true); setErr(null);
+    try { await upload(file); } catch (e: any) { setErr(e?.response?.data?.error ?? "Upload failed"); } finally { setBusy(false); }
+  }
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24"
-      fill={open ? "var(--gold-500)" : "none"}
-      stroke={open ? "var(--gold-600)" : "currentColor"}
-      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-    </svg>
+    <span className="vlt-upbtn-wrap">
+      <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handle(f); e.target.value = ""; }} />
+      <button className="sv-btn sv-btn--ghost sv-btn--sm" onClick={() => inputRef.current?.click()} disabled={busy}>
+        {busy ? <span className="vlt-spin vlt-spin--ink" /> : <><Ico k="upload" /> {label}</>}
+      </button>
+      {err && <span className="vlt-err">{err}</span>}
+    </span>
   );
 }
 
-function FileIcon({ status }: { status: string }) {
-  const color = status === "approved" ? "var(--green-600)"
-    : status === "uploaded" || status === "under_review" ? "var(--gold-600)"
-    : status === "rejected" ? "var(--danger)"
-    : "var(--ink-400)";
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-    </svg>
-  );
-}
-
-function ChevronRight() {
-  return (
-    <svg className="vault-folder-arrow" width="14" height="14" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m9 18 6-6-6-6"/>
-    </svg>
-  );
-}
-
-// ── Upload button (single document) ───────────────────────────
-
+// ── Single-document upload ────────────────────────────────────
 function ChecklistUploadButton({
-  clientServiceId, documentId, documentName, templateId, status,
-  onUploaded, label
+  clientServiceId, documentId, documentName, templateId, status, onUploaded, label,
 }: {
   clientServiceId: string; documentId?: string; documentName: string; templateId?: string;
   status: string; onUploaded: () => void; label?: string;
 }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  async function handleFile(file: File) {
-    setUploading(true);
-    setError(null);
+  async function upload(file: File) {
     const form = new FormData();
     form.append("file", file);
     form.append("serviceId", clientServiceId);
@@ -149,145 +147,18 @@ function ChecklistUploadButton({
     if (documentId) form.append("documentId", documentId);
     if (templateId) form.append("templateId", templateId);
     form.append("documentType", documentName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase());
-
-    try {
-      await apiClient.post("/vault/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      onUploaded();
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? "Upload failed");
-    } finally {
-      setUploading(false);
-    }
+    await apiClient.post("/vault/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+    onUploaded();
   }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "flex-end" }}>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        style={{ display: "none" }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
-      />
-      <button
-        className="btn btn-secondary db-btn-sm"
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        style={{ whiteSpace: "nowrap" }}
-      >
-        {uploading ? "Uploading…" : label ? label : status === "rejected" ? "Re-upload" : "Upload"}
-      </button>
-      {error && <span style={{ color: "var(--danger)", fontSize: "0.75rem" }}>{error}</span>}
-    </div>
-  );
+  // "Update" (existing uploaded/approved docs) is a simple button;
+  // first-time Upload / Re-upload uses the animated draw button.
+  if (label === "Update") return <SimpleUploadButton label="Update" upload={upload} />;
+  return <UploadButton label={status === "rejected" ? "Re-upload" : "Upload"} upload={upload} />;
 }
 
-// ── Vault Upload (any doc for a service) ──────────────────────
-
-function VaultUpload({ serviceId, templates, onUploaded }: {
-  serviceId: string; templates: any[]; onUploaded: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [customName, setCustomName] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  async function handleFile(file: File) {
-    const name = selectedTemplate
-      ? templates.find(t => t.id === selectedTemplate)?.name ?? customName
-      : customName;
-    if (!name) { setError("Choose a document type first"); return; }
-
-    setUploading(true);
-    setError(null);
-    const form = new FormData();
-    form.append("file", file);
-    form.append("serviceId", serviceId);
-    form.append("documentName", name);
-    if (selectedTemplate) form.append("templateId", selectedTemplate);
-    form.append("documentType", name.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase());
-
-    try {
-      await apiClient.post("/vault/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setOpen(false);
-      setSelectedTemplate("");
-      setCustomName("");
-      onUploaded();
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  if (!open) {
-    return (
-      <button className="btn btn-primary db-btn-sm" onClick={() => setOpen(true)}>
-        + Upload Document
-      </button>
-    );
-  }
-
-  return (
-    <div style={{ background: "var(--ink-50)", border: "1px solid var(--line-soft)", borderRadius: "0.5rem", padding: "1rem", minWidth: "260px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-        <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>Upload a document</span>
-        <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", lineHeight: 1 }}>✕</button>
-      </div>
-      <select
-        value={selectedTemplate}
-        onChange={e => { setSelectedTemplate(e.target.value); setCustomName(""); }}
-        className="form-input"
-        style={{ marginBottom: "0.5rem", fontSize: "0.875rem" }}
-      >
-        <option value="">Select document type…</option>
-        {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.required ? " *" : ""}</option>)}
-        <option value="__custom">Other (custom name)</option>
-      </select>
-      {selectedTemplate === "__custom" && (
-        <input
-          className="form-input"
-          placeholder="Document name"
-          value={customName}
-          onChange={e => setCustomName(e.target.value)}
-          style={{ marginBottom: "0.5rem", fontSize: "0.875rem" }}
-        />
-      )}
-      {error && <div style={{ color: "var(--danger)", fontSize: "0.75rem", marginBottom: "0.5rem" }}>{error}</div>}
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        style={{ display: "none" }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
-      />
-      <button
-        className="btn btn-primary"
-        style={{ width: "100%", fontSize: "0.875rem" }}
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading || (!selectedTemplate && !customName)}
-      >
-        {uploading ? "Uploading…" : "Choose file & upload"}
-      </button>
-    </div>
-  );
-}
-
-// ── Common Doc Upload ─────────────────────────────────────────
-
+// ── Common doc upload ─────────────────────────────────────────
 const COMMON_DOC_TYPES: Record<string, string> = {
-  pan: "PAN Card",
-  aadhaar: "Aadhaar",
-  dsc: "DSC",
-  bank_proof: "Bank Proof",
-  form16: "Form 16",
-  form26as: "Form 26AS",
+  pan: "PAN Card", aadhaar: "Aadhaar", dsc: "DSC", bank_proof: "Bank Proof", form16: "Form 16", form26as: "Form 26AS",
 };
 
 function VaultCommonUpload({ onUploaded }: { onUploaded: () => void }) {
@@ -304,14 +175,9 @@ function VaultCommonUpload({ onUploaded }: { onUploaded: () => void }) {
     const form = new FormData();
     form.append("file", file);
     form.append("documentType", docType);
-
     try {
-      await apiClient.post("/vault/common-upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setOpen(false);
-      setDocType("");
-      onUploaded();
+      await apiClient.post("/vault/common-upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+      setOpen(false); setDocType(""); onUploaded();
     } catch (err: any) {
       setError(err.response?.data?.error ?? "Upload failed");
     } finally {
@@ -320,42 +186,22 @@ function VaultCommonUpload({ onUploaded }: { onUploaded: () => void }) {
   }
 
   if (!open) {
-    return (
-      <button className="btn btn-primary db-btn-sm" onClick={() => setOpen(true)}>
-        + Upload Common Doc
-      </button>
-    );
+    return <button className="sv-btn" onClick={() => setOpen(true)}><Ico k="plus" /> Upload common doc</button>;
   }
-
   return (
-    <div style={{ background: "var(--ink-50)", border: "1px solid var(--line-soft)", borderRadius: "0.5rem", padding: "1rem", minWidth: "260px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-        <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>Upload common document</span>
-        <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", lineHeight: 1 }}>✕</button>
+    <div className="vlt-uploader">
+      <div className="vlt-uploader-head">
+        <span className="vlt-uploader-title">Upload common document</span>
+        <button className="vlt-uploader-close" onClick={() => setOpen(false)} aria-label="Close"><Ico k="x" sw={2} /></button>
       </div>
-      <select
-        value={docType}
-        onChange={e => setDocType(e.target.value)}
-        className="form-input"
-        style={{ marginBottom: "0.5rem", fontSize: "0.875rem" }}
-      >
+      <select value={docType} onChange={e => setDocType(e.target.value)} className="vlt-select">
         <option value="">Select document type…</option>
         {Object.entries(COMMON_DOC_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>
-      {error && <div style={{ color: "var(--danger)", fontSize: "0.75rem", marginBottom: "0.5rem" }}>{error}</div>}
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        style={{ display: "none" }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
-      />
-      <button
-        className="btn btn-primary"
-        style={{ width: "100%", fontSize: "0.875rem" }}
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading || !docType}
-      >
+      {error && <div className="vlt-err">{error}</div>}
+      <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+      <button className="sv-btn vlt-uploader-cta" onClick={() => inputRef.current?.click()} disabled={uploading || !docType}>
         {uploading ? "Uploading…" : "Choose file & upload"}
       </button>
     </div>
@@ -363,92 +209,73 @@ function VaultCommonUpload({ onUploaded }: { onUploaded: () => void }) {
 }
 
 function CommonDocUpdateButton({ documentType, onUploaded }: { documentType: string; onUploaded: () => void }) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  async function handleFile(file: File) {
-    setUploading(true);
-    setError(null);
+  async function upload(file: File) {
     const form = new FormData();
     form.append("file", file);
     form.append("documentType", documentType);
-
-    try {
-      await apiClient.post("/vault/common-upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      onUploaded();
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? "Upload failed");
-    } finally {
-      setUploading(false);
-    }
+    await apiClient.post("/vault/common-upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+    onUploaded();
   }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "flex-end" }}>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        style={{ display: "none" }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
-      />
-      <button
-        className="btn btn-secondary db-btn-sm"
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        style={{ whiteSpace: "nowrap" }}
-      >
-        {uploading ? "Uploading…" : "Update"}
-      </button>
-      {error && <span style={{ color: "var(--danger)", fontSize: "0.75rem" }}>{error}</span>}
-    </div>
-  );
+  return <SimpleUploadButton label="Update" upload={upload} />;
 }
 
 // ── Breadcrumb ────────────────────────────────────────────────
-
 function Breadcrumb({ items }: { items: Array<{ label: string; href?: string }> }) {
   return (
-    <nav style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", color: "var(--ink-400)", marginBottom: "1.5rem" }}>
+    <nav className="vlt-crumbs">
       {items.map((item, i) => (
-        <span key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          {i > 0 && <span>/</span>}
-          {item.href ? (
-            <Link to={item.href} style={{ color: "var(--gold-600)", fontWeight: 500 }}>{item.label}</Link>
-          ) : (
-            <span style={{ color: "var(--ink-700)", fontWeight: 600 }}>{item.label}</span>
-          )}
+        <span key={i} className="vlt-crumb">
+          {i > 0 && <Ico k="chevron" sw={1.9} />}
+          {item.href ? <Link to={item.href}>{item.label}</Link> : <span className="vlt-crumb-cur">{item.label}</span>}
         </span>
       ))}
     </nav>
   );
 }
 
-// ── Top-level view ────────────────────────────────────────────
+function PageHead({ eyebrow, title, sub, action }: { eyebrow: string; title: string; sub: string; action?: ReactNode }) {
+  return (
+    <header className="vlt-head">
+      <div>
+        <span className="vlt-eyebrow">{eyebrow}</span>
+        <h1 className="vlt-title">{title}</h1>
+        <p className="vlt-sub">{sub}</p>
+      </div>
+      {action}
+    </header>
+  );
+}
 
+// ── Document row ──────────────────────────────────────────────
+function DocRow({ status, name, meta, note, actions }: {
+  status: string; name: string; meta?: ReactNode; note?: ReactNode; actions?: ReactNode;
+}) {
+  const m = DOC_META[status] ?? DOC_META.pending;
+  return (
+    <div className="vlt-doc">
+      <span className={`sv-doc-ico sv-ico--${m.tone}`}><Ico k={m.key} sw={m.key === "check" ? 2.4 : 1.8} /></span>
+      <div className="vlt-doc-body">
+        <span className="vlt-doc-name">{name}</span>
+        <span className="vlt-doc-meta">{m.label}{meta ? <> · {meta}</> : null}</span>
+        {note && <span className="vlt-doc-note">{note}</span>}
+      </div>
+      {actions && <div className="vlt-doc-actions">{actions}</div>}
+    </div>
+  );
+}
+
+// ── Top-level view ────────────────────────────────────────────
 function VaultTopLevel() {
   const { data: groups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ["vault-groups"],
-    queryFn: async () => {
-      const { data } = await apiClient.get("/vault/groups");
-      return data.data ?? [];
-    },
+    queryFn: async () => { const { data } = await apiClient.get("/vault/groups"); return data.data ?? []; },
   });
-
   const { data: commonDocs = [], isLoading: commonLoading } = useQuery({
     queryKey: ["vault-common-docs"],
-    queryFn: async () => {
-      const { data } = await apiClient.get("/vault/common-documents");
-      return data.data ?? [];
-    },
+    queryFn: async () => { const { data } = await apiClient.get("/vault/common-documents"); return data.data ?? []; },
   });
 
-  if (groupsLoading || commonLoading) {
-    return <div className="page-loader"><div className="page-loader-ring" /></div>;
-  }
+  if (groupsLoading || commonLoading) return <div className="page-loader"><Loader /></div>;
 
   const activeFY = (() => {
     const now = new Date();
@@ -458,57 +285,42 @@ function VaultTopLevel() {
   })();
 
   return (
-    <div className="db-page-new">
+    <div className="vlt-page">
       <Breadcrumb items={[{ label: "Vault" }]} />
-      <div className="vault-top-header">
-        <div>
-          <h1 className="db-page-title">Your Tax Vault</h1>
-          <p className="db-page-sub">Every document, every year — organized and always accessible.</p>
-        </div>
-      </div>
+      <PageHead eyebrow="Document vault" title="Your Tax Vault" sub="Every document, every year — organized and always accessible." />
 
-      <div className="vault-folder-grid">
-        {/* Common docs folder */}
-        <Link to="/client/vault?common=1" className="vault-folder-card vault-folder-common">
-          <div className="vault-folder-icon"><FolderIcon /></div>
-          <div className="vault-folder-body">
-            <div className="vault-folder-name">Common Docs</div>
-            <div className="vault-folder-meta">PAN · Aadhaar · DSC · Bank Proof</div>
-            <div className="vault-folder-count">
-              {commonDocs.length} document{commonDocs.length !== 1 ? "s" : ""}
-            </div>
+      <div className="vlt-grid">
+        <Link to="/client/vault?common=1" className="vlt-folder vlt-folder--common">
+          <span className="vlt-folder-ico"><Ico k="id" /></span>
+          <div className="vlt-folder-body">
+            <div className="vlt-folder-name">Common Docs</div>
+            <div className="vlt-folder-meta">PAN · Aadhaar · DSC · Bank Proof</div>
+            <div className="vlt-folder-count">{commonDocs.length} document{commonDocs.length !== 1 ? "s" : ""}</div>
           </div>
-          <ChevronRight />
+          <span className="vlt-folder-arrow"><Ico k="chevron" sw={2} /></span>
         </Link>
 
-        {/* FY folders */}
         {groups.map((g: any) => {
           const isCurrent = g.fy === activeFY;
+          const up = g.services.reduce((s: number, x: any) => s + x.docsUploaded, 0);
+          const tot = g.services.reduce((s: number, x: any) => s + x.docsTotal, 0);
           return (
-            <Link key={g.fy} to={`/client/vault?fy=${g.fy}`} className="vault-folder-card vault-folder-fy">
-              <div className="vault-folder-icon"><FolderIcon open={isCurrent} /></div>
-              <div className="vault-folder-body">
-                <div className="vault-folder-name">
-                  FY {g.fy}
-                  {isCurrent && <span className="vault-current-badge">Current</span>}
-                </div>
-                <div className="vault-folder-meta">
-                  {g.services.length} service{g.services.length !== 1 ? "s" : ""}
-                </div>
-                <div className="vault-folder-count">
-                  {g.services.reduce((s: number, x: any) => s + x.docsUploaded, 0)} /
-                  {g.services.reduce((s: number, x: any) => s + x.docsTotal, 0)} docs uploaded
-                </div>
+            <Link key={g.fy} to={`/client/vault?fy=${g.fy}`} className="vlt-folder">
+              <span className="vlt-folder-ico"><Ico k="folder" /></span>
+              <div className="vlt-folder-body">
+                <div className="vlt-folder-name">FY {g.fy}{isCurrent && <span className="vlt-current">Current</span>}</div>
+                <div className="vlt-folder-meta">{g.services.length} service{g.services.length !== 1 ? "s" : ""}</div>
+                <div className="vlt-folder-count">{up} / {tot} docs uploaded</div>
               </div>
-              <ChevronRight />
+              <span className="vlt-folder-arrow"><Ico k="chevron" sw={2} /></span>
             </Link>
           );
         })}
 
         {!groups.length && (
-          <div className="vault-empty">
-            <div className="db-empty-icon">🗄️</div>
-            <p className="vault-empty-text">No services yet. Use <strong>+ Add Service</strong> in the top-right to begin.</p>
+          <div className="vlt-empty" style={{ gridColumn: "1 / -1" }}>
+            <span className="vlt-empty-ico"><Ico k="archive" sw={1.6} /></span>
+            <p>No services yet. Use <strong>Add Service</strong> in the top-right to begin.</p>
           </div>
         )}
       </div>
@@ -517,60 +329,45 @@ function VaultTopLevel() {
 }
 
 // ── FY-level view ─────────────────────────────────────────────
-
 function VaultFYView({ fy }: { fy: string }) {
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ["vault-groups"],
-    queryFn: async () => {
-      const { data } = await apiClient.get("/vault/groups");
-      return data.data ?? [];
-    },
+    queryFn: async () => { const { data } = await apiClient.get("/vault/groups"); return data.data ?? []; },
   });
 
-  if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
-
+  if (isLoading) return <div className="page-loader"><Loader /></div>;
   const fyGroup = groups.find((g: any) => g.fy === fy);
 
   return (
-    <div className="db-page-new">
-      <Breadcrumb items={[
-        { label: "Vault", href: "/vault" },
-        { label: `FY ${fy}` },
-      ]} />
-      <div className="vault-top-header">
-        <div>
-          <h1 className="db-page-title">FY {fy}</h1>
-          <p className="db-page-sub">{fyGroup?.services.length ?? 0} service{fyGroup?.services.length !== 1 ? "s" : ""} in this financial year.</p>
-        </div>
-      </div>
+    <div className="vlt-page">
+      <Breadcrumb items={[{ label: "Vault", href: "/client/vault" }, { label: `FY ${fy}` }]} />
+      <PageHead eyebrow="Financial year" title={`FY ${fy}`} sub={`${fyGroup?.services.length ?? 0} service${fyGroup?.services.length !== 1 ? "s" : ""} in this financial year.`} />
 
       {!fyGroup?.services.length ? (
-        <div className="vault-empty">
-          <p className="vault-empty-text">No services found for FY {fy}.</p>
+        <div className="vlt-empty">
+          <span className="vlt-empty-ico"><Ico k="folder" sw={1.6} /></span>
+          <p>No services found for FY {fy}.</p>
         </div>
       ) : (
-        <div className="vault-folder-grid">
+        <div className="vlt-grid">
           {fyGroup.services.map((svc: any) => {
-            const tone = SERVICE_STATUS_STYLES[svc.status] ?? SERVICE_STATUS_STYLES.pending;
+            const tone = STATUS_TONE[svc.status] ?? STATUS_TONE.pending;
             const pct = svc.docsTotal > 0 ? Math.round((svc.docsUploaded / svc.docsTotal) * 100) : 0;
             return (
-              <Link key={svc.clientServiceId} to={`/client/vault?fy=${fy}&svc=${svc.clientServiceId}`} className="vault-service-card">
-                <div className="vault-service-top">
+              <Link key={svc.clientServiceId} to={`/client/vault?fy=${fy}&svc=${svc.clientServiceId}`} className="vlt-svc">
+                <div className="vlt-svc-top">
                   <div>
-                    <div className="vault-service-category">{svc.serviceCategory}</div>
-                    <div className="vault-service-name">{svc.serviceName}</div>
+                    <div className="vlt-svc-cat">{svc.serviceCategory}</div>
+                    <div className="vlt-svc-name">{svc.serviceName}</div>
                   </div>
-                  <span className="vault-service-status" style={{ background: tone.bg, color: tone.fg }}>
-                    {SERVICE_STATUS_SHORT_LABELS[svc.status] ?? svc.status}
+                  <span className="vlt-status" style={{ background: tone.bg, color: tone.fg }}>
+                    {SERVICE_STATUS_LABELS[svc.status] ?? svc.status}
                   </span>
                 </div>
-                <div className="vault-service-progress-wrap">
-                  <div className="vault-service-progress-track">
-                    <div className="vault-service-progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? "var(--green-600)" : "var(--gold-500)" }} />
-                  </div>
-                  <span className="vault-service-progress-label">{svc.docsUploaded}/{svc.docsTotal} docs</span>
+                <div className="vlt-prog">
+                  <div className="vlt-prog-track"><div className={`vlt-prog-fill${pct === 100 ? " is-done" : ""}`} style={{ width: `${pct}%` }} /></div>
+                  <span className="vlt-prog-label">{svc.docsUploaded}/{svc.docsTotal} docs</span>
                 </div>
-                <ChevronRight />
               </Link>
             );
           })}
@@ -581,16 +378,11 @@ function VaultFYView({ fy }: { fy: string }) {
 }
 
 // ── Service-level view ────────────────────────────────────────
-
 function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
   const qc = useQueryClient();
-
   const { data: detail, isLoading, error } = useQuery({
     queryKey: ["vault-service", svcId],
-    queryFn: async () => {
-      const { data } = await apiClient.get(`/vault/service/${svcId}`);
-      return data.data;
-    },
+    queryFn: async () => { const { data } = await apiClient.get(`/vault/service/${svcId}`); return data.data; },
   });
 
   function refresh() {
@@ -598,252 +390,167 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
     qc.invalidateQueries({ queryKey: ["vault-groups"] });
   }
 
-  if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (isLoading) return <div className="page-loader"><Loader /></div>;
   if (error || !detail) {
     return (
-      <div className="db-page-new">
-        <Breadcrumb items={[{ label: "Vault", href: "/vault" }, { label: `FY ${fy}`, href: `/vault?fy=${fy}` }, { label: "Not found" }]} />
-        <div className="vault-empty"><p className="vault-empty-text">Service not found or you don't have access.</p></div>
+      <div className="vlt-page">
+        <Breadcrumb items={[{ label: "Vault", href: "/client/vault" }, { label: `FY ${fy}`, href: `/client/vault?fy=${fy}` }, { label: "Not found" }]} />
+        <div className="vlt-empty"><span className="vlt-empty-ico"><Ico k="x" sw={1.6} /></span><p>Service not found or you don't have access.</p></div>
       </div>
     );
   }
 
-  const docs        = detail.documents       ?? [];
-  const templates   = detail.templates       ?? [];
-  const commonDocs  = detail.commonDocs      ?? [];
-  const outputDocs  = detail.outputDocuments ?? [];
+  const docs       = detail.documents       ?? [];
+  const templates  = detail.templates       ?? [];
+  const commonDocs = detail.commonDocs      ?? [];
+  const outputDocs = detail.outputDocuments ?? [];
 
-  const inputDocs  = docs.filter((d: any) => d.status === "pending" || d.status === "uploaded" || d.status === "rejected" || d.status === "under_review");
-  const finalDocs  = docs.filter((d: any) => d.status === "approved");
+  const inputDocs = docs.filter((d: any) => d.status === "pending" || d.status === "uploaded" || d.status === "rejected" || d.status === "under_review");
+  const finalDocs = docs.filter((d: any) => d.status === "approved");
 
   const isTemplateCompleted = (t: any) => {
-    const hasUploadedDoc = docs.some((d: any) => 
+    const hasUploadedDoc = docs.some((d: any) =>
       (d.status === "uploaded" || d.status === "under_review" || d.status === "approved") &&
-      (d.templateId === t.id || normalize(d.documentName) === normalize(t.name))
-    );
-    const inCommon = isCommonDocAvailable(t.name, commonDocs);
-    return hasUploadedDoc || inCommon;
+      (d.templateId === t.id || normalize(d.documentName) === normalize(t.name)));
+    return hasUploadedDoc || isCommonDocAvailable(t.name, commonDocs);
   };
-
   const pendingTemplates = templates.filter((t: any) => !isTemplateCompleted(t));
   const allDone = templates.length > 0 && pendingTemplates.length === 0;
-
-  const tone = SERVICE_STATUS_STYLES[detail.status] ?? SERVICE_STATUS_STYLES.pending;
+  const reqPct = templates.length > 0 ? Math.round(((templates.length - pendingTemplates.length) / templates.length) * 100) : 0;
+  const tone = STATUS_TONE[detail.status] ?? STATUS_TONE.pending;
 
   return (
-    <div className="db-page-new">
-      <Breadcrumb items={[
-        { label: "Vault", href: "/vault" },
-        { label: `FY ${fy}`, href: `/vault?fy=${fy}` },
-        { label: detail.serviceName },
-      ]} />
-
-      <div className="vault-service-header">
+    <div className="vlt-page">
+      <Breadcrumb items={[{ label: "Vault", href: "/client/vault" }, { label: `FY ${fy}`, href: `/client/vault?fy=${fy}` }, { label: detail.serviceName }]} />
+      <header className="vlt-head">
         <div>
-          <h1 className="db-page-title">{detail.serviceName}</h1>
-          <p className="db-page-sub">
-            FY {detail.fy} ·{" "}
-            <span style={{ background: tone.bg, color: tone.fg, padding: "0.15rem 0.5rem", borderRadius: "999px", fontSize: "0.8rem" }}>
-              {SERVICE_STATUS_SHORT_LABELS[detail.status] ?? detail.status}
-            </span>
-          </p>
+          <span className="vlt-eyebrow">FY {detail.fy}</span>
+          <h1 className="vlt-title">{detail.serviceName}</h1>
+          <div className="vlt-sub">
+            <span className="vlt-status" style={{ background: tone.bg, color: tone.fg }}>{SERVICE_STATUS_LABELS[detail.status] ?? detail.status}</span>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="vault-service-layout">
-        {/* Left: documents */}
-        <div className="vault-docs-area">
-          {/* Input folder */}
-          <div className="vault-folder-section">
-            <div className="vault-folder-section-header">
-              <FolderIcon open />
-              <span>Input</span>
-              <span className="vault-folder-badge">{inputDocs.length}</span>
+      <div className="vlt-layout">
+        <div className="vlt-docs">
+          {/* Input */}
+          <section className="vlt-section">
+            <div className="vlt-section-head">
+              <span className="vlt-section-ico"><Ico k="upload" /></span>
+              <span className="vlt-section-title">Uploaded</span>
+              <span className="vlt-section-badge">{inputDocs.length}</span>
             </div>
             {inputDocs.length === 0 ? (
-              <div className="vault-folder-empty">No documents uploaded yet. Upload using the button above.</div>
+              <div className="vlt-section-empty">No documents pending — everything here is approved.</div>
             ) : (
-              <div className="vault-doc-list">
+              <div className="vlt-doclist">
                 {inputDocs.map((doc: any) => (
-                  <div key={doc.id} className="vault-doc-row">
-                    <FileIcon status={doc.status} />
-                    <div className="vault-doc-info">
-                      <span className="vault-doc-name">{doc.documentName}</span>
-                      {doc.status === "rejected" && doc.notes && (
-                        <span className="vault-doc-rejection-note">Rejected: {doc.notes}</span>
-                      )}
-                      {doc.uploadedAt && (
-                        <span className="vault-doc-date">Uploaded {fmtDate(doc.uploadedAt)}</span>
-                      )}
-                    </div>
-                    <span className="vault-doc-status" style={
-                      doc.status === "approved" ? { color: "var(--green-600)" }
-                      : doc.status === "rejected" ? { color: "var(--danger)" }
-                      : doc.status === "uploaded" || doc.status === "under_review" ? { color: "var(--gold-600)" }
-                      : { color: "var(--ink-400)" }
-                    }>
-                      {doc.status === "approved" ? "✓ Approved"
-                       : doc.status === "uploaded" ? "↑ Uploaded"
-                       : doc.status === "under_review" ? "Under Review"
-                       : doc.status === "rejected" ? "✕ Rejected"
-                       : "⏳ Pending"}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <DocRow
+                    key={doc.id}
+                    status={doc.status}
+                    name={doc.documentName}
+                    meta={doc.uploadedAt ? `Uploaded ${fmtDate(doc.uploadedAt)}` : undefined}
+                    note={doc.status === "rejected" && doc.notes ? `Rejected: ${doc.notes}` : undefined}
+                    actions={<>
                       {doc.fileUrl && <ViewDocButton documentId={doc.id} />}
                       {(doc.status === "pending" || doc.status === "rejected") && (
-                        <ChecklistUploadButton
-                          clientServiceId={detail.clientServiceId}
-                          documentId={doc.id}
-                          documentName={doc.documentName}
-                          templateId={doc.templateId}
-                          status={doc.status}
-                          onUploaded={refresh}
-                        />
+                        <ChecklistUploadButton clientServiceId={detail.clientServiceId} documentId={doc.id} documentName={doc.documentName} templateId={doc.templateId} status={doc.status} onUploaded={refresh} />
                       )}
                       {(doc.status === "uploaded" || doc.status === "under_review" || doc.status === "approved") && (
-                        <ChecklistUploadButton
-                          clientServiceId={detail.clientServiceId}
-                          documentId={doc.id}
-                          documentName={doc.documentName}
-                          templateId={doc.templateId}
-                          status={doc.status}
-                          onUploaded={refresh}
-                          label="Update"
-                        />
+                        <ChecklistUploadButton clientServiceId={detail.clientServiceId} documentId={doc.id} documentName={doc.documentName} templateId={doc.templateId} status={doc.status} onUploaded={refresh} label="Update" />
                       )}
-                    </div>
-                  </div>
+                    </>}
+                  />
                 ))}
               </div>
             )}
-          </div>
+          </section>
 
-          {/* Final folder */}
+          {/* Final (approved) */}
           {finalDocs.length > 0 && (
-            <div className="vault-folder-section">
-              <div className="vault-folder-section-header">
-                <FolderIcon />
-                <span>Final</span>
-                <span className="vault-folder-badge">{finalDocs.length}</span>
+            <section className="vlt-section">
+              <div className="vlt-section-head">
+                <span className="vlt-section-ico sv-ico--green"><Ico k="check" sw={2.4} /></span>
+                <span className="vlt-section-title">Approved</span>
+                <span className="vlt-section-badge">{finalDocs.length}</span>
               </div>
-              <div className="vault-doc-list">
+              <div className="vlt-doclist">
                 {finalDocs.map((doc: any) => (
-                  <div key={doc.id} className="vault-doc-row">
-                    <FileIcon status="approved" />
-                    <div className="vault-doc-info">
-                      <span className="vault-doc-name">{doc.documentName}</span>
-                      {doc.uploadedAt && (
-                        <span className="vault-doc-date">Approved {fmtDate(doc.uploadedAt)}</span>
-                      )}
-                    </div>
-                    <span className="vault-doc-status" style={{ color: "var(--green-600)" }}>✓ Approved</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <DocRow
+                    key={doc.id}
+                    status="approved"
+                    name={doc.documentName}
+                    meta={doc.uploadedAt ? `Approved ${fmtDate(doc.uploadedAt)}` : undefined}
+                    actions={<>
                       {doc.fileUrl && <ViewDocButton documentId={doc.id} />}
-                      <ChecklistUploadButton
-                        clientServiceId={detail.clientServiceId}
-                        documentId={doc.id}
-                        documentName={doc.documentName}
-                        templateId={doc.templateId}
-                        status={doc.status}
-                        onUploaded={refresh}
-                        label="Update"
-                      />
-                    </div>
-                  </div>
+                      <ChecklistUploadButton clientServiceId={detail.clientServiceId} documentId={doc.id} documentName={doc.documentName} templateId={doc.templateId} status={doc.status} onUploaded={refresh} label="Update" />
+                    </>}
+                  />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Output docs folder — generated by Taxpert */}
+          {/* Output from Taxpert */}
           {outputDocs.length > 0 && (
-            <div className="vault-folder-section" style={{ borderLeft: '3px solid var(--green-400, #4ade80)', paddingLeft: '0.75rem' }}>
-              <div className="vault-folder-section-header" style={{ color: 'var(--green-700, #15803d)' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green-600, #16a34a)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-                <span style={{ color: 'var(--green-700, #15803d)', fontWeight: 700 }}>Output from Taxpert</span>
-                <span className="vault-folder-badge" style={{ background: 'var(--green-100, #dcfce7)', color: 'var(--green-700, #15803d)' }}>
-                  {outputDocs.length}
-                </span>
+            <section className="vlt-section vlt-section--out">
+              <div className="vlt-section-head">
+                <span className="vlt-section-ico sv-ico--green"><Ico k="inbox" /></span>
+                <span className="vlt-section-title">From your Taxpert</span>
+                <span className="vlt-section-badge sv-ico--green">{outputDocs.length}</span>
               </div>
-              <div className="vault-doc-list">
+              <div className="vlt-doclist">
                 {outputDocs.map((doc: any) => (
-                  <div key={doc.id} className="vault-doc-row">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green-600, #16a34a)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    <div className="vault-doc-info">
-                      <span className="vault-doc-name">{doc.document_name}</span>
-                      {doc.description && <span className="vault-doc-date">{doc.description}</span>}
-                      {doc.uploaded_at && <span className="vault-doc-date">Ready {fmtDate(doc.uploaded_at)}</span>}
+                  <div key={doc.id} className="vlt-doc">
+                    <span className="sv-doc-ico sv-ico--green"><Ico k="fileCheck" /></span>
+                    <div className="vlt-doc-body">
+                      <span className="vlt-doc-name">{doc.document_name}</span>
+                      <span className="vlt-doc-meta">{doc.description ? doc.description : "Ready"}{doc.uploaded_at ? ` · ${fmtDate(doc.uploaded_at)}` : ""}</span>
                     </div>
-                    <span className="vault-doc-status" style={{ color: 'var(--green-600, #16a34a)' }}>Ready</span>
-                    <VaultOutputDocViewButton docId={doc.id} signedUrl={doc.signed_url} />
+                    <div className="vlt-doc-actions">
+                      <VaultOutputDocViewButton docId={doc.id} signedUrl={doc.signed_url} />
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
         </div>
 
-        {/* Right: required docs panel */}
+        {/* Required docs panel */}
         {templates.length > 0 && (
-          <aside className="vault-required-panel">
-            <div className="vault-panel-header">
-              <span className="vault-panel-title">Required Documents</span>
-              <span className="vault-panel-count">{templates.length - pendingTemplates.length}/{templates.length}</span>
+          <aside className="vlt-panel">
+            <div className="vlt-panel-head">
+              <span className="vlt-panel-title">Required documents</span>
+              <span className="vlt-panel-count">{templates.length - pendingTemplates.length}/{templates.length}</span>
             </div>
 
             {allDone ? (
-              <div className="vault-panel-done">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green-600)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m20 7-11 11-5-5"/>
-                </svg>
-                <span>All required documents are uploaded.</span>
-              </div>
+              <div className="vlt-panel-done"><Ico k="check" sw={2.4} /> All required documents uploaded.</div>
             ) : (
-              <div className="vault-panel-progress">
-                <div className="vault-panel-track">
-                  <div className="vault-panel-fill" style={{
-                    width: `${templates.length > 0 ? Math.round(((templates.length - pendingTemplates.length) / templates.length) * 100) : 0}%`
-                  }} />
-                </div>
-              </div>
+              <div className="vlt-panel-bar"><div className="vlt-panel-bar-fill" style={{ width: `${reqPct}%` }} /></div>
             )}
 
-            <div className="vault-panel-list">
+            <div className="vlt-panel-list">
               {templates.map((t: any) => {
                 const isDone = isTemplateCompleted(t);
                 const inCommon = isCommonDocAvailable(t.name, commonDocs);
                 return (
-                  <div key={t.id} className={`vault-panel-item${isDone ? " vault-panel-item-done" : ""}`}>
-                    <div className="vault-panel-check">
-                      {isDone
-                        ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green-600)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m20 7-11 11-5-5"/></svg>
-                        : <div className="vault-panel-dot" />
-                      }
+                  <div key={t.id} className={`vlt-req${isDone ? " is-done" : ""}`}>
+                    <span className="vlt-req-check">{isDone ? <Ico k="check" sw={2.6} /> : <span className="vlt-req-dot" />}</span>
+                    <div className="vlt-req-body">
+                      <span className="vlt-req-name">{t.name}</span>
+                      {t.description && <span className="vlt-req-hint">{t.description}</span>}
                     </div>
-                    <div className="vault-panel-name-wrap">
-                      <span className="vault-panel-name">{t.name}</span>
-                      {t.description && (
-                        <span className="vault-panel-hint">{t.description}</span>
-                      )}
-                    </div>
-                    {inCommon ? (
-                      <span className="vault-panel-common-badge">In Common Docs</span>
-                    ) : t.required && !isDone ? (
-                      <span className="vault-panel-req">Required</span>
-                    ) : null}
+                    {inCommon ? <span className="vlt-req-badge vlt-req-badge--common">Common</span>
+                      : t.required && !isDone ? <span className="vlt-req-badge vlt-req-badge--req">Required</span> : null}
                   </div>
                 );
               })}
             </div>
 
-            <Link to={`/client/services/${detail.clientServiceId}`} className="vault-panel-link">
-              View full checklist →
-            </Link>
+            <Link to={`/client/services/${detail.clientServiceId}`} className="vlt-panel-link">View full checklist <Ico k="chevron" sw={2} /></Link>
           </aside>
         )}
       </div>
@@ -852,70 +559,56 @@ function VaultServiceView({ fy, svcId }: { fy: string; svcId: string }) {
 }
 
 // ── Common docs view ──────────────────────────────────────────
-
 function VaultCommonDocsView() {
   const qc = useQueryClient();
-
   const { data: commonDocs = [], isLoading } = useQuery({
     queryKey: ["vault-common-docs"],
-    queryFn: async () => {
-      const { data } = await apiClient.get("/vault/common-documents");
-      return data.data ?? [];
-    },
+    queryFn: async () => { const { data } = await apiClient.get("/vault/common-documents"); return data.data ?? []; },
   });
+  function refresh() { qc.invalidateQueries({ queryKey: ["vault-common-docs"] }); }
 
-  function refresh() {
-    qc.invalidateQueries({ queryKey: ["vault-common-docs"] });
-  }
-
-  if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (isLoading) return <div className="page-loader"><Loader /></div>;
 
   return (
-    <div className="db-page-new">
-      <Breadcrumb items={[
-        { label: "Vault", href: "/vault" },
-        { label: "Common Docs" },
-      ]} />
-      <div className="vault-top-header">
-        <div>
-          <h1 className="db-page-title">Common Documents</h1>
-          <p className="db-page-sub">PAN, Aadhaar, DSC, and Bank Proof shared across all your services.</p>
-        </div>
-        <VaultCommonUpload onUploaded={refresh} />
-      </div>
+    <div className="vlt-page">
+      <Breadcrumb items={[{ label: "Vault", href: "/client/vault" }, { label: "Common Docs" }]} />
+      <PageHead
+        eyebrow="Shared documents"
+        title="Common Documents"
+        sub="PAN, Aadhaar, DSC, and Bank Proof shared across all your services."
+        action={<VaultCommonUpload onUploaded={refresh} />}
+      />
 
       {!commonDocs.length ? (
-        <div className="vault-empty">
-          <div className="db-empty-icon">📂</div>
-          <p className="vault-empty-text">No common documents uploaded yet.</p>
-          <p style={{ fontSize: "0.85rem", color: "var(--ink-400)", marginTop: "0.5rem" }}>
-            Upload PAN, Aadhaar, DSC, or Bank Proof and they will appear here.
-          </p>
+        <div className="vlt-empty">
+          <span className="vlt-empty-ico"><Ico k="id" sw={1.6} /></span>
+          <p>No common documents uploaded yet.</p>
+          <p className="vlt-empty-hint">Upload PAN, Aadhaar, DSC, or Bank Proof and they will appear here.</p>
         </div>
       ) : (
-        <div className="vault-doc-list" style={{ marginTop: "1.5rem" }}>
-          {commonDocs.map((d: any) => (
-            <div key={d.id} className="vault-doc-row">
-              <FileIcon status="approved" />
-              <div className="vault-doc-info">
-                <span className="vault-doc-name">{COMMON_DOC_TYPES[d.documentType] ?? d.documentType}</span>
-                {d.documentName && <span className="vault-doc-date">{d.documentName}</span>}
+        <section className="vlt-section">
+          <div className="vlt-doclist">
+            {commonDocs.map((d: any) => (
+              <div key={d.id} className="vlt-doc">
+                <span className="sv-doc-ico sv-ico--green"><Ico k="check" sw={2.4} /></span>
+                <div className="vlt-doc-body">
+                  <span className="vlt-doc-name">{COMMON_DOC_TYPES[d.documentType] ?? d.documentType}</span>
+                  <span className="vlt-doc-meta">Uploaded{d.documentName ? ` · ${d.documentName}` : ""}</span>
+                </div>
+                <div className="vlt-doc-actions">
+                  {d.fileUrl && <ViewDocButton documentId={d.id} isCommon />}
+                  <CommonDocUpdateButton documentType={d.documentType} onUploaded={refresh} />
+                </div>
               </div>
-              <span className="vault-doc-status" style={{ color: "var(--green-600)" }}>✓ Uploaded</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                {d.fileUrl && <ViewDocButton documentId={d.id} isCommon={true} />}
-                <CommonDocUpdateButton documentType={d.documentType} onUploaded={refresh} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
 }
 
 // ── Main router ───────────────────────────────────────────────
-
 export default function VaultPage() {
   const [searchParams] = useSearchParams();
   const qc = useQueryClient();
@@ -923,16 +616,12 @@ export default function VaultPage() {
   const svc = searchParams.get("svc");
   const common = searchParams.get("common");
 
-  // Backfill sync: on every vault page load, propagate any existing common docs
-  // into pending service-doc rows so users don't see stale "Pending" states.
+  // Backfill sync: propagate existing common docs into pending service-doc rows.
   useEffect(() => {
     apiClient.post("/vault/sync").then(() => {
-      // Refresh all vault queries so the UI picks up the newly synced statuses
       qc.invalidateQueries({ queryKey: ["vault-service"] });
       qc.invalidateQueries({ queryKey: ["vault-groups"] });
-    }).catch(() => {
-      // Non-critical — silently ignore sync errors
-    });
+    }).catch(() => { /* non-critical */ });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (common === "1") return <VaultCommonDocsView />;

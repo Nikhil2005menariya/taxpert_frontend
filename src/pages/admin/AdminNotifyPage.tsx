@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Loader from "../../components/ui/Loader";
 import { Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,7 +43,7 @@ export default function AdminNotifyPage() {
     },
   });
 
-  if (authLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (authLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin)    return <Navigate to="/dashboard" replace />;
 
   const canSend = recipientId && subject.trim() && body.trim() && !send.isPending;
@@ -142,7 +143,7 @@ export default function AdminNotifyPage() {
         </h3>
 
         {histLoading ? (
-          <div className="page-loader" style={{ height: 80 }}><div className="page-loader-ring" /></div>
+          <div className="page-loader" style={{ height: 80 }}><Loader /></div>
         ) : (history ?? []).length === 0 ? (
           <div className="db-empty-card">
             <p className="db-empty-title">No notifications sent yet</p>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { serviceCategories } from "../../data/site-content";
 import { apiClient } from "../../api/client";
+import { CategoryIcon } from "../../shared/category-icons";
 
 export default function AddServiceModal() {
   const [open, setOpen] = useState(false);
@@ -50,79 +51,95 @@ export default function AddServiceModal() {
 
   return (
     <>
-      <button className="btn btn-primary add-svc-btn" onClick={handleOpen}>
-        + Add Service
+      <button className="addsvc-btn" onClick={handleOpen} aria-label="Add a service">
+        <span className="addsvc-main">
+          <span className="addsvc-ico">
+            <span className="addsvc-blur" />
+            <span className="addsvc-plus">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            </span>
+          </span>
+          Add Service
+        </span>
       </button>
 
       {open && (
-        <div className="add-svc-overlay" onClick={() => setOpen(false)}>
-          <div className="add-svc-modal" onClick={e => e.stopPropagation()}>
-            <div className="add-svc-modal-header">
-              <div>
-                {category ? (
-                  <button className="add-svc-back" onClick={() => { setCategorySlug(null); setMessage(null); }}>
-                    ← Back
-                  </button>
-                ) : (
-                  <span className="add-svc-modal-title">Add a Service</span>
-                )}
+        <div className="asv-overlay" onClick={() => setOpen(false)}>
+          <div className="asv-modal" onClick={e => e.stopPropagation()}>
+            <div className="asv-head">
+              <div className="asv-head-left">
                 {category && (
-                  <span className="add-svc-modal-title">{category.title}</span>
+                  <button className="asv-back" onClick={() => { setCategorySlug(null); setMessage(null); }} aria-label="Back to categories">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+                  </button>
                 )}
+                <div className="asv-head-text">
+                  <span className="asv-eyebrow">{category ? "Choose a service" : "Service catalogue"}</span>
+                  <span className="asv-title">{category ? category.title : "Add a service"}</span>
+                </div>
               </div>
-              <button className="add-svc-close" onClick={() => setOpen(false)}>✕</button>
+              <button className="asv-close" onClick={() => setOpen(false)} aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              </button>
             </div>
 
-            <div className="add-svc-modal-body">
+            <div className="asv-body">
               {message && (
-                <div className={`add-svc-msg add-svc-msg-${message.type}`}>
-                  {message.text}
+                <div className={`asv-msg asv-msg--${message.type}`}>
+                  <span>{message.text}</span>
                   {message.type === "exists" && message.svcId && (
                     <button
-                      className="add-svc-msg-link"
+                      className="asv-msg-link"
                       onClick={() => { setOpen(false); navigate(`/client/vault?svc=${message.svcId}`); }}
                     >
-                      Go to Vault →
+                      Go to Vault
                     </button>
                   )}
                 </div>
               )}
 
               {!category ? (
-                // Category picker
-                <div className="add-svc-cat-list">
+                <div className="asv-cats">
                   {serviceCategories.map(cat => (
                     <button
                       key={cat.slug}
-                      className="add-svc-cat-item"
+                      className="asv-cat"
                       onClick={() => { setCategorySlug(cat.slug); setMessage(null); }}
                     >
-                      <span className="add-svc-cat-name">{cat.title}</span>
-                      <span className="add-svc-cat-count">{cat.items.length}</span>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m9 18 6-6-6-6"/>
-                      </svg>
+                      <span className="asv-cat-ico"><CategoryIcon slug={cat.slug} /></span>
+                      <span className="asv-cat-body">
+                        <span className="asv-cat-name">{cat.title}</span>
+                        <span className="asv-cat-count">{cat.items.length} service{cat.items.length !== 1 ? "s" : ""}</span>
+                      </span>
+                      <span className="asv-cat-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                      </span>
                     </button>
                   ))}
                 </div>
               ) : (
-                // Service picker within category
-                <div className="add-svc-svc-list">
+                <div className="asv-svcs">
                   {category.items.map(svc => (
-                    <div key={svc.slug} className="add-svc-svc-item">
-                      <div className="add-svc-svc-info">
-                        <span className="add-svc-svc-name">{svc.name}</span>
-                        <span className="add-svc-svc-summary">{svc.summary}</span>
+                    <div key={svc.slug} className="asv-svc">
+                      <div className="asv-svc-body">
+                        <div className="asv-svc-top">
+                          <span className="asv-svc-name">{svc.name}</span>
+                          {(svc as any).price && <span className="asv-svc-price">{(svc as any).price}</span>}
+                        </div>
+                        <span className="asv-svc-summary">{svc.summary}</span>
                       </div>
-                      <div className="add-svc-svc-right">
-                        <button
-                          className="btn btn-primary add-svc-add-btn"
-                          onClick={() => handleAdd(svc.slug)}
-                          disabled={addingSlug !== null}
-                        >
-                          {addingSlug === svc.slug ? "Adding…" : "+ Add"}
-                        </button>
-                      </div>
+                      <button
+                        className="asv-add"
+                        onClick={() => handleAdd(svc.slug)}
+                        disabled={addingSlug !== null}
+                        aria-label={`Add ${svc.name}`}
+                      >
+                        {addingSlug === svc.slug ? (
+                          <span className="asv-spin" />
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                        )}
+                      </button>
                     </div>
                   ))}
                 </div>

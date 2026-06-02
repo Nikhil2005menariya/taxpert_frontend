@@ -1,10 +1,16 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
+import Loader from "../../../components/ui/Loader";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { apiClient } from "../../../api/client";
 import MilestoneBar from "../../../components/dashboard/MilestoneBar";
 import StaffWorkflowControls from "../../../components/staff/StaffWorkflowControls";
+import BinButton from "../../../components/ui/BinButton";
+import PayButton from "../../../components/ui/PayButton";
+import DownloadButton from "../../../components/ui/DownloadButton";
+import UploadButton from "../../../components/ui/UploadButton";
 
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
 
@@ -19,15 +25,6 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   completed: "Completed",
   cancelled: "Cancelled",
   on_hold: "On Hold",
-};
-
-const DOCUMENT_STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  uploaded: "Uploaded",
-  under_review: "Under Review",
-  approved: "Approved",
-  rejected: "Rejected",
-  expired: "Expired",
 };
 
 // Internal event types — never shown to clients
@@ -49,37 +46,64 @@ function formatDate(iso: string | null) {
   });
 }
 
-const EVENT_LABELS: Record<string, { label: string; icon: string; color: string }> = {
-  document_approved:           { label: "Document approved",       icon: "✓", color: "var(--green-600)" },
-  document_rejected:           { label: "Document rejected",       icon: "✕", color: "var(--red-600)" },
-  document_uploaded:           { label: "Document uploaded",       icon: "↑", color: "var(--gold-600)" },
-  document_reupload_requested: { label: "Re-upload requested",     icon: "↺", color: "var(--gold-600)" },
-  optional_document_added:     { label: "Document slot added",     icon: "+", color: "var(--ink-500)" },
-  status_changed:              { label: "Status updated",          icon: "→", color: "var(--ink-500)" },
-  deletion_requested:          { label: "Deletion requested",      icon: "!", color: "var(--red-500)" },
-  deletion_rejected:           { label: "Deletion request rejected",icon: "✕", color: "var(--ink-500)" },
-  deletion_request_cancelled:  { label: "Deletion request cancelled",icon: "✕", color: "var(--ink-400)" },
-  payment_received:            { label: "Payment received",        icon: "₹", color: "var(--green-600)" },
-  service_created:             { label: "Service created",         icon: "★", color: "var(--ink-400)" },
+// ── Premium icon set (no emojis / bare arrow glyphs) ──────────
+const P: Record<string, ReactNode> = {
+  check:     <path d="M20 6 9 17l-5-5" />,
+  clock:     <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 2" /></>,
+  eye:       <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
+  x:         <path d="M18 6 6 18M6 6l12 12" />,
+  alert:     <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9.5v4M12 17h.01" /></>,
+  file:      <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></>,
+  fileCheck: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="m9.5 14.5 2 2 3.5-3.5" /></>,
+  upload:    <><path d="M12 15V3M8 7l4-4 4 4" /><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4" /></>,
+  download:  <><path d="M12 3v12M8 11l4 4 4-4" /><path d="M3 21h18" /></>,
+  plus:      <path d="M12 5v14M5 12h14" />,
+  refresh:   <><path d="M21 8a9 9 0 0 0-15-3.7L3 7" /><path d="M3 3v4h4" /><path d="M3 16a9 9 0 0 0 15 3.7L21 17" /><path d="M21 21v-4h-4" /></>,
+  trash:     <><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></>,
+  card:      <><rect x="2" y="5" width="20" height="14" rx="2.5" /><path d="M2 10h20" /></>,
+  flag:      <path d="M4 22V4h13l-2 4 2 4H4" />,
+  spark:     <path d="M12 3v3M12 18v3M3 12h3M18 12h3M6.3 6.3l2.1 2.1M15.6 15.6l2.1 2.1M17.7 6.3l-2.1 2.1M8.4 15.6l-2.1 2.1" />,
+  checklist: <><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="m8 11 2 2 4-4M8 16h6" /></>,
+  layers:    <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5" /></>,
+  pause:     <path d="M9 5v14M15 5v14" />,
+  inbox:     <><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5Z" /></>,
+};
+function Svg({ k, sw = 1.8 }: { k: string; sw?: number }) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{P[k]}</svg>;
+}
+
+// Document status → premium icon + tone + label
+const DOC_META: Record<string, { key: string; tone: string; label: string }> = {
+  approved:     { key: "check", tone: "green", label: "Approved" },
+  uploaded:     { key: "file",  tone: "ink",   label: "Uploaded" },
+  under_review: { key: "eye",   tone: "amber", label: "Under review" },
+  rejected:     { key: "x",     tone: "red",   label: "Rejected" },
+  expired:      { key: "alert", tone: "amber", label: "Expired" },
+  pending:      { key: "clock", tone: "faint", label: "Awaiting upload" },
 };
 
-function StatusIcon({ status }: { status: string }) {
-  if (status === "approved")    return <span className="cl-status-icon cl-verified">✓</span>;
-  if (status === "under_review") return <span className="cl-status-icon cl-uploaded">↺</span>;
-  if (status === "uploaded")    return <span className="cl-status-icon cl-uploaded">↑</span>;
-  if (status === "rejected")    return <span className="cl-status-icon cl-rejected">✕</span>;
-  if (status === "expired")     return <span className="cl-status-icon cl-rejected">!</span>;
-  return <span className="cl-status-icon cl-pending">⏳</span>;
-}
+// Activity event → premium icon + tone + label
+const EVENT_META: Record<string, { label: string; key: string; tone: string }> = {
+  document_approved:           { label: "Document approved",         key: "check",   tone: "green" },
+  document_rejected:           { label: "Document rejected",         key: "x",       tone: "red" },
+  document_uploaded:           { label: "Document uploaded",         key: "upload",  tone: "accent" },
+  document_reupload_requested: { label: "Re-upload requested",       key: "refresh", tone: "amber" },
+  optional_document_added:     { label: "Document slot added",       key: "plus",    tone: "ink" },
+  status_changed:              { label: "Status updated",            key: "flag",    tone: "ink" },
+  deletion_requested:          { label: "Deletion requested",        key: "trash",   tone: "red" },
+  deletion_rejected:           { label: "Deletion request rejected", key: "x",       tone: "ink" },
+  deletion_request_cancelled:  { label: "Deletion cancelled",        key: "x",       tone: "ink" },
+  payment_received:            { label: "Payment received",          key: "card",    tone: "green" },
+  service_created:             { label: "Service created",           key: "spark",   tone: "accent" },
+};
 
-function IconFile() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-    </svg>
-  );
+function taskState(status: string): "done" | "active" | "blocked" | "pending" {
+  if (status === "done") return "done";
+  if (status === "in_progress") return "active";
+  if (status === "blocked") return "blocked";
+  return "pending";
 }
+const TASK_LABEL: Record<string, string> = { done: "Done", active: "In progress", blocked: "Blocked", pending: "Pending" };
 
 // ── Output doc view (fetches fresh signed URL) ────────────────────────────────
 function OutputDocViewButton({ docId }: { docId: string }) {
@@ -93,12 +117,7 @@ function OutputDocViewButton({ docId }: { docId: string }) {
       alert(e.response?.data?.error ?? 'Could not load document');
     } finally { setLoading(false); }
   }
-  return (
-    <button onClick={handleView} disabled={loading} className="cl-upload-btn"
-      style={{ background: 'var(--green-600, #16a34a)', borderColor: 'var(--green-600, #16a34a)' }}>
-      {loading ? '…' : 'Download'}
-    </button>
-  );
+  return <DownloadButton onClick={handleView} loading={loading} />;
 }
 
 // ── Staff doc approve/reject ───────────────────────────────────────────────────
@@ -135,6 +154,24 @@ function StaffDocActions({ docId, status, onDone }: { docId: string; status: str
       <button onClick={handleReject} disabled={busy} className="cl-reject-btn">Reject</button>
     </div>
   );
+}
+
+// ── Inline doc upload (mirrors VaultPage ChecklistUploadButton) ──────────────
+function DocUploadButton({ doc, clientServiceId, onUploaded }: {
+  doc: any; clientServiceId: string; onUploaded: () => void;
+}) {
+  async function upload(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("serviceId", clientServiceId);
+    form.append("documentName", doc.document_name);
+    if (doc.id) form.append("documentId", doc.id);
+    form.append("documentType", doc.document_name.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase());
+    await apiClient.post("/vault/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
+    onUploaded();
+  }
+  const label = doc.status === "rejected" || doc.status === "expired" ? "Re-upload" : "Upload";
+  return <UploadButton label={label} upload={upload} />;
 }
 
 // ── Remove Service — header button + modal ────────────────────────────────────
@@ -174,16 +211,32 @@ function RemoveServiceButton({ clientServiceId, hasDocuments, deletionRequested 
   if (deletionRequested) {
     return (
       <div className="cl-deletion-badge">
-        <span className="cl-deletion-pill">⏳ Deletion pending</span>
+        <span className="cl-deletion-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+            <line x1="5" y1="2" x2="19" y2="2"/><line x1="5" y1="22" x2="19" y2="22"/>
+            <path d="M17 2v4.172a2 2 0 0 1-.586 1.414L12 12"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12"/>
+            <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12"/><path d="M7 22v-4.172a2 2 0 0 1 .586-1.414L12 12"/>
+          </svg>
+          Deletion pending
+        </span>
         <button
           className="cl-deletion-cancel-link"
           onClick={() => cancelMutation.mutate()}
           disabled={cancelMutation.isPending}
         >
-          {cancelMutation.isPending ? "Cancelling…" : "Cancel request"}
+          {cancelMutation.isPending ? (
+            "Cancelling…"
+          ) : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              Cancel request
+            </>
+          )}
         </button>
         {cancelMutation.isError && (
-          <span style={{ fontSize: "0.75rem", color: "var(--red-600)" }}>
+          <span className="cl-deletion-err">
             {(cancelMutation.error as any)?.response?.data?.error ?? "Failed"}
           </span>
         )}
@@ -193,21 +246,18 @@ function RemoveServiceButton({ clientServiceId, hasDocuments, deletionRequested 
 
   return (
     <>
-      <button className="cl-remove-header-btn" onClick={() => setOpen(true)}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="3 6 5 6 21 6"/>
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-          <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
-        </svg>
-        Remove
-      </button>
+      <BinButton onClick={() => setOpen(true)} title="Remove service" />
 
       {open && (
         <div className="cl-modal-backdrop" onClick={() => setOpen(false)}>
           <div className="cl-modal" onClick={e => e.stopPropagation()}>
             <div className="cl-modal-header">
               <span className="cl-modal-title">Remove this service?</span>
-              <button className="cl-modal-close" onClick={() => setOpen(false)}>✕</button>
+              <button className="cl-modal-close" onClick={() => setOpen(false)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
             </div>
             <div className="cl-modal-body">
               {hasDocuments ? (
@@ -262,15 +312,15 @@ function OptionalTemplateRow({ template, clientServiceId, onAdded }: {
   }
 
   return (
-    <div className="cl-optional-row">
-      <div>
-        <span className="cl-optional-name">{template.name}</span>
-        {template.description && <span className="cl-doc-status-text" style={{ marginLeft: "0.5rem" }}>{template.description}</span>}
+    <div className="sv-opt">
+      <div className="sv-opt-body">
+        <span className="sv-opt-name">{template.name}</span>
+        {template.description && <span className="sv-opt-desc">{template.description}</span>}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        {err && <span style={{ fontSize: "0.75rem", color: "var(--red-600)" }}>{err}</span>}
-        <button onClick={handleAdd} disabled={busy} className="cl-add-optional-btn">
-          {busy ? "Adding…" : "+ Add"}
+      <div className="sv-opt-action">
+        {err && <span className="sv-opt-err">{err}</span>}
+        <button onClick={handleAdd} disabled={busy} className="sv-btn sv-btn--ghost">
+          {busy ? "Adding…" : <><Svg k="plus" sw={2} /> Add</>}
         </button>
       </div>
     </div>
@@ -320,7 +370,7 @@ export default function ServiceDetailsPage() {
     qc.invalidateQueries({ queryKey: ["vault-service", id] });
   }
 
-  if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (isLoading) return <div className="page-loader"><Loader /></div>;
   if (error || !cs) {
     return (
       <div className="cl-shell">
@@ -345,10 +395,8 @@ export default function ServiceDetailsPage() {
 
   const workspaceTasks    = workspace?.tasks    ?? [];
   const workspaceEvents   = workspace?.events   ?? [];
-  const workspaceDueDates = workspace?.dueDates ?? [];
 
   const openTasks   = workspaceTasks.filter((t: any) => t.status !== "done" && t.status !== "cancelled");
-  const nextDueDates = workspaceDueDates.filter((d: any) => d.status === "open").slice(0, 4);
 
   // Filter internal events — client only sees public-facing events
   const clientEvents = isClient
@@ -420,7 +468,7 @@ export default function ServiceDetailsPage() {
             </div>
           </div>
           {cs.service?.slug && (
-            <Link to={`/client/invoices/${cs.id}`} className="btn btn-primary cl-pay-now-btn">Pay Now →</Link>
+            <PayButton to={`/client/invoices/${cs.id}`} label="Pay now" />
           )}
         </div>
       )}
@@ -468,221 +516,164 @@ export default function ServiceDetailsPage() {
 
       {/* ── Overview Tab ──────────────────────────────────────── */}
       {activeTab === 'overview' && (
-        <>
-          {/* Workspace: tasks + due dates */}
-          {workspace && (
-            <div className="cl-workspace-grid">
-              <div className="cl-progress-card">
-                <div className="cl-progress-top">
-                  <span className="cl-progress-label">Workspace tasks</span>
-                  <span className="cl-progress-fraction">
-                    {workspaceTasks.filter((t: any) => t.status === "done").length} of {workspaceTasks.length} completed
-                  </span>
-                </div>
-                {workspaceTasks.length === 0 ? (
-                  <div className="cl-workspace-empty">No structured tasks have been generated yet.</div>
-                ) : (
-                  <div className="cl-workspace-stack">
-                    {workspaceTasks.map((task: any) => (
-                      <div key={task.id} className="cl-workspace-item">
-                        <div>
-                          <div className="cl-doc-name">{task.title}</div>
-                          {task.description && <div className="cl-doc-status-text">{task.description}</div>}
-                        </div>
-                        <span className={`cl-overall-status cl-status-${task.status === "done" ? "completed" : task.status === "blocked" ? "on_hold" : "in_progress"}`}>
-                          {task.status.replace(/_/g, " ")}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+        <div className="sv-overview">
 
-              <div className="cl-progress-card">
-                <div className="cl-progress-top">
-                  <span className="cl-progress-label">Service due dates</span>
-                  <span className="cl-progress-fraction">{nextDueDates.length} upcoming</span>
-                </div>
-                {nextDueDates.length === 0 ? (
-                  <div className="cl-workspace-empty">No service deadlines are currently scheduled.</div>
-                ) : (
-                  <div className="cl-workspace-stack">
-                    {nextDueDates.map((dd: any) => (
-                      <div key={dd.id} className="cl-workspace-item">
-                        <div>
-                          <div className="cl-doc-name">{dd.title}</div>
-                          {dd.description && <div className="cl-doc-status-text">{dd.description}</div>}
-                        </div>
-                        <span className="cl-doc-status-text">{formatDate(dd.due_at)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          {/* Workspace tasks */}
+          {workspace && workspaceTasks.length > 0 && (
+            <section className="sv-panel">
+              <div className="sv-panel-head">
+                <span className="sv-panel-title"><span className="sv-panel-title-ico"><Svg k="checklist" /></span>Workspace tasks</span>
+                <span className="sv-panel-meta">{workspaceTasks.filter((t: any) => t.status === "done").length} / {workspaceTasks.length} done</span>
               </div>
-            </div>
+              <ol className="sv-tasks">
+                {workspaceTasks.map((task: any) => {
+                  const st = taskState(task.status);
+                  return (
+                    <li key={task.id} className={`sv-task is-${st}`}>
+                      <span className="sv-task-ico">
+                        {st === "done" ? <Svg k="check" sw={2.4} />
+                          : st === "blocked" ? <Svg k="pause" sw={2} />
+                          : st === "active" ? <span className="sv-pulse" />
+                          : <span className="sv-hollow" />}
+                      </span>
+                      <div className="sv-task-body">
+                        <div className="sv-task-title">{task.title}</div>
+                        {task.description && <div className="sv-task-desc">{task.description}</div>}
+                      </div>
+                      <span className="sv-task-state">{TASK_LABEL[st]}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
           )}
 
-          {/* Document progress */}
+          {/* Documents */}
           {total > 0 && (
-            <div className="cl-progress-card">
-              <div className="cl-progress-top">
-                <span className="cl-progress-label">Document checklist</span>
-                <span className="cl-progress-fraction">{done} of {total} uploaded · {approved} approved</span>
+            <section className="sv-panel">
+              <div className="sv-panel-head">
+                <span className="sv-panel-title"><span className="sv-panel-title-ico"><Svg k="layers" /></span>Documents</span>
+                <span className="sv-panel-meta">{done}/{total} uploaded · {approved} approved</span>
               </div>
-              <div className="cl-progress-track">
-                <div className="cl-progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? "var(--green-600)" : "var(--gold-500)" }} />
+
+              <div className="sv-docs-progress">
+                <div className="sv-ring">
+                  <svg viewBox="0 0 76 76">
+                    <defs>
+                      <linearGradient id="svGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#e85220" />
+                        <stop offset="100%" stopColor="#cf440f" />
+                      </linearGradient>
+                    </defs>
+                    <circle className="sv-ring-track" cx="38" cy="38" r="33" />
+                    <circle className="sv-ring-prog" cx="38" cy="38" r="33"
+                      strokeDasharray={2 * Math.PI * 33}
+                      strokeDashoffset={2 * Math.PI * 33 * (1 - pct / 100)} />
+                  </svg>
+                  <span className="sv-ring-num">{pct}%</span>
+                </div>
+                <div className="sv-docs-summary">
+                  <div className="sv-stat"><span className="sv-stat-num">{docs.filter((d: any) => ["pending", "rejected", "expired"].includes(d.status)).length}</span><span className="sv-stat-label">Pending</span></div>
+                  <div className="sv-stat"><span className="sv-stat-num">{docs.filter((d: any) => ["uploaded", "under_review"].includes(d.status)).length}</span><span className="sv-stat-label">In review</span></div>
+                  <div className="sv-stat"><span className="sv-stat-num">{approved}</span><span className="sv-stat-label">Approved</span></div>
+                </div>
               </div>
-              <div className="cl-progress-steps">
-                {[
-                  { label: "Pending",  count: docs.filter((d: any) => d.status === "pending" || d.status === "rejected" || d.status === "expired").length },
-                  { label: "Uploaded", count: docs.filter((d: any) => d.status === "uploaded" || d.status === "under_review").length },
-                  { label: "Approved", count: approved },
-                ].map(s => (
-                  <div key={s.label} className="cl-progress-step">
-                    <span className="cl-step-count">{s.count}</span>
-                    <span className="cl-step-label">{s.label}</span>
-                  </div>
+
+              <div className="sv-doclist">
+                {docs.map((doc: any) => {
+                  const m = DOC_META[doc.status] ?? DOC_META.pending;
+                  return (
+                    <div key={doc.id} className="sv-doc">
+                      <span className={`sv-doc-ico sv-ico--${m.tone}`}><Svg k={m.key} sw={m.key === "check" ? 2.4 : 1.8} /></span>
+                      <div className="sv-doc-body">
+                        <div className="sv-doc-name">{doc.document_name}</div>
+                        <div className="sv-doc-status">{m.label}</div>
+                        {doc.notes && doc.status === "rejected" && <div className="sv-doc-note">Reason: {doc.notes}</div>}
+                        {doc.reupload_requested && doc.reupload_note && <div className="sv-doc-note sv-doc-note--amber">Re-upload requested: {doc.reupload_note}</div>}
+                      </div>
+                      <div className="sv-doc-right">
+                        {(doc.status === "uploaded" || doc.status === "approved") && doc.file_path && (
+                          <span className="sv-doc-uploaded"><Svg k="check" sw={2.4} /> File uploaded</span>
+                        )}
+                        {isClient && (doc.status === "pending" || doc.status === "rejected" || doc.status === "expired") && (
+                          <DocUploadButton doc={doc} clientServiceId={cs.id} onUploaded={refreshService} />
+                        )}
+                        {isStaff && <StaffDocActions docId={doc.id} status={doc.status} onDone={refreshService} />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Optional documents */}
+          {isClient && optionalTemplates.length > 0 && (
+            <section className="sv-panel">
+              <div className="sv-panel-head">
+                <span className="sv-panel-title"><span className="sv-panel-title-ico"><Svg k="plus" /></span>Optional documents</span>
+                <span className="sv-panel-meta">Add if applicable</span>
+              </div>
+              <div className="sv-optlist">
+                {optionalTemplates.map((t: any) => (
+                  <OptionalTemplateRow key={t.id} template={t} clientServiceId={cs.id} onAdded={refreshService} />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Document list */}
-          <div className="cl-doc-list">
-            <div className="cl-doc-list-header">
-              <span className="cl-doc-list-title">Required documents</span>
-              <span className="cl-doc-count">{total} items</span>
-            </div>
-
-            {docs.map((doc: any) => (
-              <div key={doc.id} className={`cl-doc-row cl-doc-${doc.status}`}>
-                <div className="cl-doc-left">
-                  <StatusIcon status={doc.status} />
-                  <div className="cl-doc-info">
-                    <div className="cl-doc-name">{doc.document_name}</div>
-                    <div className="cl-doc-status-text">{DOCUMENT_STATUS_LABELS[doc.status]}</div>
-                    {doc.notes && doc.status === "rejected" && (
-                      <div className="cl-doc-rejection-note">Rejection reason: {doc.notes}</div>
-                    )}
-                    {doc.reupload_requested && doc.reupload_note && (
-                      <div className="cl-doc-reupload-note">Re-upload requested: {doc.reupload_note}</div>
-                    )}
-                  </div>
-                </div>
-                <div className="cl-doc-right">
-                  {(doc.status === "uploaded" || doc.status === "approved") && doc.file_path && (
-                    <div className="cl-uploaded-name">
-                      <IconFile />
-                      <span>File uploaded</span>
-                    </div>
-                  )}
-                  {isClient && (doc.status === "pending" || doc.status === "rejected" || doc.status === "expired") && (
-                    <Link
-                      to={`/client/vault?fy=${cs.fiscal_year ?? ""}&svc=${cs.id}`}
-                      className="cl-upload-btn"
-                    >
-                      {doc.status === "rejected" || doc.status === "expired" ? "Re-upload in Vault →" : "Upload in Vault →"}
-                    </Link>
-                  )}
-                  {isStaff && (
-                    <StaffDocActions docId={doc.id} status={doc.status} onDone={refreshService} />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Optional / conditional documents */}
-          {isClient && optionalTemplates.length > 0 && (
-            <div className="cl-optional-section">
-              <div className="cl-optional-header">
-                <span className="cl-optional-title">Optional / conditional documents</span>
-                <span className="cl-optional-sub">Add if applicable to your situation</span>
-              </div>
-              {optionalTemplates.map((t: any) => (
-                <OptionalTemplateRow
-                  key={t.id}
-                  template={t}
-                  clientServiceId={cs.id}
-                  onAdded={refreshService}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Output documents — generated by Taxpert, visible to client */}
+          {/* Output documents from Taxpert */}
           {(cs.output_documents ?? []).length > 0 && (
-            <div className="cl-doc-list" style={{ marginTop: '1.5rem' }}>
-              <div className="cl-doc-list-header" style={{ borderLeft: '3px solid var(--green-500, #22c55e)', paddingLeft: '0.75rem' }}>
-                <div>
-                  <span className="cl-doc-list-title">Documents from your Taxpert</span>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--ink-400)', marginTop: '2px' }}>
-                    Processed certificates, filings, and outputs — ready to download
-                  </div>
-                </div>
-                <span className="cl-doc-count">{(cs.output_documents ?? []).length} file{(cs.output_documents ?? []).length !== 1 ? 's' : ''}</span>
+            <section className="sv-panel sv-panel--out">
+              <div className="sv-panel-head">
+                <span className="sv-panel-title"><span className="sv-panel-title-ico sv-ico--green"><Svg k="inbox" /></span>Documents from your Taxpert</span>
+                <span className="sv-panel-meta">{(cs.output_documents ?? []).length} file{(cs.output_documents ?? []).length !== 1 ? "s" : ""}</span>
               </div>
-              {(cs.output_documents ?? []).map((doc: any) => (
-                <div key={doc.id} className="cl-doc-row" style={{ borderLeft: '3px solid var(--green-400, #4ade80)' }}>
-                  <div className="cl-doc-left">
-                    <span className="cl-status-icon cl-verified">↓</span>
-                    <div className="cl-doc-info">
-                      <div className="cl-doc-name">{doc.document_name}</div>
-                      {doc.description && <div className="cl-doc-status-text">{doc.description}</div>}
-                      {doc.uploaded_at && (
-                        <div className="cl-doc-status-text" style={{ color: 'var(--ink-400)' }}>
-                          Ready {formatDate(doc.uploaded_at)}
-                        </div>
+              <div className="sv-doclist">
+                {(cs.output_documents ?? []).map((doc: any) => (
+                  <div key={doc.id} className="sv-doc">
+                    <span className="sv-doc-ico sv-ico--green"><Svg k="fileCheck" /></span>
+                    <div className="sv-doc-body">
+                      <div className="sv-doc-name">{doc.document_name}</div>
+                      {doc.description && <div className="sv-doc-status">{doc.description}</div>}
+                      {doc.uploaded_at && <div className="sv-doc-status">Ready {formatDate(doc.uploaded_at)}</div>}
+                    </div>
+                    <div className="sv-doc-right">
+                      {doc.signed_url ? (
+                        <DownloadButton href={doc.signed_url} />
+                      ) : (
+                        <OutputDocViewButton docId={doc.id} />
                       )}
                     </div>
                   </div>
-                  <div className="cl-doc-right">
-                    {doc.signed_url ? (
-                      <a
-                        href={doc.signed_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="cl-upload-btn"
-                        style={{ background: 'var(--green-600, #16a34a)', borderColor: 'var(--green-600, #16a34a)' }}
-                      >
-                        Download
-                      </a>
-                    ) : (
-                      <OutputDocViewButton docId={doc.id} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </section>
           )}
-        </>
+        </div>
       )}
 
       {/* ── Activity Tab ──────────────────────────────────────── */}
       {activeTab === 'activity' && (
-        <div className="cl-activity-tab">
+        <div className="sv-activity">
           {clientEvents.length === 0 ? (
-            <div className="cl-activity-empty">
-              <div className="cl-activity-empty-icon">📋</div>
+            <div className="sv-empty">
+              <span className="sv-empty-ico"><Svg k="clock" sw={1.5} /></span>
               <p>No activity recorded yet for this service.</p>
             </div>
           ) : (
-            <div className="cl-activity-feed">
+            <div className="sv-feed">
               {clientEvents.map((event: any) => {
-                const meta = EVENT_LABELS[event.event_type] ?? {
-                  label: event.event_type.replace(/_/g, " "),
-                  icon: "·",
-                  color: "var(--ink-400)",
-                };
+                const m = EVENT_META[event.event_type] ?? { label: event.event_type.replace(/_/g, " "), key: "flag", tone: "ink" };
                 return (
-                  <div key={event.id} className="cl-activity-item">
-                    <div className="cl-activity-dot" style={{ background: meta.color }}>{meta.icon}</div>
-                    <div className="cl-activity-content">
-                      <div className="cl-activity-message">{event.message}</div>
-                      <div className="cl-activity-meta">
-                        <span className="cl-activity-type">{meta.label}</span>
-                        <span className="cl-activity-sep">·</span>
-                        <span className="cl-activity-time">{formatDate(event.created_at)}</span>
+                  <div key={event.id} className="sv-event">
+                    <span className={`sv-event-ico sv-ico--${m.tone}`}><Svg k={m.key} sw={m.key === "check" ? 2.4 : 1.8} /></span>
+                    <div className="sv-event-body">
+                      <div className="sv-event-msg">{event.message}</div>
+                      <div className="sv-event-meta">
+                        <span className="sv-event-type">{m.label}</span>
+                        <span className="sv-event-sep" />
+                        <span className="sv-event-time">{formatDate(event.created_at)}</span>
                       </div>
                     </div>
                   </div>
@@ -691,8 +682,8 @@ export default function ServiceDetailsPage() {
             </div>
           )}
           {openTasks.length > 0 && isStaff && (
-            <div style={{ marginTop: "1rem" }}>
-              <Link to="/work-queue" className="btn btn-secondary">Review open tasks</Link>
+            <div style={{ marginTop: "20px" }}>
+              <Link to="/work-queue" className="sv-btn sv-btn--ghost">Review open tasks</Link>
             </div>
           )}
         </div>

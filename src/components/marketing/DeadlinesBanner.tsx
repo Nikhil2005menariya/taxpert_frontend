@@ -15,7 +15,6 @@ function fmt(isoDate: string) {
   return new Date(isoDate).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
-    year: "numeric",
   });
 }
 
@@ -44,29 +43,25 @@ export default function DeadlinesBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="dlb-strip">
-      <div className="container dlb-inner">
-        <span className="dlb-heading">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-            <path d="M1 7h14" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M5 1v4M11 1v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <div className="lp-ticker">
+      <div className="lp-container lp-ticker-inner">
+        <span className="lp-ticker-label">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="1" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            <path d="M1 7h14" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M5 1v4M11 1v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          Upcoming Deadlines
+          Deadlines
         </span>
-        <div className="dlb-pills">
+        <div className="lp-ticker-scroll">
           {visible.map((d) => {
             const days = daysLeft(d.isoDate, todayMidnight);
             const urgent = days <= 7;
-            const soon = days <= 14;
             return (
-              <span
-                key={d.isoDate}
-                className={`dlb-pill${urgent ? " dlb-pill-urgent" : soon ? " dlb-pill-soon" : ""}`}
-              >
-                <span className="dlb-pill-label">{d.label}</span>
-                <span className="dlb-pill-date">{fmt(d.isoDate)}</span>
-                {urgent && <span className="dlb-pill-tag">Due soon</span>}
+              <span key={d.isoDate} className="lp-ticker-pill">
+                <b>{d.label}</b>
+                <span className="lp-ticker-date">{fmt(d.isoDate)}</span>
+                {urgent && <span className="lp-ticker-tag">{days}d left</span>}
               </span>
             );
           })}

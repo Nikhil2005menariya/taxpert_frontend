@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Loader from "../../components/ui/Loader";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -218,7 +219,7 @@ export default function AdminQueuePage() {
   });
 
   if (authLoading || isLoading) {
-    return <div className="page-loader"><div className="page-loader-ring" /></div>;
+    return <div className="page-loader"><Loader /></div>;
   }
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 

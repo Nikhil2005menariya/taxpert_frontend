@@ -1,13 +1,24 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useParams, useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { apiClient } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
 import { serviceCategories as staticCategories } from "../../shared/site-content";
+import { CategoryIcon } from "../../shared/category-icons";
+import { useScrollReveal } from "../../hooks/useScrollReveal";
+import { formatRupees } from "../../shared/finance-utils";
 import Navbar from "../../components/marketing/Navbar";
 import Footer from "../../components/marketing/Footer";
-import { Helmet } from "react-helmet-async";
-import { formatRupees } from "../../shared/finance-utils";
+
+// ── Inline premium icons ──────────────────────────────────────
+
+const Chevron = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+);
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+);
 
 // ── Razorpay pay button ───────────────────────────────────────
 
@@ -59,7 +70,7 @@ function PaymentButton({
           }
         },
         modal: { ondismiss() { setState("idle"); } },
-        theme: { color: "#c49a3a" },
+        theme: { color: "#e85220" },
       });
       rzp.open();
     } catch (err: any) {
@@ -69,22 +80,17 @@ function PaymentButton({
   }
 
   if (state === "success") {
-    return <div style={{ color: "#16a34a", fontWeight: 500, padding: "1rem", background: "#f0fdf4", borderRadius: "0.5rem" }}>Payment successful! Redirecting...</div>;
+    return <div className="lp-sd-paysuccess">Payment successful — redirecting…</div>;
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-      {error && <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>{error}</div>}
-      <button
-        onClick={handlePayment}
-        disabled={state !== "idle"}
-        className="btn btn-primary"
-        style={{ width: "100%" }}
-      >
-        {state === "idle" ? `Pay Now · ${formattedPrice}` : "Processing..."}
+    <>
+      {error && <div className="lp-sd-payerr">{error}</div>}
+      <button onClick={handlePayment} disabled={state !== "idle"} className="lp-btn lp-btn--accent">
+        {state === "idle" ? `Pay now · ${formattedPrice}` : "Processing…"}
       </button>
-      <p style={{ fontSize: "0.75rem", color: "#64748b", textAlign: "center" }}>Secure payment via Razorpay</p>
-    </div>
+      <p className="lp-sd-paynote">Secure payment via Razorpay</p>
+    </>
   );
 }
 
@@ -119,12 +125,14 @@ function CategoryDetailPage({
   const selectedSvcSlug = searchParams.get("svc");
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const shellRef = useRef<HTMLElement>(null);
+  useScrollReveal(shellRef);
 
   const selected: MarketingServiceItem | undefined =
     (selectedSvcSlug ? category.items.find((i) => i.slug === selectedSvcSlug) : undefined)
     ?? category.items[0];
 
-  if (!selected) return <div style={{ padding: "3rem", textAlign: "center" }}>Service not found</div>;
+  if (!selected) return <div className="lp-sd-state">Service not found</div>;
 
   const { data: priceData, isLoading: priceLoading } = useQuery({
     queryKey: ["service-price", selected.slug],
@@ -138,7 +146,6 @@ function CategoryDetailPage({
     queryKey: ["service-docs", selected.slug],
     queryFn: async () => {
       const res = await apiClient.get(`/services/${selected.slug}/documents`);
-      // backend returns flat: { id, name, required, description }
       return res.data.data as { id: string; name: string; required: boolean; description: string | null }[];
     },
   });
@@ -172,109 +179,131 @@ function CategoryDetailPage({
         <title>{selected.name} | TheTaxpert</title>
         <meta name="description" content={selected.summary} />
       </Helmet>
-      <Navbar isLoggedIn={!!profile} />
-      <main className="svc-detail-page">
-        <div className="container">
-          <Link to="/services" className="back-link">← All Services</Link>
 
-          <div className="svc-detail-shell">
-            {/* LEFT: sub-service list */}
-            <aside className="svc-detail-menu">
-              <div className="svc-detail-menu-label">{category.title}</div>
-              <nav className="svc-detail-nav">
-                {category.items.map((item) => (
-                  <Link
-                    key={item.slug}
-                    to={`/services/${categorySlug}?svc=${item.slug}`}
-                    className={`svc-detail-nav-item${item.slug === selected.slug ? " svc-detail-nav-item-active" : ""}`}
-                  >
-                    <span className="svc-detail-nav-name">{item.name}</span>
-                    {item.price && (
-                      <span className="svc-detail-nav-price">{item.price}</span>
-                    )}
-                  </Link>
-                ))}
-              </nav>
-            </aside>
+      <main className="lp" ref={shellRef}>
+        <Navbar isLoggedIn={!!profile} />
 
-            {/* CENTER: service info */}
-            <article className="svc-detail-center">
-              <span className="section-kicker">{category.title}</span>
-              <h1 className="svc-detail-title">{selected.name}</h1>
-              <p className="svc-detail-lead">{selected.summary}</p>
+        {/* Breadcrumb */}
+        <div className="lp-container lp-sd-top">
+          <nav className="lp-sd-crumbs">
+            <Link to="/">Home</Link>
+            <Chevron />
+            <Link to="/services">Services</Link>
+            <Chevron />
+            <span>{category.title}</span>
+          </nav>
+        </div>
+
+        {/* Sub-service tabs */}
+        <div className="lp-sd-tabs-wrap">
+          <div className="lp-container">
+            <div className="lp-sd-tabs">
+              {category.items.map((item) => (
+                <Link
+                  key={item.slug}
+                  to={`/services/${categorySlug}?svc=${item.slug}${refSuffix}`}
+                  className={`lp-sd-tab${item.slug === selected.slug ? " is-active" : ""}`}
+                >
+                  {item.name}
+                  {item.price && <span className="lp-sd-tab-price">{item.price}</span>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Detail + sticky action */}
+        <section className="lp-section lp-sd-hero">
+          <div className="lp-container lp-sd-layout">
+            <div className="lp-sd-main">
+              <span className="lp-eyebrow" data-reveal>{category.title}</span>
+              <h1 className="lp-sd-title" data-reveal>{selected.name}</h1>
+              <p className="lp-sd-lead" data-reveal>{selected.summary}</p>
 
               {selected.details && (
-                <div className="svc-detail-section">
-                  <h2 className="svc-detail-h2">What this service covers</h2>
+                <div className="lp-sd-block" data-reveal>
+                  <h2 className="lp-sd-h2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+                    What this service covers
+                  </h2>
                   <p>{selected.details}</p>
                 </div>
               )}
 
               {selected.bestFor && (
-                <div className="svc-detail-section">
-                  <h2 className="svc-detail-h2">Best suited for</h2>
-                  <p>{selected.bestFor}</p>
+                <div className="lp-sd-callout" data-reveal>
+                  <span className="lp-sd-callout-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.6" fill="currentColor" /></svg>
+                  </span>
+                  <div>
+                    <span className="lp-sd-callout-label">Best suited for</span>
+                    <p>{selected.bestFor}</p>
+                  </div>
                 </div>
               )}
-            </article>
 
-            {/* RIGHT: docs + action */}
-            <aside className="svc-detail-side">
               {docsData && docsData.length > 0 && (
-                <div className="svc-detail-docs-card">
-                  <div className="svc-detail-docs-title">Required Documents</div>
-                  <ul className="svc-detail-docs-list">
+                <div className="lp-sd-block">
+                  <h2 className="lp-sd-h2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
+                    Documents you’ll need
+                  </h2>
+                  <ul className="lp-sd-docs">
                     {docsData.map((t) => (
-                      <li key={t.id} className="svc-detail-docs-item">
-                        <span className={`svc-detail-docs-dot${t.required ? " svc-detail-docs-dot-req" : ""}`} />
-                        <div className="svc-detail-docs-item-body">
-                          <span className="svc-detail-docs-item-name">{t.name}</span>
-                          {t.description && (
-                            <span className="svc-detail-docs-hint">{t.description}</span>
-                          )}
-                        </div>
-                        {t.required && <span className="svc-detail-docs-req-badge">Required</span>}
+                      <li className="lp-sd-doc" key={t.id}>
+                        <span className={`lp-sd-doc-ico${t.required ? " is-req" : ""}`}>
+                          <CheckIcon />
+                        </span>
+                        <span className="lp-sd-doc-body">
+                          <span className="lp-sd-doc-name">
+                            {t.name}
+                            {t.required && <em>Required</em>}
+                          </span>
+                          {t.description && <span className="lp-sd-doc-hint">{t.description}</span>}
+                        </span>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
+            </div>
 
-              <div className="svc-detail-action-card">
-                {isPaid && (
-                  <>
-                    <div className="pay-price-row">
-                      <span className="pay-label">Service fee</span>
-                      <span className="pay-amount">{priceLoading ? "..." : formattedPrice}</span>
-                    </div>
-                    <p className="pay-note">Inclusive of all taxes · One-time payment</p>
-                  </>
-                )}
+            {/* Action rail */}
+            <aside className="lp-sd-aside">
+              <div className="lp-sd-action" data-reveal>
+                <div className="lp-sd-action-cat">
+                  <CategoryIcon slug={categorySlug} />
+                  {category.title}
+                </div>
+
+                <div className="lp-sd-price">
+                  <span className="lp-sd-price-amt">{priceLoading ? "…" : formattedPrice}</span>
+                  {isPaid && <span className="lp-sd-price-note">one-time · incl. all taxes</span>}
+                </div>
 
                 {existsData?.exists ? (
-                  <div className="svc-already-added">
-                    <span>✓ Already added</span>
+                  <div className="lp-sd-added">
+                    <span className="lp-sd-added-badge"><CheckIcon /> Already added to your account</span>
                     <Link
                       to={existsData.clientServiceId ? `/client/vault?svc=${existsData.clientServiceId}` : "/client/vault"}
-                      className="btn btn-secondary"
-                      style={{ width: "100%", textAlign: "center" }}
+                      className="lp-btn lp-btn--primary"
                     >
-                      Go to Vault →
+                      Go to vault
                     </Link>
                   </div>
                 ) : !profile ? (
                   <>
                     {refCode && (
-                      <div className="pay-referral-note">
-                        🎁 Referral code <strong>{refCode}</strong> — sign up to claim ₹500 off
+                      <div className="lp-sd-ref">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
+                        <span>Referral code <strong>{refCode}</strong> — sign up to claim ₹500 off.</span>
                       </div>
                     )}
                     <Link
                       to={`/register?next=/services/${categorySlug}?svc=${selected.slug}${refSuffix}`}
-                      className="btn btn-primary"
-                      style={{ display: "block", textAlign: "center" }}
+                      className="lp-btn lp-btn--accent"
                     >
-                      {isPaid ? `Get Started · ${formattedPrice}` : "Get Started — Free"}
+                      {isPaid ? `Get started · ${formattedPrice}` : "Get started — free"}
                     </Link>
                   </>
                 ) : isPaid ? (
@@ -283,26 +312,38 @@ function CategoryDetailPage({
                   <button
                     onClick={() => assignMutation.mutate()}
                     disabled={assignMutation.isPending}
-                    className="btn btn-primary"
-                    style={{ width: "100%" }}
+                    className="lp-btn lp-btn--accent"
                   >
-                    {assignMutation.isPending ? "Adding..." : "+ Add Service — Free"}
+                    {assignMutation.isPending ? "Adding…" : "Add service — free"}
                   </button>
                 )}
 
-                <a
-                  href="mailto:info@thetaxpert.com"
-                  className="btn btn-secondary"
-                  style={{ display: "block", marginTop: "0.75rem", textAlign: "center" }}
-                >
+                <a href="mailto:info@thetaxpert.com" className="lp-sd-talk">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                   Talk to a Taxpert
                 </a>
+
+                <ul className="lp-sd-trust">
+                  <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                    Secure payment via Razorpay
+                  </li>
+                  <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                    Reviewed &amp; filed by qualified experts
+                  </li>
+                  <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                    Documents stored in your vault
+                  </li>
+                </ul>
               </div>
             </aside>
           </div>
-        </div>
+        </section>
+
+        <Footer />
       </main>
-      <Footer />
     </>
   );
 }
@@ -320,27 +361,31 @@ export default function ServiceDetailPage() {
     queryFn: async () => {
       const res = await apiClient.get("/services");
       return res.data.data;
-    }
+    },
   });
 
   const category = (dbCategories || staticCategories).find((c: any) => c.slug === slug);
-  
+
   if (!category && !categoriesLoading) {
-    // Check if the slug is actually a service slug directly
-    const allServices = (dbCategories || staticCategories).flatMap((c: any) => c.items.map((i: any) => ({ ...i, categorySlug: c.slug })));
+    // Slug might be a service slug directly — redirect into its category.
+    const allServices = (dbCategories || staticCategories).flatMap((c: any) =>
+      c.items.map((i: any) => ({ ...i, categorySlug: c.slug })),
+    );
     const directService = allServices.find((s: any) => s.slug === slug);
     if (directService) {
       return <Navigate to={`/services/${directService.categorySlug}?svc=${slug}${refCode ? `&ref=${refCode}` : ""}`} replace />;
     }
     return (
-      <>
+      <main className="lp">
         <Navbar isLoggedIn={false} />
-        <div className="p-12 text-center">
-          <h2>Service not found</h2>
-          <Link to="/services">← Browse all services</Link>
+        <div className="lp-sd-state">
+          <div>
+            <h2 className="lp-sd-title" style={{ fontSize: "28px" }}>Service not found</h2>
+            <Link to="/services" className="lp-btn lp-btn--ghost" style={{ marginTop: "20px" }}>Browse all services</Link>
+          </div>
         </div>
         <Footer />
-      </>
+      </main>
     );
   }
 
@@ -349,11 +394,11 @@ export default function ServiceDetailPage() {
 
   if (categoriesLoading || !category || !selected) {
     return (
-      <>
+      <main className="lp">
         <Navbar isLoggedIn={false} />
-        <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#c49a3a]"></div></div>
+        <div className="lp-sd-state"><div className="lp-sd-spinner" /></div>
         <Footer />
-      </>
+      </main>
     );
   }
 

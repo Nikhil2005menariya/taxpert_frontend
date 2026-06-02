@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Navigate } from "react-router-dom";
+import Loader from "../../../components/ui/Loader";
 import { useAuth } from "../../../contexts/AuthContext";
 import { apiClient } from "../../../api/client";
 import MilestoneBar from "../../../components/dashboard/MilestoneBar";
 import AddServiceModal from "../../../components/dashboard/AddServiceModal";
+import PayButton from "../../../components/ui/PayButton";
 
 type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
 
@@ -20,173 +22,158 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-const SERVICE_STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
-  pending:            { fg: "#b45309", bg: "#fef3c7" },
-  documents_required: { fg: "#b45309", bg: "#fef3c7" },
-  documents_received: { fg: "#15803d", bg: "#dcfce7" },
-  under_review:       { fg: "#1d4ed8", bg: "#dbeafe" },
-  in_progress:        { fg: "#1d4ed8", bg: "#dbeafe" },
-  action_required:    { fg: "#be123c", bg: "#ffe4e6" },
-  invoice_pending:    { fg: "#b45309", bg: "#fef3c7" },
-  completed:          { fg: "#15803d", bg: "#dcfce7" },
-  on_hold:            { fg: "#4b5563", bg: "#f3f4f6" },
-  cancelled:          { fg: "#6b7280", bg: "#f3f4f6" },
+const SERVICE_STATUS_TONE: Record<string, { fg: string; bg: string }> = {
+  pending:            { fg: "#a96a16", bg: "#f6ecd6" },
+  documents_required: { fg: "#a96a16", bg: "#f6ecd6" },
+  documents_received: { fg: "var(--lp-green)", bg: "var(--lp-green-soft)" },
+  under_review:       { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
+  in_progress:        { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
+  action_required:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
+  invoice_pending:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
+  completed:          { fg: "var(--lp-green)", bg: "var(--lp-green-soft)" },
+  on_hold:            { fg: "var(--lp-ink-subtle)", bg: "var(--lp-surface-2)" },
+  cancelled:          { fg: "var(--lp-ink-faint)", bg: "var(--lp-surface-2)" },
 };
 
 function formatRelative(iso: string | null) {
   if (!iso) return null;
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 2)  return "just now";
+  if (mins < 2) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 function docStats(docs: any[]) {
   if (!docs?.length) return null;
-  const approved = docs.filter(d => d.status === "approved").length;
-  const pending  = docs.filter(d => d.status === "pending" || d.status === "rejected" || d.status === "expired").length;
-  const pct      = Math.round((approved / docs.length) * 100);
+  const approved = docs.filter((d) => d.status === "approved").length;
+  const pending = docs.filter((d) => d.status === "pending" || d.status === "rejected" || d.status === "expired").length;
+  const pct = Math.round((approved / docs.length) * 100);
   return { approved, pending, total: docs.length, pct };
 }
 
 export default function MyServicesPage() {
   const { profile } = useAuth();
 
-  // Staff use /workload — /my-services is client-only
   const isStaff = profile?.role && profile.role !== "client";
   if (isStaff) return <Navigate to="/workload" replace />;
 
   const { data: clientServices, error, isLoading } = useQuery({
-    queryKey: ['my-services'],
+    queryKey: ["my-services"],
     queryFn: async () => {
-      const { data } = await apiClient.get('/client-services');
-      return data.data; // backend returns { data: [...] }
-    }
+      const { data } = await apiClient.get("/client-services");
+      return data.data;
+    },
   });
 
-  if (isLoading) {
-    return (
-      <div className="page-loader"><div className="page-loader-ring" /></div>
-    );
-  }
+  if (isLoading) return <div className="page-loader"><Loader /></div>;
 
   return (
-    <div className="cs-shell">
-      <div className="cs-header">
+    <div className="lps-page">
+      <header className="lps-head">
         <div>
-          <h1 className="cs-heading">My Services</h1>
-          <p className="cs-sub">Track and manage every service assigned to your account.</p>
+          <span className="lps-eyebrow">Your account</span>
+          <h1 className="lps-title">My Services</h1>
+          <p className="lps-sub">Track and manage every service assigned to your account.</p>
         </div>
         <AddServiceModal />
-      </div>
+      </header>
 
-      {error && <div className="db-alert-error">{(error as any).message}</div>}
+      {error && <div className="lpd-alert">{(error as any).message}</div>}
 
       {!clientServices?.length ? (
-        <div className="cs-empty">
-          <div className="cs-empty-icon">📋</div>
-          <h3 className="cs-empty-title">No services yet</h3>
-          <p className="cs-empty-desc">
-            Add a service to begin the document checklist and start your filing workflow.
-          </p>
-          <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--ink-400)" }}>
-            Use <strong>+ Add Service</strong> in the top-right to get started.
-          </p>
+        <div className="lpd-empty">
+          <span className="lpd-empty-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
+          </span>
+          <h3>No services yet</h3>
+          <p>Add a service to begin the document checklist and start your filing workflow.</p>
+          <div className="lpd-empty-actions">
+            <Link to="/services" className="lp-btn lp-btn--primary">
+              Browse services <svg className="lp-btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </Link>
+            <a href="mailto:info@thetaxpert.com" className="lp-btn lp-btn--ghost">Talk to a Taxpert</a>
+          </div>
         </div>
       ) : (
-        <div className="cs-grid">
+        <div className="lps-grid">
           {clientServices.map((cs: any) => {
             const stats = docStats(cs.client_documents);
-            const st    = SERVICE_STATUS_STYLES[cs.status] ?? SERVICE_STATUS_STYLES.pending;
+            const tone = SERVICE_STATUS_TONE[cs.status] ?? SERVICE_STATUS_TONE.pending;
             const lastUpdated = formatRelative(cs.status_updated_at ?? cs.updated_at);
             const needsPayment = cs.status === "invoice_pending" && cs.payment_status !== "paid";
 
-            // Determine the "next action" for clarity
-            const nextAction = cs.status === "documents_required"
-              ? "Upload to your Tax Vault"
-              : cs.status === "invoice_pending"
-              ? "Invoice ready — payment required"
-              : cs.status === "in_progress"
-              ? "Your filing is being processed"
-              : cs.status === "under_review"
-              ? "Expert is reviewing your documents"
-              : cs.status === "completed"
-              ? "Service completed"
+            const nextAction =
+              cs.status === "documents_required" ? "Upload to your Tax Vault"
+              : cs.status === "invoice_pending"  ? "Invoice ready — payment required"
+              : cs.status === "in_progress"      ? "Your filing is being processed"
+              : cs.status === "under_review"     ? "Expert is reviewing your documents"
+              : cs.status === "completed"        ? "Service completed"
               : null;
 
             return (
-              <div key={cs.id} className="cs-card-wrap">
-                <Link to={`/client/services/${cs.id}`} className="cs-card">
-                  <div className="cs-card-top">
-                    <div className="cs-card-meta">
-                      <span className="cs-card-category">{cs.service?.category}</span>
-                      {cs.fiscal_year && (
-                        <span className="cs-fy-badge">FY {cs.fiscal_year}</span>
-                      )}
+              <div key={cs.id} className="lps-card-wrap">
+                <div className="lps-card">
+                  <Link to={`/client/services/${cs.id}`} className="lps-card-link" aria-label={cs.service?.name} />
+                  <div className="lps-card-top">
+                    <div className="lps-card-meta">
+                      <span className="lps-card-cat">{cs.service?.category}</span>
+                      {cs.fiscal_year && <span className="lps-fy">FY {cs.fiscal_year}</span>}
                     </div>
-                    <span className="cs-status-pill" style={{ background: st.bg, color: st.fg }}>
+                    <span className="lps-status" style={{ color: tone.fg, background: tone.bg }}>
                       {SERVICE_STATUS_LABELS[cs.status] ?? cs.status}
                     </span>
                   </div>
 
-                  <div className="cs-card-name">{cs.service?.name}</div>
+                  <h3 className="lps-card-name">{cs.service?.name}</h3>
+                  {nextAction && <p className="lps-next">{nextAction}</p>}
 
-                  {nextAction && (
-                    <div className="cs-next-action">{nextAction}</div>
-                  )}
-
-                  <div className="cs-milestone-wrap">
-                    <MilestoneBar status={cs.status as ServiceStatus} compact={true} />
+                  <div className="lps-milestone">
+                    <MilestoneBar status={cs.status as ServiceStatus} compact />
                   </div>
 
                   {stats && (
-                    <div className="cs-doc-row">
-                      <div className="cs-doc-bar-track">
-                        <div
-                          className="cs-doc-bar-fill"
-                          style={{
-                            width: `${stats.pct}%`,
-                            background: stats.pct === 100 ? "var(--green-600)" : "var(--gold-500)",
-                          }}
-                        />
+                    <div className="lps-doc">
+                      <div className="lps-doc-top">
+                        <span className="lps-doc-label">Documents</span>
+                        <span className="lps-doc-pct">{stats.pct}%</span>
                       </div>
-                      <div className="cs-doc-chips">
+                      <div className="lps-doc-track">
+                        <span className={`lps-doc-fill${stats.pct === 100 ? " is-complete" : ""}`} style={{ width: `${stats.pct}%` }} />
+                      </div>
+                      <div className="lps-doc-chips">
                         {stats.approved > 0 && (
-                          <span className="cs-doc-chip cs-chip-verified">✓ {stats.approved} approved</span>
+                          <span className="lps-chip lps-chip--ok">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                            {stats.approved} approved
+                          </span>
                         )}
                         {stats.pending > 0 && (
-                          <span className="cs-doc-chip cs-chip-pending">⏳ {stats.pending} pending</span>
+                          <span className="lps-chip lps-chip--wait">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                            {stats.pending} pending
+                          </span>
                         )}
                       </div>
                     </div>
                   )}
 
-                  <div className="cs-card-footer">
-                    <span className="cs-card-date">
-                      Started {new Date(cs.created_at).toLocaleDateString("en-IN", {
-                        day: "numeric", month: "short", year: "numeric",
-                      })}
+                  <div className="lps-card-foot">
+                    <span className="lps-foot-date">
+                      Started {new Date(cs.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </span>
-                    {lastUpdated && (
-                      <span className="cs-card-date">Updated {lastUpdated}</span>
+                    {lastUpdated && <span className="lps-foot-date lps-foot-upd">{lastUpdated}</span>}
+                    {needsPayment ? (
+                      <PayButton to={`/client/invoices/${cs.id}`} label="Pay now" className="lp-paybtn--sm lps-card-pay" />
+                    ) : (
+                      <span className="lps-card-arrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                      </span>
                     )}
-                    <span className="cs-card-arrow">→</span>
                   </div>
-                </Link>
-
-                {needsPayment && (
-                  <Link to={`/invoices/${cs.id}`} className="cs-pay-now-banner">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
-                    </svg>
-                    Invoice ready — <strong>Pay Now to complete</strong>
-                    <span className="cs-pay-now-arrow">→</span>
-                  </Link>
-                )}
+                </div>
               </div>
             );
           })}

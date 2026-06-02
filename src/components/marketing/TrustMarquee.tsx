@@ -12,11 +12,11 @@ const ITEMS = [
 export default function TrustMarquee() {
   const repeated = [...ITEMS, ...ITEMS];
   return (
-    <div className="trust-marquee-wrap">
-      <div className="trust-marquee-track">
+    <div className="lp-marquee" aria-hidden="true">
+      <div className="lp-marquee-track">
         {repeated.map((item, i) => (
-          <span key={i} className="trust-marquee-item">
-            <span className="trust-marquee-dot" />
+          <span key={i} className="lp-marquee-item">
+            <span className="lp-marquee-dot" />
             {item}
           </span>
         ))}

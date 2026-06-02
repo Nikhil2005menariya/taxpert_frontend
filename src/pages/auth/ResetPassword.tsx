@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "../../api/client";
+import AuthLayout from "../../components/auth/AuthLayout";
+import { PasswordField, ButtonSpinner } from "../../components/auth/fields";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -34,65 +37,51 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
+    <>
+      <Helmet>
+        <title>Reset password | TheTaxpert</title>
+      </Helmet>
+      <AuthLayout>
+        <div className="lp-auth-card">
+          <header className="lp-auth-head">
+            <h1 className="lp-auth-title">Set a new password</h1>
+            <p className="lp-auth-subtitle">Choose a strong password to secure your account.</p>
+          </header>
 
-        <div className="auth-brand">
-          <div className="auth-brand-logo">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--ink-900)"/>
-              <path d="M8 11h16M16 11v13" stroke="var(--gold-400)" strokeWidth="1.75" strokeLinecap="round"/>
-              <circle cx="24" cy="22" r="2.5" stroke="var(--paper)" strokeWidth="1.5"/>
-            </svg>
-            <span className="auth-brand-name">TheTaxpert</span>
-          </div>
-          <p className="auth-brand-sub">Set your new password</p>
-        </div>
-
-        {success ? (
-          <div className="auth-success-banner">
-            Password updated! Redirecting to dashboard…
-          </div>
-        ) : !ready ? (
-          <div className="auth-error-banner">
-            Invalid or expired reset link. Please request a new one from the{" "}
-            <a href="/login" style={{ color: "inherit", textDecoration: "underline" }}>sign in page</a>.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} noValidate>
-            <div className="auth-form-fields">
-              <div className="form-group">
-                <label className="form-label">New Password</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="Min. 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
-                  autoComplete="new-password"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Confirm Password</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="Repeat password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </div>
-              {error && <div className="auth-error-banner">{error}</div>}
-              <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
-                {loading ? "Updating…" : "Set New Password"}
-              </button>
+          {success ? (
+            <div className="lp-auth-banner lp-auth-banner--success">
+              Password updated — redirecting to your dashboard…
             </div>
-          </form>
-        )}
-
-      </div>
-    </div>
+          ) : !ready ? (
+            <div className="lp-auth-banner lp-auth-banner--error">
+              This reset link is invalid or has expired. Request a new one from the{" "}
+              <Link to="/login">sign in page</Link>.
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} noValidate className="lp-auth-form">
+              <PasswordField
+                label="New password"
+                placeholder="Min. 8 characters"
+                autoComplete="new-password"
+                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <PasswordField
+                label="Confirm password"
+                placeholder="Repeat password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+              />
+              {error && <div className="lp-auth-banner lp-auth-banner--error">{error}</div>}
+              <button type="submit" className="lp-btn lp-btn--primary lp-auth-submit" disabled={loading}>
+                {loading ? <><ButtonSpinner /> Updating…</> : "Set new password"}
+              </button>
+            </form>
+          )}
+        </div>
+      </AuthLayout>
+    </>
   );
 }

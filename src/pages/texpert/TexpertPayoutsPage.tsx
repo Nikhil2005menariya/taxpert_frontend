@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Loader from "../../components/ui/Loader";
 import { useQuery } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,7 +75,7 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
 
 export default function TexpertPayoutsPage() {
   const { profile, isLoading } = useAuth();
-  if (isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
+  if (isLoading) return <div className="page-loader"><Loader /></div>;
   const isTexpert = profile?.role === 'expert' || profile?.role === 'ca';
   if (!isTexpert) return <Navigate to="/dashboard" replace />;
   return <PayoutsView />;

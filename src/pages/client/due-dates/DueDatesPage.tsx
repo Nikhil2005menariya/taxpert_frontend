@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import type { ReactNode } from "react";
+import Loader from "../../../components/ui/Loader";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../../api/client";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -6,419 +8,340 @@ import { Navigate } from "react-router-dom";
 import { computeClientDueDates } from "../../../shared/due-dates";
 import type { DueDate } from "../../../shared/due-dates";
 
-const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// ── Constants ─────────────────────────────────────────────────
+const WEEK_DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
-// Monday-anchored day index (0=Mon … 6=Sun)
-function weekDay(d: Date): number {
-  return (d.getDay() + 6) % 7;
+// ── Helpers ───────────────────────────────────────────────────
+function weekDay(d: Date) { return (d.getDay() + 6) % 7; }
+function toKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-
-const URGENCY_STYLE: Record<DueDate["urgency"], { bg: string; color: string; border: string; label: string }> = {
-  overdue:  { bg: "rgba(239, 68, 68, 0.05)",  color: "#dc2626", border: "1.5px solid rgba(239, 68, 68, 0.2)", label: "Overdue"  },
-  urgent:   { bg: "rgba(245, 158, 11, 0.08)", color: "#b45309", border: "1.5px solid rgba(245, 158, 11, 0.25)", label: "Due Soon" },
-  upcoming: { bg: "rgba(59, 130, 246, 0.06)",  color: "#2563eb", border: "1.5px solid rgba(59, 130, 246, 0.2)", label: "Upcoming" },
-  later:    { bg: "var(--ink-50)",            color: "var(--ink-500)", border: "1.5px solid var(--line-soft)", label: "Later"   },
-};
-
-const URGENCY_COLOR: Record<DueDate["urgency"], string> = {
-  overdue:  "#dc2626",
-  urgent:   "#b45309",
-  upcoming: "#2563eb",
-  later:    "var(--ink-300)",
-};
-
-function toLocalDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function nearestDueDateMonth(dueDates: DueDate[]): { year: number; month: number } {
+function nearestMonth(items: DueDate[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const upcoming = dueDates
-    .filter(d => d.date >= today)
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-  if (upcoming.length === 0) return { year: now.getFullYear(), month: now.getMonth() };
-  const inCurrentMonth = upcoming.some(
-    d => d.date.getFullYear() === now.getFullYear() && d.date.getMonth() === now.getMonth()
+  const upcoming = items.filter(d => d.date >= today).sort((a,b) => a.date.getTime()-b.date.getTime());
+  if (!upcoming.length) return { year: now.getFullYear(), month: now.getMonth() };
+  const inCurrent = upcoming.some(d => d.date.getFullYear()===now.getFullYear() && d.date.getMonth()===now.getMonth());
+  return inCurrent ? { year: now.getFullYear(), month: now.getMonth() }
+    : { year: upcoming[0].date.getFullYear(), month: upcoming[0].date.getMonth() };
+}
+function daysLeft(date: Date) {
+  return Math.ceil((date.getTime() - Date.now()) / 86400000);
+}
+function fmtShort(d: Date) {
+  return d.toLocaleDateString("en-IN", { day:"numeric", month:"short" });
+}
+function fmtFull(d: Date) {
+  return d.toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
+}
+function monthTitle(d: Date) {
+  return d.toLocaleDateString("en-IN", { month:"long", year:"numeric" });
+}
+
+// ── Urgency config ────────────────────────────────────────────
+type Urgency = DueDate["urgency"];
+const U: Record<Urgency, { dot: string; accent: string; pillBg: string; pillFg: string; borderColor: string }> = {
+  overdue:  { dot:"#d4493f", accent:"#c43d33", pillBg:"#fbe9e2", pillFg:"#c43d33", borderColor:"#e07570" },
+  urgent:   { dot:"#d98a2b", accent:"#a96a16", pillBg:"#f6ecd6", pillFg:"#a96a16", borderColor:"#e0b060" },
+  upcoming: { dot:"var(--lp-ink-muted)", accent:"var(--lp-ink-muted)", pillBg:"var(--lp-surface-2)", pillFg:"var(--lp-ink-muted)", borderColor:"var(--lp-hairline)" },
+  later:    { dot:"var(--lp-ink-faint)", accent:"var(--lp-ink-faint)", pillBg:"var(--lp-surface-2)", pillFg:"var(--lp-ink-faint)", borderColor:"var(--lp-hairline-soft)" },
+};
+const ORDER: Urgency[] = ["overdue","urgent","upcoming","later"];
+function topUrgency(items: DueDate[]): Urgency {
+  return items.reduce<Urgency>((b,d) => ORDER.indexOf(d.urgency)<ORDER.indexOf(b)?d.urgency:b,"later");
+}
+
+// ── Countdown label ───────────────────────────────────────────
+function countdownLabel(d: Date): { num: string; unit: string } {
+  const n = daysLeft(d);
+  if (n < 0)  return { num: String(Math.abs(n)), unit: Math.abs(n)===1?"day overdue":"days overdue" };
+  if (n === 0) return { num: "0",  unit: "due today" };
+  if (n === 1) return { num: "1",  unit: "day left" };
+  return { num: String(n), unit: "days left" };
+}
+
+// ── Mini SVG icons ────────────────────────────────────────────
+function SvgIco({ paths, sw=1.8, size=18 }: { paths: ReactNode; sw?: number; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+      {paths}
+    </svg>
   );
-  if (inCurrentMonth) return { year: now.getFullYear(), month: now.getMonth() };
-  return { year: upcoming[0].date.getFullYear(), month: upcoming[0].date.getMonth() };
 }
+const IcoChevL = () => <SvgIco paths={<path d="m15 18-6-6 6-6"/>} sw={2}/>;
+const IcoChevR = () => <SvgIco paths={<path d="m9 18 6-6-6-6"/>} sw={2}/>;
+const IcoAlert = () => <SvgIco paths={<><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></>} />;
+const IcoClock = () => <SvgIco paths={<><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></>} />;
+const IcoCalendar = () => <SvgIco paths={<><rect x="3" y="4" width="18" height="18" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></>} />;
+const IcoFolder = () => <SvgIco paths={<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>} />;
+const IcoCheck = () => <SvgIco paths={<path d="M20 6 9 17l-5-5"/>} sw={2.4} />;
 
-function monthLabel(date: Date) {
-  return date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
-
-function fmt(date: Date) {
-  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-}
-
-function daysLeftLabel(date: Date): string {
-  const diff = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  if (diff < 0) return `${Math.abs(diff)}d overdue`;
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Tomorrow";
-  return `${diff}d left`;
-}
-
-// ── Premium Calendar Component ──
-interface CalendarProps {
-  dueDates: DueDate[];
-}
-
-function DueDatesCalendar({ dueDates }: CalendarProps) {
-  const [year, setYear]       = useState(() => nearestDueDateMonth(dueDates).year);
-  const [month, setMonth]     = useState(() => nearestDueDateMonth(dueDates).month);
-  const [selected, setSelected] = useState<string | null>(null); // "YYYY-MM-DD"
+// ── Calendar ──────────────────────────────────────────────────
+function Calendar({ items }: { items: DueDate[] }) {
+  const [year, setYear] = useState(() => nearestMonth(items).year);
+  const [month, setMonth] = useState(() => nearestMonth(items).month);
+  const [sel, setSel] = useState<string|null>(null);
   const now = new Date();
+  const todayKey = toKey(now);
 
-  function prevMonth() {
-    if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1);
-    setSelected(null);
-  }
-  function nextMonth() {
-    if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1);
-    setSelected(null);
-  }
+  function prev() { if (month===0){setYear(y=>y-1);setMonth(11);}else setMonth(m=>m-1);setSel(null); }
+  function next() { if (month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1);setSel(null); }
 
-  const currentMonthLabel = new Date(year, month, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-  const firstDay   = new Date(year, month, 1);
-  const totalDays  = new Date(year, month + 1, 0).getDate();
-  const startPad   = weekDay(firstDay);
-  const todayKey   = toLocalDateKey(now);
+  const label = new Date(year,month,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+  const totalDays = new Date(year,month+1,0).getDate();
+  const startPad = weekDay(new Date(year,month,1));
 
-  // Map day-key → items
   const dayMap = useMemo(() => {
-    const m = new Map<string, DueDate[]>();
-    for (const d of dueDates) {
-      const k = toLocalDateKey(d.date);
-      if (!m.has(k)) m.set(k, []);
-      m.get(k)!.push(d);
-    }
+    const m = new Map<string,DueDate[]>();
+    for (const d of items) { const k=toKey(d.date); if(!m.has(k))m.set(k,[]); m.get(k)!.push(d); }
     return m;
-  }, [dueDates]);
+  }, [items]);
 
-  // Build grid cells
-  const cells: (number | null)[] = [
+  const cells: (number|null)[] = [
     ...Array<null>(startPad).fill(null),
-    ...Array.from({ length: totalDays }, (_, i) => i + 1),
+    ...Array.from({length:totalDays},(_,i)=>i+1),
   ];
-  while (cells.length % 7 !== 0) cells.push(null);
+  while (cells.length%7!==0) cells.push(null);
 
-  function dayKey(day: number) {
-    return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  }
+  function dk(day:number){ return `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; }
 
-  // Highest-priority urgency for a set of items
-  function topUrgency(items: DueDate[]): DueDate["urgency"] {
-    const order: DueDate["urgency"][] = ["overdue", "urgent", "upcoming", "later"];
-    return items.reduce<DueDate["urgency"]>((best, d) =>
-      order.indexOf(d.urgency) < order.indexOf(best) ? d.urgency : best
-    , "later");
-  }
-
-  const selectedItems = selected ? (dayMap.get(selected) ?? []) : [];
+  const selItems = sel ? (dayMap.get(sel)??[]) : [];
 
   return (
-    <div className="dd-calendar" style={{ background: "var(--card)", border: "1.5px solid var(--line-soft)", borderRadius: "16px", overflow: "hidden", maxWidth: "480px", boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
-      {/* Navigation */}
-      <div className="dd-cal-nav" style={{ padding: "1rem 1.25rem", borderBottom: "1px solid var(--line-soft)", background: "rgba(0,0,0,0.01)" }}>
-        <button className="dd-cal-nav-btn" onClick={prevMonth} aria-label="Previous month" style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>‹</button>
-        <span className="dd-cal-month-label" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, letterSpacing: "-0.01em" }}>{currentMonthLabel}</span>
-        <button className="dd-cal-nav-btn" onClick={nextMonth} aria-label="Next month" style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>›</button>
+    <div className="ddc">
+      {/* nav */}
+      <div className="ddc-nav">
+        <button className="ddc-navbtn" onClick={prev} aria-label="Previous month"><IcoChevL /></button>
+        <span className="ddc-label">{label}</span>
+        <button className="ddc-navbtn" onClick={next} aria-label="Next month"><IcoChevR /></button>
       </div>
 
-      {/* Day-of-week headers */}
-      <div className="dd-cal-grid">
-        {WEEK_DAYS.map(d => (
-          <div key={d} className="dd-cal-header-cell" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, color: "var(--ink-400)", padding: "0.75rem 0", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>{d}</div>
-        ))}
+      {/* dow */}
+      <div className="ddc-grid">
+        {WEEK_DAYS.map((d,i)=><div key={i} className="ddc-dow">{d}</div>)}
 
-        {/* Day cells */}
-        {cells.map((day, i) => {
-          if (day === null) return <div key={`e${i}`} className="dd-cal-cell dd-cal-empty" style={{ opacity: 0.15 }} />;
-          const k    = dayKey(day);
-          const items = dayMap.get(k) ?? [];
-          const isToday    = k === todayKey;
-          const isSelected = k === selected;
-
+        {/* cells */}
+        {cells.map((day,i)=>{
+          if(day===null) return <div key={`x${i}`} className="ddc-cell ddc-empty"/>;
+          const k=dk(day);
+          const its=dayMap.get(k)??[];
+          const isToday=k===todayKey;
+          const isSel=k===sel;
+          const hasDue=its.length>0;
+          const urg=hasDue?topUrgency(its):null;
           return (
-            <div
-              key={k}
-              onClick={() => items.length ? setSelected(isSelected ? null : k) : undefined}
-              role={items.length ? "button" : undefined}
-              tabIndex={items.length ? 0 : undefined}
-              onKeyDown={items.length ? e => e.key === "Enter" && setSelected(isSelected ? null : k) : undefined}
-              style={{
-                aspectRatio: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "4px",
-                cursor: items.length ? "pointer" : "default",
-                borderRadius: "8px",
-                transition: "all 0.15s ease",
-                border: isSelected ? "1.5px solid var(--gold-500)" : "1.5px solid transparent",
-                background: isSelected ? "rgba(196, 154, 58, 0.05)" : "transparent",
-              }}
+            <div key={k}
+              className={`ddc-cell${isToday?" is-today":""}${hasDue?" has-due":""}${isSel?" is-sel":""}`}
+              onClick={()=>hasDue&&setSel(isSel?null:k)}
+              role={hasDue?"button":undefined}
+              tabIndex={hasDue?0:undefined}
+              onKeyDown={hasDue?(e=>e.key==="Enter"&&setSel(isSel?null:k)):undefined}
             >
-              <span style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.84rem",
-                fontWeight: isToday ? 700 : 500,
-                color: isToday ? "white" : "var(--ink-700)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                ...(isToday ? {
-                  width: "24px",
-                  height: "24px",
-                  borderRadius: "50%",
-                  background: "var(--ink-900)",
-                } : {})
-              }}>
-                {day}
-              </span>
-              {items.length > 0 && (
-                <span style={{
-                  width: "5px",
-                  height: "5px",
-                  borderRadius: "50%",
-                  background: URGENCY_COLOR[topUrgency(items)],
-                  display: "block"
-                }} />
+              <span className="ddc-num">{day}</span>
+              {hasDue&&urg&&(
+                <span className="ddc-dot" style={{background:U[urg].dot}}/>
               )}
             </div>
           );
         })}
       </div>
 
-      {/* Selected day detail Drawer */}
-      {selected && selectedItems.length > 0 && (
-        <div className="dd-cal-detail" style={{ borderTop: "1.5px solid var(--line-soft)", background: "rgba(0,0,0,0.01)", padding: "1.25rem 1.5rem" }}>
-          <div className="dd-cal-detail-date" style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.04em", color: "var(--ink-400)", marginBottom: "0.75rem" }}>
-            {new Date(selected + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {selectedItems.map(d => (
-              <div key={d.id} className="dd-cal-detail-item" style={{ borderLeft: `3px solid ${URGENCY_STYLE[d.urgency].color}`, background: "var(--card)", border: "1px solid var(--line-soft)", borderLeftWidth: "3px", borderRadius: "10px", padding: "0.75rem 1rem", boxShadow: "0 1px 2px rgba(0,0,0,0.01)" }}>
-                <div className="dd-cal-detail-label" style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--ink-900)" }}>{d.label}</div>
-                <div className="dd-cal-detail-service" style={{ fontSize: "0.76rem", color: "var(--ink-400)", marginTop: "0.15rem" }}>{d.serviceName}</div>
-                {d.description && <div className="dd-cal-detail-desc" style={{ fontSize: "0.76rem", color: "var(--ink-500)", marginTop: "0.25rem", lineHeight: 1.4 }}>{d.description}</div>}
-              </div>
-            ))}
-          </div>
+      {/* expanded day */}
+      {sel&&selItems.length>0&&(
+        <div className="ddc-expand">
+          <div className="ddc-expand-date">{fmtFull(new Date(sel+"T00:00:00"))}</div>
+          {selItems.map(d=>(
+            <div key={d.id} className="ddc-expand-item" style={{borderLeftColor:U[d.urgency].dot}}>
+              <div className="ddc-expand-name">{d.label}</div>
+              <div className="ddc-expand-svc">{d.serviceName}</div>
+              {d.description&&<div className="ddc-expand-desc">{d.description}</div>}
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ── Main Page Component ──
+// ── Deadline card ─────────────────────────────────────────────
+function DeadlineCard({ d }: { d: DueDate }) {
+  const n = daysLeft(d.date);
+  const u = U[d.urgency];
+  const label = n<0?`${Math.abs(n)}d overdue`:n===0?"Today":n===1?"Tomorrow":`${n}d`;
+  return (
+    <div className="ddl-card" style={{borderLeftColor:u.borderColor}}>
+      <div className="ddl-card-body">
+        <div className="ddl-card-top">
+          <span className="ddl-date" style={{color:u.accent}}>{fmtShort(d.date)}</span>
+          <span className="ddl-pill" style={{background:u.pillBg,color:u.pillFg}}>{label}</span>
+        </div>
+        <div className="ddl-name">{d.label}</div>
+        {d.description&&<div className="ddl-desc">{d.description}</div>}
+        <div className="ddl-svc">
+          <IcoFolder />
+          {d.serviceName}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Group (agenda section) ────────────────────────────────────
+function Group({ title, items, accent }: { title: string; items: DueDate[]; accent?: string }) {
+  if (!items.length) return null;
+  return (
+    <section className="ddg">
+      <div className="ddg-head">
+        <span className="ddg-title" style={accent?{color:accent}:undefined}>{title}</span>
+        <span className="ddg-pill">{items.length}</span>
+      </div>
+      <div className="ddg-list">
+        {items.map(d=><DeadlineCard key={d.id} d={d}/>)}
+      </div>
+    </section>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────
 export default function DueDatesPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const isClient = profile?.role === "client";
 
-  const { data: dueDates = [], isLoading } = useQuery<DueDate[]>({
+  const { data: dueDates=[], isLoading } = useQuery<DueDate[]>({
     queryKey: ["client-due-dates"],
     queryFn: async () => {
       const res = await apiClient.get("/client-services/due-dates");
-      const active = res.data.data.map((s: any) => ({ slug: s.service?.slug ?? "", name: s.service?.name ?? "" })).filter((s: any) => s.slug);
-      const raw = computeClientDueDates(active, 6);
-      return raw;
+      const active = res.data.data
+        .map((s:any) => ({slug:s.service?.slug??"",name:s.service?.name??""}))
+        .filter((s:any)=>s.slug);
+      return computeClientDueDates(active,6);
     },
     enabled: isClient,
   });
 
   const now = new Date();
-  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const cutoff    = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+  const thisMonth = new Date(now.getFullYear(),now.getMonth(),1);
+  const nextMonth = new Date(now.getFullYear(),now.getMonth()+1,1);
+  const cutoff    = new Date(now.getFullYear(),now.getMonth()+2,1);
 
-  // Grouping / processing for the agenda
-  const hydrated = useMemo(() =>
-    dueDates.map(d => ({ ...d, date: new Date(d.date) })),
-    [dueDates]
-  );
+  const hydrated = useMemo(()=>dueDates.map(d=>({...d,date:new Date(d.date)})),[dueDates]);
+  const visible  = useMemo(()=>hydrated.filter(d=>d.urgency==="overdue"||d.date<cutoff),[hydrated,cutoff]);
 
-  // Show current month + next month only; overdue always show
-  const visible = useMemo(() =>
-    hydrated.filter(d => d.urgency === "overdue" || d.date < cutoff),
-    [hydrated, cutoff]
-  );
+  const sorted=(arr:DueDate[])=>[...arr].sort((a,b)=>a.date.getTime()-b.date.getTime());
+  const overdue    = useMemo(()=>sorted(visible.filter(d=>d.urgency==="overdue")),[visible]);
+  const thisMonthD = useMemo(()=>sorted(visible.filter(d=>d.urgency!=="overdue"&&d.date>=thisMonth&&d.date<nextMonth)),[visible,thisMonth,nextMonth]);
+  const nextMonthD = useMemo(()=>sorted(visible.filter(d=>d.date>=nextMonth&&d.date<cutoff)),[visible,nextMonth,cutoff]);
 
-  const overdue    = useMemo(() => visible.filter(d => d.urgency === "overdue").sort((a, b) => a.date.getTime() - b.date.getTime()), [visible]);
-  const thisMonthD = useMemo(() => visible.filter(d => d.urgency !== "overdue" && d.date >= thisMonth && d.date < nextMonth).sort((a, b) => a.date.getTime() - b.date.getTime()), [visible, thisMonth, nextMonth]);
-  const nextMonthD = useMemo(() => visible.filter(d => d.date >= nextMonth && d.date < cutoff).sort((a, b) => a.date.getTime() - b.date.getTime()), [visible, nextMonth, cutoff]);
+  const stats = useMemo(()=>({
+    overdue: hydrated.filter(d=>d.urgency==="overdue").length,
+    urgent:  hydrated.filter(d=>d.urgency==="urgent").length,
+    upcoming:hydrated.filter(d=>d.urgency==="upcoming").length,
+    total:   hydrated.length,
+  }),[hydrated]);
 
-  const urgentCount = useMemo(() => hydrated.filter(d => d.urgency === "overdue" || d.urgency === "urgent").length, [hydrated]);
+  // next pressing deadline for the hero countdown
+  const hero = overdue[0]??thisMonthD[0]??nextMonthD[0]??null;
+  const heroCD = hero ? countdownLabel(hero.date) : null;
 
-  if (authLoading || isLoading) return <div className="page-loader"><div className="page-loader-ring" /></div>;
-  if (!isClient) return <Navigate to="/dashboard" replace />;
+  if (authLoading||isLoading) return <div className="page-loader"><Loader/></div>;
+  if (!isClient) return <Navigate to="/dashboard" replace/>;
 
-  function Group({ title, items, accent }: { title: string; items: typeof hydrated; accent?: string }) {
-    if (items.length === 0) return null;
-    return (
-      <div className="dd-group" style={{ marginBottom: "2rem" }}>
-        <div className="dd-group-title" style={{
-          fontSize: "0.72rem",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: accent || "var(--ink-400)",
-          borderBottom: "1px solid var(--line-soft)",
-          paddingBottom: "0.5rem",
-          marginBottom: "1rem"
-        }}>
-          {title}
-        </div>
-
-        {/* Premium Timeline Container */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", borderLeft: "1.5px solid var(--line-soft)", paddingLeft: "1.5rem", marginLeft: "6px", position: "relative" }}>
-          {items.map(d => {
-            const style = URGENCY_STYLE[d.urgency];
-            return (
-              <div key={d.id} className="dd-timeline-item-wrapper" style={{ position: "relative" }}>
-                
-                {/* Timeline Bullet Node */}
-                <div style={{
-                  position: "absolute",
-                  left: "-29.5px",
-                  top: "14px",
-                  width: "11px",
-                  height: "11px",
-                  borderRadius: "50%",
-                  border: "2px solid var(--paper)",
-                  background: style.color,
-                  boxShadow: "0 0 0 3px rgba(0,0,0,0.02)"
-                }} />
-
-                {/* Premium Agenda Card */}
-                <div className="dd-item" style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: "1.25rem",
-                  padding: "1.1rem 1.25rem",
-                  background: "var(--card)",
-                  border: "1px solid var(--line-soft)",
-                  borderRadius: "12px",
-                  transition: "all 0.2s ease",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.01)"
-                }}>
-                  <div className="dd-item-left" style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1 }}>
-                    <div className="dd-item-date" style={{ color: style.color, fontSize: "0.78rem", fontWeight: 700, fontFamily: "var(--font-mono)" }}>
-                      {fmt(d.date)}
-                    </div>
-                    <div className="dd-item-label" style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--ink-900)", lineHeight: 1.3 }}>
-                      {d.label}
-                    </div>
-                    {d.description && (
-                      <div className="dd-item-desc" style={{ fontSize: "0.78rem", color: "var(--ink-500)", marginTop: "0.2rem", lineHeight: 1.4 }}>
-                        {d.description}
-                      </div>
-                    )}
-                    <div className="dd-item-service" style={{ fontSize: "0.74rem", color: "var(--ink-400)", marginTop: "0.25rem" }}>
-                      {d.serviceName}
-                    </div>
-                  </div>
-                  
-                  {/* Fine High-Contrast Outline Pill */}
-                  <span className="dd-urgency-pill" style={{
-                    background: style.bg,
-                    color: style.color,
-                    border: style.border,
-                    borderRadius: "20px",
-                    padding: "0.2rem 0.65rem",
-                    fontSize: "0.68rem",
-                    fontWeight: 600,
-                    letterSpacing: "0.02em",
-                    whiteSpace: "nowrap",
-                    alignSelf: "flex-start",
-                    marginTop: "2px"
-                  }}>
-                    {daysLeftLabel(d.date)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
+  const allClear = !overdue.length&&!thisMonthD.length&&!nextMonthD.length;
 
   return (
-    <div className="dd-shell" style={{ padding: "1.5rem 1.5rem 4rem" }}>
-      <div className="dd-header" style={{ marginBottom: "2rem" }}>
-        <div>
-          <h1 className="dd-heading" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--ink-900)", margin: 0, letterSpacing: "-0.02em" }}>Due Dates</h1>
-          <p className="dd-sub" style={{ color: "var(--ink-500)", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-            <span>Compliance deadlines relevant to your active services.</span>
-            {urgentCount > 0 && (
-              <span className="dd-urgent-badge" style={{
-                background: "rgba(220,38,38,0.06)",
-                border: "1px solid rgba(220,38,38,0.2)",
-                color: "#dc2626",
-                padding: "0.15rem 0.6rem",
-                borderRadius: "20px",
-                fontSize: "0.7rem",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em"
-              }}>
-                {urgentCount} need attention
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
+    <div className="ddp">
+      {/* ── Page header ── */}
+      <header className="ddp-head">
+        <span className="ddp-eyebrow">Compliance calendar</span>
+        <h1 className="ddp-title">Due Dates</h1>
+        <p className="ddp-sub">Statutory deadlines for your active services — nothing slips.</p>
+      </header>
 
-      {hydrated.length === 0 ? (
-        <div className="dd-empty-state" style={{ padding: "4rem 2rem", background: "var(--card)", border: "1.5px dashed var(--line-soft)", borderRadius: "16px" }}>
-          <span style={{ fontSize: "2.5rem", display: "block", marginBottom: "1rem" }}>📋</span>
-          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--ink-900)", margin: 0 }}>No active services</h3>
-          <p style={{ fontSize: "0.84rem", color: "var(--ink-400)", marginTop: "0.25rem" }}>Add a service to see your relevant compliance deadlines here.</p>
+      {!hydrated.length ? (
+        /* Empty state */
+        <div className="ddp-empty">
+          <span className="ddp-empty-ico"><IcoCalendar/></span>
+          <h3>No active services</h3>
+          <p>Add a service to see its compliance deadlines appear here.</p>
         </div>
       ) : (
-        <div className="dd-page-body" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "2.5rem", alignItems: "start" }}>
-          
-          {/* Left Column: Premium Sticky Calendar */}
-          <div style={{ position: "sticky", top: "100px", alignSelf: "start" }}>
-            <DueDatesCalendar dueDates={hydrated} />
-          </div>
+        <div className="ddp-body">
+          {/* ── LEFT COLUMN ── */}
+          <aside className="ddp-aside">
+            {/* Hero countdown */}
+            <div className={`ddp-hero${hero?" ddp-hero--"+hero.urgency:" ddp-hero--clear"}`}>
+              <div className="ddp-hero-glow"/>
+              {hero&&heroCD ? (
+                <>
+                  <div className="ddp-hero-eyebrow">
+                    {hero.urgency==="overdue"
+                      ? <><IcoAlert/> Overdue</>
+                      : hero.urgency==="urgent"
+                      ? <><IcoClock/> Due soon</>
+                      : <><IcoCalendar/> Next deadline</>}
+                  </div>
+                  <div className="ddp-hero-count">
+                    <span className="ddp-hero-num">{heroCD.num}</span>
+                    <span className="ddp-hero-unit">{heroCD.unit}</span>
+                  </div>
+                  <div className="ddp-hero-name">{hero.label}</div>
+                  <div className="ddp-hero-meta">{hero.serviceName} · {fmtFull(hero.date)}</div>
+                </>
+              ) : (
+                <>
+                  <div className="ddp-hero-eyebrow ddp-hero-eyebrow--clear"><IcoCheck/> All clear</div>
+                  <div className="ddp-hero-name" style={{marginTop:12}}>Nothing urgent right now</div>
+                  <div className="ddp-hero-meta">Deadlines will surface here as they approach.</div>
+                </>
+              )}
+            </div>
 
-          {/* Right Column: Premium Timeline Agenda */}
-          <div className="dd-agenda" style={{ display: "flex", flexDirection: "column" }}>
-            {urgentCount > 0 && (
-              <div className="dd-alert-bar" style={{
-                padding: "0.85rem 1.25rem",
-                background: "rgba(220,38,38,0.05)",
-                border: "1.5px solid rgba(220,38,38,0.18)",
-                borderRadius: "12px",
-                marginBottom: "1.5rem",
-                fontSize: "0.84rem",
-                color: "#dc2626",
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem"
-              }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <span>{urgentCount} deadline{urgentCount !== 1 ? "s" : ""} need urgent attention</span>
+            {/* Stat row */}
+            <div className="ddp-stats">
+              <div className="ddp-stat" data-tone={stats.overdue>0?"overdue":"none"}>
+                <IcoAlert/>
+                <div>
+                  <div className="ddp-stat-n">{stats.overdue}</div>
+                  <div className="ddp-stat-l">Overdue</div>
+                </div>
               </div>
-            )}
-            <Group title="Overdue" items={overdue} accent="#dc2626" />
-            <Group title={monthLabel(thisMonth)} items={thisMonthD} />
-            <Group title={monthLabel(nextMonth)} items={nextMonthD} />
-          </div>
+              <div className="ddp-stat" data-tone={stats.urgent>0?"urgent":"none"}>
+                <IcoClock/>
+                <div>
+                  <div className="ddp-stat-n">{stats.urgent}</div>
+                  <div className="ddp-stat-l">Urgent</div>
+                </div>
+              </div>
+              <div className="ddp-stat">
+                <IcoCalendar/>
+                <div>
+                  <div className="ddp-stat-n">{stats.upcoming}</div>
+                  <div className="ddp-stat-l">Upcoming</div>
+                </div>
+              </div>
+            </div>
 
+            {/* Calendar */}
+            <Calendar items={hydrated}/>
+          </aside>
+
+          {/* ── RIGHT COLUMN — Agenda ── */}
+          <main className="ddp-agenda">
+            {allClear ? (
+              <div className="ddp-agenda-clear">
+                <span className="ddp-agenda-clear-ico"><IcoCheck/></span>
+                <h3>You're all caught up</h3>
+                <p>No deadlines in the next 60 days. We'll alert you as they approach.</p>
+              </div>
+            ) : (
+              <>
+                <Group title="Overdue" items={overdue} accent="#c43d33"/>
+                <Group title={monthTitle(thisMonth)} items={thisMonthD}/>
+                <Group title={monthTitle(nextMonth)} items={nextMonthD}/>
+              </>
+            )}
+          </main>
         </div>
       )}
     </div>

@@ -1,8 +1,8 @@
 const rows = [
   {
     aspect: "Filing Process",
-    traditional: "Manual data entry, error-prone",
-    taxpert: "Automated extraction + Taxpert review",
+    traditional: "Manual, error-prone, last-minute",
+    taxpert: "Expert-prepared and reviewed before filing",
   },
   {
     aspect: "Speed",
@@ -28,32 +28,33 @@ const rows = [
 
 export default function WhyChooseUs() {
   return (
-    <section id="why-us" className="section section-alt">
-      <div className="container">
-        <div className="section-heading">
-          <span className="section-kicker">Why Choose Us</span>
-          <h2>Modern platform efficiency. Real Taxpert oversight.</h2>
-          <p>Compare the traditional approach to what TheTaxpert delivers.</p>
+    <section id="why-us" className="lp-section lp-section--alt">
+      <div className="lp-container">
+        <div className="lp-intro" data-reveal>
+          <span className="lp-eyebrow">Why choose us</span>
+          <h2 className="lp-h2">Modern platform efficiency. Real Taxpert oversight.</h2>
+          <p className="lp-lead">Compare the traditional approach to what TheTaxpert delivers.</p>
         </div>
-        <div className="cmp-overflow">
-          <div className="cmp-table">
-            <div className="cmp-header">
-              <div className="cmp-aspect">What matters</div>
-              <div className="cmp-col cmp-old">Traditional Approach</div>
-              <div className="cmp-col cmp-new">TheTaxpert</div>
-            </div>
-            {rows.map((row, i) => (
-              <div key={i} className="cmp-row">
-                <div className="cmp-aspect">{row.aspect}</div>
-                <div className="cmp-col cmp-old">
-                  <span className="cmp-cross">✗</span> {row.traditional}
-                </div>
-                <div className="cmp-col cmp-new">
-                  <span className="cmp-check">✓</span> {row.taxpert}
-                </div>
-              </div>
-            ))}
+
+        <div className="lp-cmp" data-reveal>
+          <div className="lp-cmp-row lp-cmp-head">
+            <div className="lp-cmp-cell lp-cmp-aspect">What matters</div>
+            <div className="lp-cmp-cell lp-cmp-old">Traditional approach</div>
+            <div className="lp-cmp-cell lp-cmp-new">TheTaxpert</div>
           </div>
+          {rows.map((row, i) => (
+            <div key={i} className="lp-cmp-row">
+              <div className="lp-cmp-cell lp-cmp-aspect">{row.aspect}</div>
+              <div className="lp-cmp-cell lp-cmp-old">
+                <span className="lp-cmp-ico lp-cmp-ico--x">✕</span>
+                {row.traditional}
+              </div>
+              <div className="lp-cmp-cell lp-cmp-new">
+                <span className="lp-cmp-ico lp-cmp-ico--c">✓</span>
+                {row.taxpert}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

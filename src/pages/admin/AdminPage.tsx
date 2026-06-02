@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import Loader from "../../components/ui/Loader";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiClient } from "../../api/client";
 import { Navigate, useSearchParams } from "react-router-dom";
@@ -36,7 +37,7 @@ export default function AdminPage() {
 
   if (authLoading || usersLoading || filingLoading) {
     return (
-      <div className="page-loader"><div className="page-loader-ring" /></div>
+      <div className="page-loader"><Loader /></div>
     );
   }
 

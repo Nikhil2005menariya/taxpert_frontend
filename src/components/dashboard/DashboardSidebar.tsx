@@ -160,16 +160,6 @@ function IconCalendar() {
   );
 }
 
-const Logo = () => (
-  <Link to="/dashboard" className="db-sidebar-logo-link" aria-label="Go to dashboard">
-    <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-      <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--ink-900)"/>
-      <path d="M8 11h16M16 11v13" stroke="var(--gold-400)" strokeWidth="1.75" strokeLinecap="round"/>
-      <circle cx="24" cy="22" r="2.5" stroke="var(--paper)" strokeWidth="1.5"/>
-    </svg>
-  </Link>
-);
-
 export default function DashboardSidebar({
   isAdmin,
   isClient,
@@ -263,8 +253,10 @@ export default function DashboardSidebar({
     <aside className="db-sidebar">
       {/* Brand */}
       <div className="db-sidebar-brand">
-        <Logo />
-        <span className="db-sidebar-brand-name">TheTaxpert</span>
+        <Link to="/dashboard" className="db-brandw" aria-label="Go to dashboard">
+          <span className="db-brandw-the">The</span>
+          <span className="db-brandw-name">Taxpert</span>
+        </Link>
       </div>
 
       {/* Nav */}

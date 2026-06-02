@@ -1,15 +1,16 @@
-import Navbar from "../../components/marketing/Navbar";
-import Footer from "../../components/marketing/Footer";
+import { Helmet } from "react-helmet-async";
+import AuthLayout from "../../components/auth/AuthLayout";
 import AuthTabs from "../../components/auth/AuthTabs";
 
 export default function Register() {
   return (
-    <main className="marketing-shell">
-      <Navbar />
-      <div className="auth-shell">
+    <>
+      <Helmet>
+        <title>Create your account | TheTaxpert</title>
+      </Helmet>
+      <AuthLayout>
         <AuthTabs defaultTab="signup" />
-      </div>
-      <Footer />
-    </main>
+      </AuthLayout>
+    </>
   );
 }
