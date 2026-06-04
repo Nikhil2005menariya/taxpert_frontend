@@ -1,106 +1,179 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import gsap from 'gsap';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Inquiry {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  service_needed: string;
-  created_at: string;
-}
+interface QueueItem { id: string; priority: number; client_name?: string; service_name?: string }
+interface Inquiry { id: string; name: string; phone: string; email: string; service_needed: string; created_at: string }
+interface Texpert { id: string; first_name: string | null; last_name: string | null; role: string; active_count: number }
 
 interface DashboardStats {
   revenue: { total: number; thisMonth: number };
   revenueByMonth: { key: string; label: string; amount: number }[];
   pipeline: Record<string, number>;
-  queue: { openCount: number; topItems: any[] };
+  queue: { openCount: number; topItems: QueueItem[] };
   recentInquiries: Inquiry[];
-  texpertWorkload: any[];
+  texpertWorkload: Texpert[];
   clients: { total: number; newThisMonth: number };
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const PIPELINE_CFG = [
-  { key: 'documents_required', label: 'Docs Required',   color: '#f59e0b' },
-  { key: 'documents_received', label: 'Docs Received',   color: '#64748b' },
-  { key: 'under_review',       label: 'Under Review',    color: '#3b82f6' },
-  { key: 'in_progress',        label: 'In Progress',     color: '#0ea5e9' },
-  { key: 'payment',            label: 'Payment',         color: '#a855f7' },
-  { key: 'completed',          label: 'Completed',       color: '#10b981' },
-] as const;
+const PIPELINE_CFG: { key: string; label: string; color: string }[] = [
+  { key: 'documents_required', label: 'Docs Required', color: '#c98a2e' },
+  { key: 'documents_received', label: 'Docs Received', color: '#8b857a' },
+  { key: 'in_progress', label: 'In Progress', color: '#4b7a8a' },
+  { key: 'under_review', label: 'Under Review', color: '#6b6fc4' },
+  { key: 'payment', label: 'Payment', color: '#e85220' },
+  { key: 'completed', label: 'Completed', color: '#2f7a5b' },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso));
-}
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function priorityLabel(p: number): { label: string; color: string } {
-  if (p >= 8) return { label: 'High',   color: '#dc2626' };
-  if (p >= 5) return { label: 'Medium', color: '#d97706' };
-  return           { label: 'Low',    color: '#6b7280' };
-}
-
-function roleBadgeColor(role: string): string {
-  return role === 'ca' ? '#7c3aed' : '#1d4ed8';
-}
-
-// Y-axis label: paise → short rupee string
+const rupees = (paise: number) => paise / 100;
+const fmtINR = (paise: number) => `₹${new Intl.NumberFormat('en-IN').format(Math.round(rupees(paise)))}`;
 function fmtShort(paise: number): string {
-  const r = paise / 100;
-  if (r >= 100000) return `₹${(r / 100000).toFixed(1)}L`;
-  if (r >= 1000)   return `₹${(r / 1000).toFixed(0)}k`;
-  if (r > 0)       return `₹${r.toFixed(0)}`;
+  const r = rupees(paise);
+  if (r >= 1e7) return `₹${(r / 1e7).toFixed(r >= 1e8 ? 0 : 1)}Cr`;
+  if (r >= 1e5) return `₹${(r / 1e5).toFixed(1)}L`;
+  if (r >= 1e3) return `₹${(r / 1e3).toFixed(0)}k`;
+  if (r > 0) return `₹${Math.round(r)}`;
   return '₹0';
 }
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+function relTime(iso: string | null): string {
+  if (!iso) return '—';
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' }).format(new Date(iso));
+}
+function initials(a?: string | null, b?: string | null): string {
+  return `${(a ?? '').charAt(0)}${(b ?? '').charAt(0)}`.toUpperCase() || '?';
+}
+function priorityMeta(p: number): { label: string; tone: string } {
+  if (p >= 8) return { label: 'High', tone: 'high' };
+  if (p >= 5) return { label: 'Medium', tone: 'med' };
+  return { label: 'Low', tone: 'low' };
+}
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
+// ── Count-up ──────────────────────────────────────────────────────────────────
 
-function Sk({ w, h, r = 6 }: { w?: string; h?: string; r?: number }) {
+function useCountUp(target: number, duration = 1100): number {
+  const [val, setVal] = useState(0);
+  const fromRef = useRef<number>(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now();
+    const from = fromRef.current;
+    const tick = (now: number) => {
+      const p = Math.min((now - t0) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const next = from + (target - from) * eased;
+      fromRef.current = next;
+      setVal(next);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return val;
+}
+
+// ── Icons (crisp line SVG, no emoji/glyphs) ─────────────────────────────────────
+
+const I = {
+  rupee: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M6 3h12M6 8h12M16 3c0 5-3.5 6-7 6h-1l6 9" /></svg>),
+  trend: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 17l6-6 4 4 8-8" /><path d="M17 7h4v4" /></svg>),
+  users: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" /></svg>),
+  inbox: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" /></svg>),
+  spark: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></svg>),
+  up: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 19V5M6 11l6-6 6 6" /></svg>),
+  down: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 5v14M6 13l6 6 6-6" /></svg>),
+  chev: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9 18l6-6-6-6" /></svg>),
+  phone: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" /></svg>),
+  layers: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m12 2 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 17l9 5 9-5" /></svg>),
+};
+
+// ── Sparkline (KPI mini chart) ──────────────────────────────────────────────────
+
+function Sparkline({ points, stroke }: { points: number[]; stroke: string }) {
+  const W = 100, H = 28;
+  const max = Math.max(...points, 1), min = Math.min(...points, 0), range = max - min || 1;
+  const pts = points.map((v, i) => [(i / Math.max(points.length - 1, 1)) * W, H - 2 - ((v - min) / range) * (H - 4)]);
+  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const id = `sg-${stroke.replace('#', '')}`;
   return (
-    <div style={{
-      width: w ?? '100%', height: h ?? '1rem', borderRadius: r,
-      background: 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)',
-      backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', flexShrink: 0,
-    }} />
+    <svg className="adm-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={stroke} stopOpacity="0.5" /><stop offset="100%" stopColor={stroke} stopOpacity="0" /></linearGradient></defs>
+      <path d={`${d} L${W},${H} L0,${H} Z`} fill={`url(#${id})`} />
+      <path d={d} fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-// ── Revenue Line Chart ────────────────────────────────────────────────────────
+// ── KPI tile (dark hero) ────────────────────────────────────────────────────────
+
+function KpiTile({ to, icon, label, value, sub, delta, spark }: {
+  to: string; icon: React.ReactNode; label: string; value: string;
+  sub?: React.ReactNode; delta?: { dir: 'up' | 'down'; text: string }; spark?: number[];
+}) {
+  return (
+    <Link to={to} className="adm-kpi" data-anim>
+      <div className="adm-kpi-top">
+        <span className="adm-kpi-ico">{icon}</span>
+        <span className="adm-kpi-label">{label}</span>
+        <I.chev className="adm-kpi-go" width={14} height={14} />
+      </div>
+      <div className="adm-kpi-val">{value}</div>
+      <div className="adm-kpi-foot">
+        {delta && <span className={`adm-delta adm-delta--${delta.dir}`}>{delta.dir === 'up' ? <I.up width={10} height={10} /> : <I.down width={10} height={10} />}{delta.text}</span>}
+        {sub && <span className="adm-kpi-sub">{sub}</span>}
+      </div>
+      {spark && spark.length > 1 && <div className="adm-kpi-spark"><Sparkline points={spark} stroke="#e85220" /></div>}
+    </Link>
+  );
+}
+
+// ── Revenue area chart ──────────────────────────────────────────────────────────
 
 function RevenueChart({ data }: { data: DashboardStats['revenueByMonth'] }) {
-  const pathRef = useRef<SVGPathElement>(null);
-  const W = 480, H = 180, pL = 50, pR = 16, pT = 18, pB = 32;
+  const pathRef = useRef<SVGPathElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+
+  const W = 720, H = 290, pL = 54, pR = 20, pT = 22, pB = 38;
   const cW = W - pL - pR, cH = H - pT - pB;
-
   const maxVal = Math.max(...data.map(d => d.amount), 1);
+  const niceMax = maxVal * 1.15;
 
-  const pts = data.map((d, i) => ({
+  const pts = useMemo(() => data.map((d, i) => ({
     x: pL + (i / Math.max(data.length - 1, 1)) * cW,
-    y: pT + cH - (d.amount / maxVal) * cH,
-    ...d,
-  }));
+    y: pT + cH - (d.amount / niceMax) * cH, ...d,
+  })), [data, cW, cH, niceMax]);
 
-  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const last = pts[pts.length - 1];
-  const areaPath = `${linePath} L${last.x.toFixed(1)},${(pT + cH).toFixed(1)} L${pL},${(pT + cH).toFixed(1)} Z`;
+  const linePath = useMemo(() => {
+    if (pts.length < 2) return pts.map(p => `M${p.x},${p.y}`).join(' ');
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i], p1 = pts[i + 1], cx = (p0.x + p1.x) / 2;
+      d += ` C${cx.toFixed(1)},${p0.y.toFixed(1)} ${cx.toFixed(1)},${p1.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
+    }
+    return d;
+  }, [pts]);
+  const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(1)},${pT + cH} L${pL},${pT + cH} Z`;
 
-  // Animate line draw on mount / data change
   useEffect(() => {
     const el = pathRef.current;
     if (!el) return;
@@ -108,281 +181,219 @@ function RevenueChart({ data }: { data: DashboardStats['revenueByMonth'] }) {
     el.style.strokeDasharray = String(len);
     el.style.strokeDashoffset = String(len);
     el.style.transition = 'none';
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        el.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1)';
-        el.style.strokeDashoffset = '0';
-      });
-    });
-  }, [data]);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)';
+      el.style.strokeDashoffset = '0';
+    }));
+  }, [linePath]);
 
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({
-    y: pT + (1 - f) * cH,
-    label: fmtShort(maxVal * f),
-  }));
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ y: pT + (1 - f) * cH, label: fmtShort(niceMax * f) }));
+  const onMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current; if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * W;
+    let best = 0, bd = Infinity;
+    pts.forEach((p, i) => { const d = Math.abs(p.x - x); if (d < bd) { bd = d; best = i; } });
+    setHover(best);
+  }, [pts]);
+
+  const total = data.reduce((s, d) => s + d.amount, 0);
+  const hp = hover != null ? pts[hover] : null;
 
   return (
-    <div style={S.card}>
-      <div style={S.cardHead}>
-        <span style={S.cardTitle}>Revenue · Last 12 Months</span>
+    <section className="adm-card adm-card--chart" data-anim>
+      <div className="adm-card-head">
+        <div><span className="adm-eyebrow">Revenue</span><h3 className="adm-card-title">Last 12 months</h3></div>
+        <div className="adm-chart-total"><span className="adm-chart-total-val">{fmtShort(total)}</span><span className="adm-chart-total-lbl">collected</span></div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}>
-        <defs>
-          <linearGradient id="rev-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#3b82f6" stopOpacity="0.13" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Grid lines + Y labels */}
-        {yTicks.map((t, i) => (
-          <g key={i}>
-            <line x1={pL} y1={t.y} x2={W - pR} y2={t.y} stroke="#f1f5f9" strokeWidth="1" />
-            <text x={pL - 5} y={t.y + 3.5} textAnchor="end" fontSize="8.5" fill="#94a3b8">{t.label}</text>
-          </g>
-        ))}
-
-        {/* Area */}
-        <path d={areaPath} fill="url(#rev-grad)" />
-
-        {/* Animated line */}
-        <path ref={pathRef} d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Dots — fade in after line draws */}
-        {pts.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#3b82f6" stroke="#fff" strokeWidth="2"
-            style={{ opacity: 0, animation: `fade-dot 0.25s ease-out ${0.9 + i * 0.04}s forwards` }} />
-        ))}
-
-        {/* X-axis labels */}
-        {pts.map((p, i) => (
-          <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#94a3b8">{p.label}</text>
-        ))}
-      </svg>
-    </div>
+      <div className="adm-chart-plot">
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="adm-chart-svg" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+          <defs><linearGradient id="adm-rev-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#e85220" stopOpacity="0.20" /><stop offset="100%" stopColor="#e85220" stopOpacity="0" /></linearGradient></defs>
+          {yTicks.map((t, i) => (
+            <g key={i}>
+              <line x1={pL} y1={t.y} x2={W - pR} y2={t.y} stroke="var(--lp-hairline-soft)" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '3 4'} />
+              <text x={pL - 10} y={t.y + 3.5} textAnchor="end" className="adm-chart-axis">{t.label}</text>
+            </g>
+          ))}
+          <path d={areaPath} fill="url(#adm-rev-grad)" />
+          <path ref={pathRef} d={linePath} fill="none" stroke="#e85220" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          {hp && (<g><line x1={hp.x} y1={pT} x2={hp.x} y2={pT + cH} stroke="#e85220" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" /><circle cx={hp.x} cy={hp.y} r="6.5" fill="#fff" stroke="#e85220" strokeWidth="2.5" /></g>)}
+          {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3.1" fill="#e85220" stroke="#fff" strokeWidth="1.8" style={{ opacity: 0, animation: `adm-fade-dot .3s ease-out ${0.95 + i * 0.04}s forwards` }} />)}
+          {pts.map((p, i) => <text key={i} x={p.x} y={H - 12} textAnchor="middle" className="adm-chart-axis">{p.label}</text>)}
+        </svg>
+        {hp && <div className="adm-chart-tip" style={{ left: `${(hp.x / W) * 100}%`, top: `${(hp.y / H) * 100}%` }}><span className="adm-chart-tip-m">{hp.label}</span><span className="adm-chart-tip-v">{fmtINR(hp.amount)}</span></div>}
+      </div>
+    </section>
   );
 }
 
-// ── Service Breakdown Donut ───────────────────────────────────────────────────
+// ── Pipeline donut (interactive + drill-down) ────────────────────────────────────
 
-function ServiceBreakdown({ pipeline }: { pipeline: Record<string, number> }) {
-  const r = 54, cx = 74, cy = 74, sw = 20;
-  const circumference = 2 * Math.PI * r;
-
+function PipelineDonut({ pipeline }: { pipeline: Record<string, number> }) {
+  const navigate = useNavigate();
+  const [active, setActive] = useState<number | null>(null);
   const items = PIPELINE_CFG.map(c => ({ ...c, value: pipeline[c.key] ?? 0 }));
   const total = items.reduce((s, d) => s + d.value, 0);
+  const totalUp = Math.round(useCountUp(total, 1000));
 
-  let cumulative = 0;
-  const segments = items
-    .filter(d => d.value > 0)
-    .map(d => {
-      const dashLen = (d.value / total) * circumference;
-      const offset  = cumulative;
-      cumulative += dashLen;
-      return { ...d, dashLen, offset };
-    });
+  const R = 62, C = 2 * Math.PI * R, cx = 80, cy = 80, sw = 18;
+  let offsetAcc = 0;
+  const segs = items.filter(i => i.value > 0).map((d) => {
+    const frac = d.value / total;
+    const len = frac * C;
+    const seg = { ...d, len, gap: C - len, dashOffset: -offsetAcc };
+    offsetAcc += len;
+    return seg;
+  });
 
   return (
-    <div style={S.card}>
-      <div style={S.cardHead}>
-        <span style={S.cardTitle}>Service Breakdown</span>
-        <Link to="/admin/client-services" style={S.viewAll}>View all</Link>
+    <section className="adm-card adm-card--donut" data-anim>
+      <div className="adm-card-head">
+        <div><span className="adm-eyebrow">Pipeline</span><h3 className="adm-card-title">Service stages</h3></div>
+        <Link to="/admin/client-services" className="adm-link">View all <I.chev width={13} height={13} /></Link>
       </div>
+
       {total === 0 ? (
-        <p style={S.empty}>No active services.</p>
+        <p className="adm-empty">No active services yet.</p>
       ) : (
-        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-          {/* Donut SVG */}
-          <div style={{ flexShrink: 0 }}>
-            <svg width="148" height="148" viewBox="0 0 148 148"
-              style={{ display: 'block', animation: 'donut-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
-              {/* Background track */}
-              <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={sw} />
+        <div className="adm-donut-wrap">
+          <div className="adm-donut-svg-wrap">
+            <svg viewBox="0 0 160 160" className="adm-donut-svg">
+              <circle cx={cx} cy={cy} r={R} fill="none" stroke="var(--lp-hairline-soft)" strokeWidth={sw} />
               <g transform={`rotate(-90 ${cx} ${cy})`}>
-                {segments.map((seg, i) => (
-                  <circle key={i} cx={cx} cy={cy} r={r}
-                    fill="none"
-                    stroke={seg.color}
-                    strokeWidth={sw}
-                    strokeDasharray={`${seg.dashLen} ${circumference}`}
-                    strokeDashoffset={-seg.offset}
-                    strokeLinecap="butt"
-                  />
-                ))}
+                {segs.map((s, i) => {
+                  const dimmed = active != null && active !== i;
+                  return (
+                    <circle key={s.key} cx={cx} cy={cy} r={R} fill="none" stroke={s.color}
+                      strokeWidth={active === i ? sw + 4 : sw}
+                      strokeDasharray={`${s.len} ${s.gap}`} strokeDashoffset={s.dashOffset}
+                      strokeLinecap="butt"
+                      className="adm-donut-seg"
+                      style={{ opacity: dimmed ? 0.32 : 1, animation: `adm-donut-draw .9s cubic-bezier(0.4,0,0.2,1) ${0.1 + i * 0.08}s both`, cursor: 'pointer' }}
+                      onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)}
+                      onClick={() => navigate(`/admin/client-services?status=${s.key}`)} />
+                  );
+                })}
               </g>
-              {/* Center label */}
-              <text x={cx} y={cy - 7} textAnchor="middle" fontSize="20" fontWeight="800" fill="#0f172a">{total}</text>
-              <text x={cx} y={cy + 10} textAnchor="middle" fontSize="8.5" fill="#94a3b8" letterSpacing="0.05em">SERVICES</text>
+              <text x={cx} y={cy - 4} textAnchor="middle" className="adm-donut-center-num">{totalUp}</text>
+              <text x={cx} y={cy + 14} textAnchor="middle" className="adm-donut-center-lbl">ACTIVE</text>
             </svg>
           </div>
 
-          {/* Legend */}
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-            {items.map(d => {
+          <ul className="adm-donut-legend">
+            {items.map((d) => {
               const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+              const segIdx = segs.findIndex(s => s.key === d.key);
               return (
-                <li key={d.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: d.value === 0 ? 0.3 : 1 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.73rem', color: '#475569', flex: 1, minWidth: 0, lineHeight: 1.3 }}>{d.label}</span>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>{d.value}</span>
-                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', width: '2.5rem', textAlign: 'right' }}>{pct}%</span>
+                <li key={d.key}
+                  className={`adm-leg-row${active === segIdx && segIdx >= 0 ? ' is-active' : ''}${d.value === 0 ? ' is-zero' : ''}`}
+                  onMouseEnter={() => segIdx >= 0 && setActive(segIdx)} onMouseLeave={() => setActive(null)}
+                  onClick={() => navigate(`/admin/client-services?status=${d.key}`)}>
+                  <span className="adm-leg-dot" style={{ background: d.color }} />
+                  <span className="adm-leg-name">{d.label}</span>
+                  <span className="adm-leg-num">{d.value}</span>
+                  <span className="adm-leg-pct">{pct}%</span>
                 </li>
               );
             })}
           </ul>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
-// ── Queue Card ────────────────────────────────────────────────────────────────
+// ── Assignment queue ────────────────────────────────────────────────────────────
 
-function QueueCard({ queue }: { queue: DashboardStats['queue'] }) {
+function QueuePanel({ queue }: { queue: DashboardStats['queue'] }) {
   return (
-    <div style={S.card}>
-      <div style={S.cardHead}>
-        <span style={S.cardTitle}>
-          Assignment Queue
-          <span style={S.countBadge}>{queue.openCount}</span>
-        </span>
-        <Link to="/admin/queue" style={S.viewAll}>View all</Link>
+    <section className="adm-card" data-anim>
+      <div className="adm-card-head">
+        <div><span className="adm-eyebrow">Operations</span><h3 className="adm-card-title">Assignment queue <span className="adm-count">{queue.openCount}</span></h3></div>
+        <Link to="/admin/queue" className="adm-link">Open queue <I.chev width={13} height={13} /></Link>
       </div>
       {queue.topItems.length === 0 ? (
-        <p style={S.empty}>No open items.</p>
+        <p className="adm-empty">Nothing waiting to be assigned.</p>
       ) : (
-        <ul style={S.list}>
-          {queue.topItems.map((item: any) => {
-            const prio = priorityLabel(item.priority ?? 0);
+        <ul className="adm-feed">
+          {queue.topItems.map((item, i) => {
+            const prio = priorityMeta(item.priority ?? 0);
             return (
-              <li key={item.id} style={S.listRow}>
-                <div style={S.listMain}>
-                  <span style={S.listTitle}>{item.service_name ?? '—'}</span>
-                  <span style={S.listSub}>{item.client_name ?? '—'}</span>
-                </div>
-                <span style={{ ...S.chip, background: `${prio.color}18`, color: prio.color }}>{prio.label}</span>
+              <li key={item.id} className="adm-feed-row" style={{ ['--i' as any]: i }}>
+                <span className={`adm-prio adm-prio--${prio.tone}`} />
+                <div className="adm-feed-main"><span className="adm-feed-title">{item.service_name || '—'}</span><span className="adm-feed-sub">{item.client_name || '—'}</span></div>
+                <span className={`adm-pill adm-pill--${prio.tone}`}>{prio.label}</span>
               </li>
             );
           })}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
-// ── New Inquiries Card ────────────────────────────────────────────────────────
+// ── New inquiries ─────────────────────────────────────────────────────────────
 
-function NewInquiriesCard({ inquiries }: { inquiries: Inquiry[] }) {
+function InquiriesPanel({ inquiries }: { inquiries: Inquiry[] }) {
   return (
-    <div style={S.card}>
-      <div style={S.cardHead}>
-        <span style={S.cardTitle}>New Inquiries</span>
-        <Link to="/admin/inquiries" style={S.viewAll}>View all</Link>
+    <section className="adm-card" data-anim>
+      <div className="adm-card-head">
+        <div><span className="adm-eyebrow">Leads</span><h3 className="adm-card-title">New inquiries</h3></div>
+        <Link to="/admin/inquiries" className="adm-link">View all <I.chev width={13} height={13} /></Link>
       </div>
       {inquiries.length === 0 ? (
-        <p style={S.empty}>No pending inquiries.</p>
+        <p className="adm-empty">No pending inquiries.</p>
       ) : (
-        <ul style={S.list}>
-          {inquiries.map(inq => (
-            <li key={inq.id} style={S.listRow}>
-              <div style={S.listMain}>
-                <span style={S.listTitle}>{inq.name}</span>
-                <span style={S.listSub}>{inq.service_needed}</span>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                  {formatDate(inq.created_at)}
-                </div>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
-                  {inq.phone}
-                </div>
-              </div>
+        <ul className="adm-feed">
+          {inquiries.map((inq, i) => (
+            <li key={inq.id} className="adm-feed-row" style={{ ['--i' as any]: i }}>
+              <span className="adm-feed-ico"><I.phone width={15} height={15} /></span>
+              <div className="adm-feed-main"><span className="adm-feed-title">{inq.name}</span><span className="adm-feed-sub">{inq.service_needed}</span></div>
+              <div className="adm-feed-right"><span className="adm-feed-meta">{inq.phone}</span><span className="adm-feed-time">{relTime(inq.created_at)}</span></div>
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
-// ── Texpert Workload ──────────────────────────────────────────────────────────
+// ── Texpert workload ─────────────────────────────────────────────────────────
 
-function WorkloadSection({ workload }: { workload: any[] }) {
+function WorkloadGrid({ workload }: { workload: Texpert[] }) {
   if (workload.length === 0) return null;
+  const sorted = [...workload].sort((a, b) => b.active_count - a.active_count);
   return (
-    <div>
-      <h3 style={S.sectionTitle}>Texpert Workload</h3>
-      <div style={S.workloadGrid}>
-        {workload.map((tx: any) => {
-          const pct  = Math.min((tx.active_count / 10) * 100, 100);
+    <section data-anim>
+      <div className="adm-section-head"><span className="adm-eyebrow">Team</span><h3 className="adm-section-title">Texpert workload</h3></div>
+      <div className="adm-team-grid">
+        {sorted.map((tx, i) => {
+          const pct = Math.min((tx.active_count / 10) * 100, 100);
           const name = `${tx.first_name ?? ''} ${tx.last_name ?? ''}`.trim() || 'Unknown';
+          const tone = pct > 80 ? 'high' : pct > 50 ? 'med' : 'low';
           return (
-            <Link key={tx.id} to={`/admin/users/taxpert/${tx.id}`} style={{ textDecoration: 'none' }}>
-              <div style={S.workloadCard}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.3rem' }}>{name}</div>
-                    <span style={{ ...S.roleBadge, background: roleBadgeColor(tx.role) }}>{tx.role.toUpperCase()}</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{tx.active_count}</span>
-                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>active</span>
-                  </div>
-                </div>
-                <div style={{ height: 5, background: '#f1f5f9', borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 10, transition: 'width 0.4s ease',
-                    width: `${pct}%`,
-                    background: pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#10b981',
-                  }} />
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: -4 }}>{tx.active_count} / 10 target</div>
+            <Link key={tx.id} to={`/admin/users/taxpert/${tx.id}`} className="adm-team-card" style={{ ['--i' as any]: i }}>
+              <div className="adm-team-top">
+                <span className="adm-avatar">{initials(tx.first_name, tx.last_name)}</span>
+                <div className="adm-team-id"><span className="adm-team-name">{name}</span><span className={`adm-role adm-role--${tx.role}`}>{tx.role.toUpperCase()}</span></div>
+                <I.chev className="adm-team-go" width={15} height={15} />
               </div>
+              <div className="adm-team-metric"><span className="adm-team-count">{tx.active_count}</span><span className="adm-team-of">/ 10 active</span></div>
+              <span className="adm-team-track"><span className={`adm-team-fill adm-team-fill--${tone}`} style={{ width: `${pct}%`, transitionDelay: `${0.1 + i * 0.05}s` }} /></span>
             </Link>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const S: Record<string, React.CSSProperties> = {
-  page:       { padding: '2rem 2.5rem', maxWidth: 1280, margin: '0 auto', fontFamily: "'Inter','system-ui',sans-serif", color: '#0f172a' },
-  greetRow:   { marginBottom: '2rem' },
-  greeting:   { fontSize: '1.5rem', fontWeight: 700, margin: 0, color: '#0f172a' },
-  greetSub:   { fontSize: '0.875rem', color: '#64748b', margin: '0.25rem 0 0' },
-
-  twoColA:    { display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '1.5rem', marginBottom: '1.5rem' },
-  twoColB:    { display: 'grid', gridTemplateColumns: '2fr 3fr', gap: '1.5rem', marginBottom: '1.5rem' },
-
-  card:       { background: '#fff', borderRadius: 10, padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' },
-  cardHead:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' },
-  cardTitle:  { fontSize: '0.875rem', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.4rem' },
-  countBadge: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', color: '#475569', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.5rem' },
-  viewAll:    { fontSize: '0.75rem', color: '#3b82f6', textDecoration: 'none', fontWeight: 500 },
-
-  list:       { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' },
-  listRow:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid #f1f5f9' },
-  listMain:   { display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0, marginRight: '0.75rem' },
-  listTitle:  { fontSize: '0.825rem', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  listSub:    { fontSize: '0.72rem', color: '#94a3b8' },
-  chip:       { display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.02em', flexShrink: 0 },
-  empty:      { fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: '1.5rem 0', margin: 0 },
-
-  sectionTitle:  { fontSize: '0.875rem', fontWeight: 700, color: '#1e293b', margin: '0 0 0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  workloadGrid:  { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' },
-  workloadCard:  { background: '#fff', borderRadius: 10, padding: '1.1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer', transition: 'box-shadow 0.15s' },
-  roleBadge:     { display: 'inline-block', color: '#fff', borderRadius: 4, fontSize: '0.62rem', fontWeight: 700, padding: '0.15rem 0.45rem', letterSpacing: '0.05em' },
-};
-
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Page ────────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboardPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const { data, isLoading } = useQuery<DashboardStats>({
     queryKey: ['admin-dashboard-stats'],
@@ -391,71 +402,75 @@ export default function AdminDashboardPage() {
     staleTime: 60_000,
   });
 
+  useEffect(() => {
+    if (!data) return;
+    const root = rootRef.current; if (!root) return;
+    const els = Array.from(root.querySelectorAll<HTMLElement>('[data-anim]'));
+    requestAnimationFrame(() => {
+      els.forEach((el, i) => gsap.fromTo(el, { y: 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out', delay: 0.04 * i, clearProps: 'transform' }));
+    });
+  }, [data]);
+
   if (!authLoading && !isAdmin) return <Navigate to="/dashboard" replace />;
 
   const today = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   const firstName = profile?.first_name ?? 'Admin';
 
   return (
-    <>
-      <style>{`
-        @keyframes shimmer   { 0%,100% { background-position: 200% 0 } 50% { background-position: -200% 0 } }
-        @keyframes donut-in  { from { opacity:0; transform:scale(0.82) } to { opacity:1; transform:scale(1) } }
-        @keyframes fade-dot  { from { opacity:0; transform:scale(0) } to { opacity:1; transform:scale(1) } }
-        .workload-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.10) !important; }
-      `}</style>
-
-      <div style={S.page}>
-
-        {/* Greeting */}
-        <div style={S.greetRow}>
-          <h1 style={S.greeting}>{greeting()}, {firstName}</h1>
-          <p style={S.greetSub}>{today}</p>
-        </div>
-
-        {/* Revenue chart + Queue — 60/40 */}
-        <div style={S.twoColA}>
-          {isLoading ? (
-            <>
-              <div style={S.card}><Sk h="11rem" r={8} /></div>
-              <div style={S.card}><Sk h="11rem" r={8} /></div>
-            </>
-          ) : data ? (
-            <>
-              <RevenueChart data={data.revenueByMonth} />
-              <QueueCard queue={data.queue} />
-            </>
-          ) : null}
-        </div>
-
-        {/* Service breakdown donut + Recent Payments — 40/60 */}
-        <div style={S.twoColB}>
-          {isLoading ? (
-            <>
-              <div style={S.card}><Sk h="11rem" r={8} /></div>
-              <div style={S.card}><Sk h="11rem" r={8} /></div>
-            </>
-          ) : data ? (
-            <>
-              <ServiceBreakdown pipeline={data.pipeline} />
-              <NewInquiriesCard inquiries={data.recentInquiries} />
-            </>
-          ) : null}
-        </div>
-
-        {/* Texpert Workload */}
-        {isLoading ? (
+    <div className="db-page-new adm-root" ref={rootRef}>
+      <header className="adm-hero" data-anim>
+        <div className="adm-hero-glow" aria-hidden />
+        <div className="adm-hero-bar">
           <div>
-            <Sk w="20%" h="0.75rem" />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: '1rem', marginTop: '0.75rem' }}>
-              {[0,1,2,3].map(i => <Sk key={i} h="7rem" r={10} />)}
-            </div>
+            <span className="adm-hero-eyebrow">Admin · Overview</span>
+            <h1 className="adm-hero-title">{greeting()}, {firstName}</h1>
+            <p className="adm-hero-date">{today}</p>
           </div>
-        ) : data ? (
-          <WorkloadSection workload={data.texpertWorkload} />
-        ) : null}
+          <span className="adm-hero-live"><span className="adm-hero-live-dot" />Live</span>
+        </div>
+        <div className="adm-kpis">
+          {isLoading || !data ? [0, 1, 2, 3].map(i => <div key={i} className="adm-kpi adm-kpi--skel" />) : <KpiRow data={data} />}
+        </div>
+      </header>
 
-      </div>
+      {isLoading || !data ? (
+        <div className="adm-grid">
+          <div className="adm-skel adm-skel--chart" /><div className="adm-skel adm-skel--side" />
+          <div className="adm-skel adm-skel--half" /><div className="adm-skel adm-skel--half" />
+        </div>
+      ) : (
+        <>
+          <div className="adm-grid">
+            <RevenueChart data={data.revenueByMonth ?? []} />
+            <PipelineDonut pipeline={data.pipeline} />
+            <QueuePanel queue={data.queue} />
+            <InquiriesPanel inquiries={data.recentInquiries ?? []} />
+          </div>
+          <WorkloadGrid workload={data.texpertWorkload ?? []} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function KpiRow({ data }: { data: DashboardStats }) {
+  const months = data.revenueByMonth ?? [];
+  const spark = months.map(m => m.amount);
+  const thisM = months.length ? months[months.length - 1].amount : data.revenue.thisMonth;
+  const prevM = months.length > 1 ? months[months.length - 2].amount : 0;
+  const delta = prevM > 0 ? Math.round(((thisM - prevM) / prevM) * 100) : (thisM > 0 ? 100 : 0);
+
+  const totalUp = useCountUp(rupees(data.revenue.total));
+  const monthUp = useCountUp(rupees(thisM));
+  const clientsUp = useCountUp(data.clients.total);
+  const queueUp = useCountUp(data.queue.openCount);
+
+  return (
+    <>
+      <KpiTile to="/admin/payments" icon={<I.rupee width={16} height={16} />} label="Total revenue" value={fmtShort(totalUp * 100)} sub="all-time captured" spark={spark} />
+      <KpiTile to="/admin/payments" icon={<I.trend width={16} height={16} />} label="This month" value={fmtShort(monthUp * 100)} delta={{ dir: delta >= 0 ? 'up' : 'down', text: `${Math.abs(delta)}%` }} sub="vs last month" />
+      <KpiTile to="/admin/users" icon={<I.users width={16} height={16} />} label="Active clients" value={String(Math.round(clientsUp))} delta={data.clients.newThisMonth > 0 ? { dir: 'up', text: `${data.clients.newThisMonth} new` } : undefined} sub="total" />
+      <KpiTile to="/admin/queue" icon={<I.inbox width={16} height={16} />} label="Open queue" value={String(Math.round(queueUp))} sub="awaiting assignment" />
     </>
   );
 }

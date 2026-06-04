@@ -11,6 +11,31 @@ function toSlug(v: string) {
   return v.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+/* ── Inline line icons ───────────────────────────────────────── */
+const Icon = {
+  back: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+  ),
+  chevronD: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+  ),
+  details: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6M9 17h6" /></svg>
+  ),
+  docs: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.6L19 8.4V19a2 2 0 0 1-2 2z" /></svg>
+  ),
+  cal: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+  ),
+  alert: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+  ),
+  check: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" /></svg>
+  ),
+};
+
 export default function ServiceEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,7 +105,6 @@ export default function ServiceEditPage() {
     enabled: isAdmin,
   });
 
-  // Populate form from fetched service (edit mode only)
   useEffect(() => {
     if (!isCreateMode && data?.service) {
       setName(data.service.name);
@@ -98,13 +122,11 @@ export default function ServiceEditPage() {
     setTimeout(() => setMsg(null), 3500);
   }
 
-  // ── Name → slug auto-generation (create mode) ──
   function handleNameChange(v: string) {
     setName(v);
     if (isCreateMode) setSlug(toSlug(v));
   }
 
-  // ── Create service ──
   const createCatMutation = useMutation({
     mutationFn: async (catName: string) => {
       const res = await apiClient.post("/config/categories", { name: catName.trim(), slug: toSlug(catName) });
@@ -159,7 +181,6 @@ export default function ServiceEditPage() {
     });
   }
 
-  // ── Update service (edit mode) ──
   const updateDetailsMutation = useMutation({
     mutationFn: async (payload: any) => { await apiClient.put(`/config/services/${id}`, payload); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Service updated."); },
@@ -175,7 +196,6 @@ export default function ServiceEditPage() {
     });
   }
 
-  // ── Document mutations ──
   const addDocMutation = useMutation({
     mutationFn: async (payload: any) => { await apiClient.post("/config/requirements", payload); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Document added."); setAddDocId(""); },
@@ -203,7 +223,6 @@ export default function ServiceEditPage() {
     toggleDocMutation.mutate({ reqId: req.id, payload: { is_required: !req.is_required, is_optional: req.is_required } });
   }
 
-  // ── Due date mutations ──
   const addDdMutation = useMutation({
     mutationFn: async (payload: any) => { await apiClient.post("/config/due-dates", payload); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Due date added."); setDdTitle(""); setDdDesc(""); },
@@ -227,7 +246,7 @@ export default function ServiceEditPage() {
 
   if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
-  if (!isCreateMode && !data?.service) return <div className="se-page">Service not found</div>;
+  if (!isCreateMode && !data?.service) return <div className="adm-root"><div className="adm-banner adm-banner--err">Service not found.</div></div>;
 
   const { categories = [], allDocumentTypes = [], requirements = [], dueDates = [] } = data ?? {};
   const service = data?.service;
@@ -241,229 +260,214 @@ export default function ServiceEditPage() {
     || addDocMutation.isPending || removeDocMutation.isPending || toggleDocMutation.isPending
     || addDdMutation.isPending || removeDdMutation.isPending;
 
-  return (
-    <div className="se-page">
-      {/* Header */}
-      <div className="se-header">
-        <div>
-          <Link to="/admin/services" className="se-back">← Services</Link>
-          <h1 className="page-title" style={{ margin: "0.25rem 0 0" }}>
-            {isCreateMode ? "New Service" : service?.name}
-          </h1>
-          {!isCreateMode && <code className="se-slug">{service?.slug}</code>}
-        </div>
-        {!isCreateMode && (
-          <span className={`se-active-badge ${service?.is_active ? "se-badge-active" : "se-badge-inactive"}`}>
-            {service?.is_active ? "Active" : "Inactive"}
-          </span>
-        )}
-      </div>
+  const TABS = [
+    { id: "details"   as const, label: "Details",  icon: Icon.details },
+    { id: "documents" as const, label: `Documents${!isCreateMode ? ` (${reqs.length})` : ""}`, icon: Icon.docs },
+    { id: "duedates"  as const, label: `Due Dates${!isCreateMode ? ` (${dueDates.length})` : ""}`, icon: Icon.cal },
+  ];
 
-      {msg && <div className={`se-flash se-flash-${msg.type}`}>{msg.text}</div>}
+  return (
+    <div className="adm-root" style={{ maxWidth: 980 }}>
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <header className="adm-hero">
+        <div className="adm-hero-glow" />
+        <Link to="/admin/services" className="adm-back">{Icon.back} Services</Link>
+        <div className="adm-hero-bar">
+          <div>
+            <p className="adm-hero-eyebrow">— {isCreateMode ? "New Service" : "Edit Service"}</p>
+            <h1 className="adm-hero-title">{isCreateMode ? "New Service" : service?.name}</h1>
+            {!isCreateMode && <p className="adm-hero-date">Slug: {service?.slug}</p>}
+          </div>
+          {!isCreateMode && (
+            <div className="adm-hero-aside">
+              <span className={`adm-badge ${service?.is_active ? "adm-badge--green" : "adm-badge--neutral"}`}>
+                <span className="adm-badge-dot" />{service?.is_active ? "Active" : "Inactive"}
+              </span>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {msg && (
+        <div className={`adm-banner adm-banner--${msg.type === "ok" ? "ok" : "err"}`} style={{ marginBottom: "1rem" }}>
+          {msg.type === "ok" ? Icon.check : Icon.alert}{msg.text}
+        </div>
+      )}
 
       {/* Tabs */}
-      <nav className="se-tabs">
-        {(["details", "documents", "duedates"] as const).map(t => (
-          <button
-            key={t}
-            className={`se-tab${tab === t ? " se-tab-active" : ""}${isCreateMode && t !== "details" ? " se-tab-locked" : ""}`}
-            onClick={() => setTab(t)}
-          >
-            {t === "details"
-              ? "Service Details"
-              : t === "documents"
-              ? `Document Requirements${!isCreateMode ? ` (${reqs.length})` : ""}`
-              : `Due Date Templates${!isCreateMode ? ` (${dueDates.length})` : ""}`}
-          </button>
-        ))}
+      <nav className="adm-seg" role="tablist">
+        {TABS.map(t => {
+          const locked = isCreateMode && t.id !== "details";
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              disabled={locked}
+              className={`adm-seg-btn${tab === t.id ? " is-active" : ""}`}
+              style={locked ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+              onClick={() => !locked && setTab(t.id)}
+            >
+              {t.icon}{t.label}
+            </button>
+          );
+        })}
       </nav>
 
       {/* ── DETAILS TAB ── */}
       {tab === "details" && (
-        <div className="se-card">
-          <div className="se-form-grid">
-            {/* Name */}
-            <div className="se-field">
-              <label>Service Name *</label>
-              <input
-                value={name}
-                onChange={e => handleNameChange(e.target.value)}
-                className="se-input"
-                placeholder="e.g. GST Registration"
-              />
+        <section className="adm-panel">
+          <div className="adm-form-grid">
+            <div className="adm-field">
+              <label className="adm-label">Service Name *</label>
+              <input value={name} onChange={e => handleNameChange(e.target.value)} className="adm-input" placeholder="e.g. GST Registration" />
             </div>
 
-            {/* Slug — editable in create mode, readonly in edit */}
             {isCreateMode ? (
-              <div className="se-field">
-                <label>Slug *</label>
-                <input
-                  value={slug}
-                  onChange={e => setSlug(e.target.value)}
-                  className="se-input"
-                  placeholder="e.g. gst-registration"
-                />
+              <div className="adm-field">
+                <label className="adm-label">Slug *</label>
+                <input value={slug} onChange={e => setSlug(e.target.value)} className="adm-input" placeholder="e.g. gst-registration" />
               </div>
             ) : (
-              <div className="se-field">
-                <label>Slug</label>
-                <code className="se-input" style={{ background: "#f1f5f9", color: "#64748b", fontFamily: "'Courier New', monospace", fontSize: "0.82rem" }}>
-                  {service?.slug}
-                </code>
+              <div className="adm-field">
+                <label className="adm-label">Slug</label>
+                <input className="adm-input" value={service?.slug ?? ""} disabled style={{ opacity: 0.6 }} />
               </div>
             )}
 
-            {/* Category */}
-            <div className="se-field" style={{ gridColumn: isNewCat ? "1 / -1" : undefined }}>
-              <label>Category</label>
+            <div className="adm-field" style={{ gridColumn: isNewCat ? "1 / -1" : undefined }}>
+              <label className="adm-label">Category</label>
               <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", flexWrap: "wrap" }}>
-                <select value={catId} onChange={e => { setCatId(e.target.value); setNewCatName(""); }} className="se-input" style={{ flex: 1, minWidth: 180 }}>
-                  <option value="">— Uncategorized —</option>
-                  {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  <option value="__new__">＋ New category…</option>
-                </select>
+                <div className="adm-select-wrap" style={{ flex: 1, minWidth: 180 }}>
+                  <select value={catId} onChange={e => { setCatId(e.target.value); setNewCatName(""); }} className="adm-select">
+                    <option value="">— Uncategorized —</option>
+                    {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <option value="__new__">＋ New category…</option>
+                  </select>
+                  <span className="adm-select-ico">{Icon.chevronD}</span>
+                </div>
                 {isNewCat && (
-                  <input
-                    value={newCatName}
-                    onChange={e => setNewCatName(e.target.value)}
-                    className="se-input"
-                    placeholder="Category name"
-                    style={{ flex: 1, minWidth: 180 }}
-                    autoFocus
-                  />
+                  <input value={newCatName} onChange={e => setNewCatName(e.target.value)} className="adm-input" placeholder="Category name" style={{ flex: 1, minWidth: 180 }} autoFocus />
                 )}
               </div>
             </div>
 
-            {/* Price */}
-            <div className="se-field">
-              <label>Price (₹ incl. GST) *</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <span style={{ color: "#94a3b8" }}>₹</span>
-                <input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} className="se-input" style={{ width: 130 }} placeholder="1499" />
-              </div>
+            <div className="adm-field">
+              <label className="adm-label">Price (₹ incl. GST) *</label>
+              <input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} className="adm-input" placeholder="1499" />
             </div>
 
-            {/* Summary */}
-            <div className="se-field se-field-full">
-              <label>Summary (short)</label>
-              <input value={summary} onChange={e => setSummary(e.target.value)} className="se-input" placeholder="One-line summary for clients" />
+            <div className="adm-field adm-field--full">
+              <label className="adm-label">Summary <span className="adm-label-opt">(short)</span></label>
+              <input value={summary} onChange={e => setSummary(e.target.value)} className="adm-input" placeholder="One-line summary for clients" />
             </div>
 
-            {/* Description */}
-            <div className="se-field se-field-full">
-              <label>Description (detail)</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} className="se-textarea" rows={3} placeholder="Longer service description shown on the service page" />
+            <div className="adm-field adm-field--full">
+              <label className="adm-label">Description <span className="adm-label-opt">(detail)</span></label>
+              <textarea value={description} onChange={e => setDescription(e.target.value)} className="adm-textarea" rows={3} placeholder="Longer service description shown on the service page" />
             </div>
 
-            {/* FY Required */}
-            <div className="se-field">
-              <label>FY Required</label>
-              <label className="se-toggle">
+            <div className="adm-field">
+              <label className="adm-label">FY Required</label>
+              <label className="adm-check">
                 <input type="checkbox" checked={requiresFy} onChange={e => setRequiresFy(e.target.checked)} />
-                <span>Client must specify fiscal year</span>
+                Client must specify fiscal year
               </label>
             </div>
 
-            {/* Active — edit mode only */}
             {!isCreateMode && isSuperAdmin && (
-              <div className="se-field">
-                <label>Active</label>
-                <label className="se-toggle">
+              <div className="adm-field">
+                <label className="adm-label">Active</label>
+                <label className="adm-check">
                   <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                  <span>Service visible to clients</span>
+                  Service visible to clients
                 </label>
               </div>
             )}
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
+          <div className="adm-savebar" style={{ marginTop: "1.5rem", justifyContent: "flex-start" }}>
             {isCreateMode ? (
               <>
-                <button onClick={handleCreate} disabled={anyPending} className="btn btn-primary" style={{ fontSize: "0.875rem" }}>
-                  {anyPending ? "Creating…" : "Create Service"}
+                <button onClick={handleCreate} disabled={anyPending} className="adm-submit">
+                  {anyPending ? <><span className="adm-submit-spin" /> Creating…</> : "Create Service"}
                 </button>
-                <Link to="/admin/services" className="btn btn-secondary" style={{ fontSize: "0.875rem" }}>
-                  Cancel
-                </Link>
+                <Link to="/admin/services" className="adm-btn adm-btn--ghost">Cancel</Link>
               </>
             ) : (
-              <button onClick={saveDetails} disabled={anyPending} className="btn btn-primary" style={{ fontSize: "0.875rem" }}>
-                {anyPending ? "Saving…" : "Save Changes"}
+              <button onClick={saveDetails} disabled={anyPending} className="adm-submit">
+                {anyPending ? <><span className="adm-submit-spin" /> Saving…</> : "Save Changes"}
               </button>
             )}
           </div>
-        </div>
+        </section>
       )}
 
       {/* ── DOCUMENTS TAB ── */}
       {tab === "documents" && (
         isCreateMode ? (
-          <div className="se-card">
-            <div className="se-empty" style={{ padding: "3rem" }}>
-              Create the service first — then configure document requirements here.
-            </div>
-          </div>
+          <section className="adm-panel">
+            <div className="adm-empty-box"><p className="adm-empty-txt">Create the service first — then configure document requirements here.</p></div>
+          </section>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div className="se-card">
-              <div className="se-card-title">Add Document Requirement</div>
-              <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-                <div className="se-field" style={{ flex: 1, minWidth: 220 }}>
-                  <label>Document Type</label>
-                  <select value={addDocId} onChange={e => setAddDocId(e.target.value)} className="se-input">
-                    <option value="">— Select document type —</option>
-                    {availableDocTypes.map((d: any) => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
-                    ))}
-                  </select>
+            <section className="adm-panel">
+              <div className="adm-sub-head"><h3 className="adm-sub-title">Add Document Requirement</h3></div>
+              <div className="adm-addbar">
+                <div className="adm-field" style={{ flex: 1, minWidth: 220 }}>
+                  <label className="adm-label">Document Type</label>
+                  <div className="adm-select-wrap">
+                    <select value={addDocId} onChange={e => setAddDocId(e.target.value)} className="adm-select">
+                      <option value="">— Select document type —</option>
+                      {availableDocTypes.map((d: any) => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}
+                    </select>
+                    <span className="adm-select-ico">{Icon.chevronD}</span>
+                  </div>
                 </div>
-                <div className="se-field">
-                  <label>Mandatory?</label>
-                  <select value={addRequired ? "yes" : "no"} onChange={e => setAddRequired(e.target.value === "yes")} className="se-input">
-                    <option value="yes">Required</option>
-                    <option value="no">Optional</option>
-                  </select>
+                <div className="adm-field">
+                  <label className="adm-label">Mandatory?</label>
+                  <div className="adm-select-wrap">
+                    <select value={addRequired ? "yes" : "no"} onChange={e => setAddRequired(e.target.value === "yes")} className="adm-select">
+                      <option value="yes">Required</option>
+                      <option value="no">Optional</option>
+                    </select>
+                    <span className="adm-select-ico">{Icon.chevronD}</span>
+                  </div>
                 </div>
-                <button onClick={handleAddDoc} disabled={anyPending || !addDocId} className="btn btn-primary" style={{ fontSize: "0.85rem" }}>Add</button>
+                <button onClick={handleAddDoc} disabled={anyPending || !addDocId} className="adm-btn adm-btn--accent">Add</button>
               </div>
-            </div>
-            <div className="se-card">
-              <div className="se-card-title">Current Requirements ({reqs.length})</div>
+            </section>
+            <section className="adm-panel">
+              <div className="adm-sub-head"><h3 className="adm-sub-title">Current Requirements<span className="adm-count">{reqs.length}</span></h3></div>
               {reqs.length === 0 ? (
-                <div className="se-empty">No document requirements configured yet.</div>
+                <div className="adm-empty-box"><p className="adm-empty-txt">No document requirements configured yet.</p></div>
               ) : (
-                <div className="se-doc-list">
+                <div className="adm-list">
                   {reqs.map((req: any, i: number) => {
                     const dt = req.document_type;
                     return (
-                      <div key={req.id} className="se-doc-row">
-                        <div className="se-doc-order">{i + 1}</div>
-                        <div className="se-doc-info">
-                          <div className="se-doc-name">{dt?.name ?? "Unknown"}</div>
-                          <code className="se-doc-code">{dt?.code}</code>
-                          {dt?.description && <div className="se-doc-desc">{dt.description}</div>}
+                      <div key={req.id} className="adm-row">
+                        <div className="adm-row-order">{i + 1}</div>
+                        <div className="adm-row-main">
+                          <div className="adm-row-name">{dt?.name ?? "Unknown"} <code className="adm-code">{dt?.code}</code></div>
+                          {dt?.description && <div className="adm-row-desc">{dt.description}</div>}
+                          <div className="adm-row-meta">
+                            <span className={`adm-badge ${req.is_required ? "adm-badge--red" : "adm-badge--neutral"}`}><span className="adm-badge-dot" />{req.is_required ? "Required" : "Optional"}</span>
+                            {dt?.is_common_document && <span className="adm-badge adm-badge--blue"><span className="adm-badge-dot" />Common</span>}
+                          </div>
                         </div>
-                        <div className="se-doc-meta">
-                          <span className={`se-badge ${req.is_required ? "se-badge-req" : "se-badge-opt"}`}>
-                            {req.is_required ? "Required" : "Optional"}
-                          </span>
-                          {dt?.is_common_document && <span className="se-badge se-badge-common">Common</span>}
-                        </div>
-                        <div className="se-doc-actions">
-                          <button onClick={() => handleToggleRequired(req)} disabled={anyPending} className="se-btn se-btn-toggle">
+                        <div className="adm-row-actions">
+                          <button onClick={() => handleToggleRequired(req)} disabled={anyPending} className="adm-btn adm-btn--sm adm-btn--ghost">
                             Make {req.is_required ? "Optional" : "Required"}
                           </button>
-                          <button onClick={() => removeDocMutation.mutate(req.id)} disabled={anyPending} className="se-btn se-btn-remove">
-                            Remove
-                          </button>
+                          <button onClick={() => removeDocMutation.mutate(req.id)} disabled={anyPending} className="adm-btn adm-btn--sm adm-btn--danger">Remove</button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-            </div>
+            </section>
           </div>
         )
       )}
@@ -471,145 +475,82 @@ export default function ServiceEditPage() {
       {/* ── DUE DATES TAB ── */}
       {tab === "duedates" && (
         isCreateMode ? (
-          <div className="se-card">
-            <div className="se-empty" style={{ padding: "3rem" }}>
-              Create the service first — then add due date templates here.
-            </div>
-          </div>
+          <section className="adm-panel">
+            <div className="adm-empty-box"><p className="adm-empty-txt">Create the service first — then add due date templates here.</p></div>
+          </section>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            <div className="se-card">
-              <div className="se-card-title">Add Due Date Template</div>
-              <div className="se-form-grid">
-                <div className="se-field se-field-full">
-                  <label>Title</label>
-                  <input value={ddTitle} onChange={e => setDdTitle(e.target.value)} className="se-input" placeholder="e.g. ITR Filing Deadline" />
+            <section className="adm-panel">
+              <div className="adm-sub-head"><h3 className="adm-sub-title">Add Due Date Template</h3></div>
+              <div className="adm-form-grid">
+                <div className="adm-field adm-field--full">
+                  <label className="adm-label">Title</label>
+                  <input value={ddTitle} onChange={e => setDdTitle(e.target.value)} className="adm-input" placeholder="e.g. ITR Filing Deadline" />
                 </div>
-                <div className="se-field se-field-full">
-                  <label>Description (optional)</label>
-                  <input value={ddDesc} onChange={e => setDdDesc(e.target.value)} className="se-input" placeholder="Brief explanation" />
+                <div className="adm-field adm-field--full">
+                  <label className="adm-label">Description <span className="adm-label-opt">(optional)</span></label>
+                  <input value={ddDesc} onChange={e => setDdDesc(e.target.value)} className="adm-input" placeholder="Brief explanation" />
                 </div>
-                <div className="se-field">
-                  <label>Recurrence</label>
-                  <select value={ddRecurrence} onChange={e => setDdRecurrence(e.target.value as any)} className="se-input">
-                    <option value="annual">Annual</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                  </select>
+                <div className="adm-field">
+                  <label className="adm-label">Recurrence</label>
+                  <div className="adm-select-wrap">
+                    <select value={ddRecurrence} onChange={e => setDdRecurrence(e.target.value as any)} className="adm-select">
+                      <option value="annual">Annual</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                    </select>
+                    <span className="adm-select-ico">{Icon.chevronD}</span>
+                  </div>
                 </div>
                 {ddRecurrence === "annual" && (
-                  <div className="se-field">
-                    <label>Month</label>
-                    <select value={ddMonth} onChange={e => setDdMonth(Number(e.target.value))} className="se-input">
-                      {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-                    </select>
+                  <div className="adm-field">
+                    <label className="adm-label">Month</label>
+                    <div className="adm-select-wrap">
+                      <select value={ddMonth} onChange={e => setDdMonth(Number(e.target.value))} className="adm-select">
+                        {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                      </select>
+                      <span className="adm-select-ico">{Icon.chevronD}</span>
+                    </div>
                   </div>
                 )}
-                <div className="se-field">
-                  <label>Day of Month</label>
-                  <input type="number" min={1} max={31} value={ddDay} onChange={e => setDdDay(Number(e.target.value))} className="se-input" style={{ width: 80 }} />
+                <div className="adm-field">
+                  <label className="adm-label">Day of Month</label>
+                  <input type="number" min={1} max={31} value={ddDay} onChange={e => setDdDay(Number(e.target.value))} className="adm-input" />
                 </div>
               </div>
-              <button onClick={handleAddDd} disabled={anyPending || !ddTitle.trim()} className="btn btn-primary" style={{ fontSize: "0.85rem", marginTop: "1rem" }}>
-                Add Template
-              </button>
-            </div>
-            <div className="se-card">
-              <div className="se-card-title">Configured Templates ({dueDates.length})</div>
+              <div className="adm-savebar" style={{ marginTop: "1.1rem", justifyContent: "flex-start" }}>
+                <button onClick={handleAddDd} disabled={anyPending || !ddTitle.trim()} className="adm-btn adm-btn--accent">Add Template</button>
+              </div>
+            </section>
+            <section className="adm-panel">
+              <div className="adm-sub-head"><h3 className="adm-sub-title">Configured Templates<span className="adm-count">{dueDates.length}</span></h3></div>
               {dueDates.length === 0 ? (
-                <div className="se-empty">No due date templates. Add one above.</div>
+                <div className="adm-empty-box"><p className="adm-empty-txt">No due date templates. Add one above.</p></div>
               ) : (
-                <div className="se-doc-list">
+                <div className="adm-list">
                   {dueDates.map((tpl: any) => (
-                    <div key={tpl.id} className="se-doc-row">
-                      <div className="se-doc-info">
-                        <div className="se-doc-name">{tpl.title}</div>
-                        {tpl.description && <div className="se-doc-desc">{tpl.description}</div>}
+                    <div key={tpl.id} className="adm-row">
+                      <div className="adm-row-main">
+                        <div className="adm-row-name">{tpl.title}</div>
+                        {tpl.description && <div className="adm-row-desc">{tpl.description}</div>}
+                        <div className="adm-row-meta">
+                          <span className="adm-badge adm-badge--accent"><span className="adm-badge-dot" />{tpl.recurrence_type}</span>
+                          <span className="adm-badge adm-badge--green"><span className="adm-badge-dot" />
+                            {tpl.recurrence_type === "annual" ? `${MONTHS[tpl.applicable_month ?? 1]} ${tpl.applicable_day}` : `Day ${tpl.applicable_day}`}
+                          </span>
+                        </div>
                       </div>
-                      <div className="se-doc-meta">
-                        <span className="se-badge se-badge-rec">{tpl.recurrence_type}</span>
-                        <span className="se-badge se-badge-day">
-                          {tpl.recurrence_type === "annual"
-                            ? `${MONTHS[tpl.applicable_month ?? 1]} ${tpl.applicable_day}`
-                            : `Day ${tpl.applicable_day}`}
-                        </span>
-                      </div>
-                      <div className="se-doc-actions">
-                        <button onClick={() => removeDdMutation.mutate(tpl.id)} disabled={anyPending} className="se-btn se-btn-remove">
-                          Remove
-                        </button>
+                      <div className="adm-row-actions">
+                        <button onClick={() => removeDdMutation.mutate(tpl.id)} disabled={anyPending} className="adm-btn adm-btn--sm adm-btn--danger">Remove</button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           </div>
         )
       )}
-
-      <style>{`
-        .se-page { padding-bottom: 3rem; max-width: 960px; }
-        .se-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-        .se-back { font-size: 0.8rem; color: #7c3aed; text-decoration: none; font-weight: 600; display: block; margin-bottom: 0.25rem; }
-        .se-back:hover { text-decoration: underline; }
-        .se-slug { font-family: 'Courier New', monospace; font-size: 0.78rem; color: #64748b; background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px; border: 1px solid #e2e8f0; }
-        .se-active-badge { font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; }
-        .se-badge-active   { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
-        .se-badge-inactive { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-
-        .se-flash { padding: 0.65rem 1rem; border-radius: 0.5rem; font-size: 0.84rem; font-weight: 600; margin-bottom: 1rem; }
-        .se-flash-ok  { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
-        .se-flash-err { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-
-        .se-tabs { display: flex; gap: 0.2rem; flex-wrap: wrap; margin-bottom: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.875rem; padding: 0.25rem; width: fit-content; }
-        .se-tab { padding: 0.5rem 1.1rem; border-radius: 0.6rem; font-size: 0.82rem; font-weight: 500; color: #64748b; background: none; border: none; cursor: pointer; white-space: nowrap; transition: background 0.12s, color 0.12s; }
-        .se-tab:hover { color: #0f172a; background: rgba(255,255,255,0.8); }
-        .se-tab-active { background: white; color: #7c3aed; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-        .se-tab-locked { opacity: 0.45; cursor: default; }
-        .se-tab-locked:hover { background: none; color: #64748b; }
-
-        .se-card { background: white; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.5rem; }
-        .se-card-title { font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; padding-bottom: 0.65rem; border-bottom: 1px solid #f1f5f9; }
-
-        .se-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .se-field { display: flex; flex-direction: column; gap: 0.35rem; }
-        .se-field-full { grid-column: 1 / -1; }
-        .se-field label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
-        .se-input { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; background: #f8fafc; color: #0f172a; width: 100%; box-sizing: border-box; }
-        .se-input:focus { border-color: #7c3aed; background: white; }
-        .se-textarea { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; background: #f8fafc; color: #0f172a; resize: vertical; width: 100%; font-family: inherit; box-sizing: border-box; }
-        .se-textarea:focus { border-color: #7c3aed; background: white; }
-        .se-toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569; cursor: pointer; }
-
-        .se-doc-list { display: flex; flex-direction: column; gap: 0.5rem; }
-        .se-doc-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.875rem; border: 1px solid #f1f5f9; border-radius: 0.75rem; background: #fafbff; }
-        .se-doc-row:hover { border-color: #e2e8f0; }
-        .se-doc-order { width: 24px; height: 24px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 0.72rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
-        .se-doc-info { flex: 1; }
-        .se-doc-name { font-size: 0.875rem; font-weight: 600; color: #0f172a; }
-        .se-doc-code { font-family: 'Courier New', monospace; font-size: 0.72rem; color: #64748b; background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 3px; }
-        .se-doc-desc { font-size: 0.78rem; color: #94a3b8; margin-top: 0.2rem; }
-        .se-doc-meta { display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; }
-        .se-doc-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
-
-        .se-badge { display: inline-flex; align-items: center; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
-        .se-badge-req    { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-        .se-badge-opt    { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
-        .se-badge-common { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-        .se-badge-rec    { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
-        .se-badge-day    { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
-
-        .se-btn { font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 5px; border: 1px solid transparent; cursor: pointer; transition: opacity 0.15s; }
-        .se-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .se-btn-toggle { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-        .se-btn-remove { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-        .se-btn:hover:not(:disabled) { opacity: 0.75; }
-
-        .se-empty { text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem; border: 1.5px dashed #e2e8f0; border-radius: 0.75rem; }
-
-        @media (max-width: 640px) { .se-form-grid { grid-template-columns: 1fr; } .se-doc-row { flex-wrap: wrap; } }
-      `}</style>
     </div>
   );
 }

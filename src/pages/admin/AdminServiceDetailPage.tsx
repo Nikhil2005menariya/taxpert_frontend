@@ -12,7 +12,6 @@ const STATUS_OPTIONS = [
   'under_review', 'payment', 'completed', 'on_hold', 'cancelled',
 ];
 
-// Workflow pipeline order — mirrors the texpert service detail view.
 const WORKFLOW_STEPS: { key: string; label: string }[] = [
   { key: 'documents_required', label: 'Docs Required' },
   { key: 'documents_received', label: 'Docs Received' },
@@ -22,86 +21,88 @@ const WORKFLOW_STEPS: { key: string; label: string }[] = [
   { key: 'completed',          label: 'Completed' },
 ];
 
-function WorkflowPipeline({ status }: { status: string }) {
-  const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === status);
-  const isOnHold = status === 'on_hold';
-  return (
-    <div className="tx-pipeline">
-      {WORKFLOW_STEPS.map((step, i) => {
-        const reached = !isOnHold && currentIdx >= i;
-        const current = !isOnHold && currentIdx === i;
-        return (
-          <div key={step.key} className={`tx-pipeline-step ${reached ? 'tx-step-reached' : ''} ${current ? 'tx-step-current' : ''}`}>
-            <div className="tx-step-dot">{reached ? '✓' : i + 1}</div>
-            <div className="tx-step-label">{step.label}</div>
-            {i < WORKFLOW_STEPS.length - 1 && <div className="tx-step-bar" />}
-          </div>
-        );
-      })}
-      {isOnHold && <div className="tx-pipeline-onhold">⏸ ON HOLD</div>}
-    </div>
-  );
+const STATUS_TONE: Record<string, string> = {
+  pending: 'adm-badge--neutral',
+  documents_required: 'adm-badge--amber',
+  documents_received: 'adm-badge--green',
+  in_progress: 'adm-badge--blue',
+  under_review: 'adm-badge--accent',
+  payment: 'adm-badge--amber',
+  completed: 'adm-badge--green',
+  on_hold: 'adm-badge--neutral',
+  cancelled: 'adm-badge--red',
+  approved: 'adm-badge--green',
+  rejected: 'adm-badge--red',
+  uploaded: 'adm-badge--blue',
+  paid: 'adm-badge--green',
+  failed: 'adm-badge--red',
+  refunded: 'adm-badge--accent',
+  done: 'adm-badge--green',
+};
+
+/* ── Inline line icons ───────────────────────────────────────── */
+const Icon = {
+  back: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>,
+  x: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>,
+  chevronD: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>,
+  check: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>,
+  alert: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>,
+  docs: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>,
+  timeline: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>,
+  tasks: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>,
+  pay: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>,
+  flow: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2" /><circle cx="5" cy="18" r="2" /><circle cx="19" cy="12" r="2" /><path d="M7 6h6a4 4 0 0 1 4 4v.5M7 18h6a4 4 0 0 0 4-4" /></svg>,
+  cog: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>,
+  ext: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6M10 14 21 3" /></svg>,
+};
+
+function EventIcon({ type }: { type: string }) {
+  let path = <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />;
+  if (type === 'status_changed') path = <><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></>;
+  else if (type === 'document_approved') path = <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>;
+  else if (type === 'document_rejected') path = <><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></>;
+  else if (type === 'document_reupload_requested') path = <><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /></>;
+  else if (type === 'optional_document_added') path = <><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></>;
+  else if (type === 'texpert_assigned') path = <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></>;
+  else if (type === 'payout_recorded' || type === 'payment_received' || type === 'payment_captured') path = <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></>;
+  else if (type === 'task_added') path = <><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></>;
+  else if (type === 'admin_note') path = <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>;
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{path}</svg>;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  pending: 'aq-badge-pending',
-  documents_required: 'aq-badge-docs',
-  documents_received: 'aq-badge-docs',
-  in_progress: 'aq-badge-active',
-  under_review: 'aq-badge-review',
-  payment: 'aq-badge-invoice',
-  completed: 'aq-badge-done',
-  on_hold: 'aq-badge-hold',
-  cancelled: 'aq-badge-hold',
-  approved: 'aq-badge-done',
-  rejected: 'aq-badge-hold',
-  uploaded: 'aq-badge-active',
-};
-
-const DOC_STATUS_BADGE: Record<string, string> = {
-  pending: 'aq-badge-pending',
-  uploaded: 'aq-badge-active',
-  approved: 'aq-badge-done',
-  rejected: 'aq-badge-hold',
-};
-
-const PAYMENT_BADGE: Record<string, string> = {
-  pending: 'aq-badge-pending',
-  paid: 'aq-badge-done',
-  failed: 'aq-badge-hold',
-  refunded: 'aq-badge-review',
-};
-
-const EVENT_ICON: Record<string, string> = {
-  status_changed: '🔄',
-  document_approved: '✅',
-  document_rejected: '❌',
-  document_reupload_requested: '🔁',
-  optional_document_added: '📎',
-  texpert_assigned: '👤',
-  payout_recorded: '💰',
-  payment_received: '💳',
-  payment_captured: '💳',
-  task_added: '📋',
-  admin_note: '📝',
-  default: '📋',
-};
-
-function badge(cls: string, label: string) {
-  return <span className={`aq-badge ${cls}`}>{label.replace(/_/g, ' ')}</span>;
+function badge(status: string) {
+  return <span className={`adm-badge ${STATUS_TONE[status] ?? 'adm-badge--neutral'}`}><span className="adm-badge-dot" />{(status ?? 'pending').replace(/_/g, ' ')}</span>;
 }
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
-
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function ReuploadModal({
-  docName, docId, serviceId, onClose,
-}: { docName: string; docId: string; serviceId: string; onClose: () => void }) {
+function WorkflowPipeline({ status }: { status: string }) {
+  const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === status);
+  const isOnHold = status === 'on_hold';
+  return (
+    <div className="adm-pipe">
+      {WORKFLOW_STEPS.map((step, i) => {
+        const reached = !isOnHold && currentIdx >= i;
+        const current = !isOnHold && currentIdx === i;
+        return (
+          <div key={step.key} className={`adm-pipe-step${reached ? ' is-reached' : ''}${current ? ' is-current' : ''}`}>
+            <div className="adm-pipe-dot">{reached ? Icon.check : i + 1}</div>
+            <div className="adm-pipe-label">{step.label}</div>
+            {i < WORKFLOW_STEPS.length - 1 && <div className="adm-pipe-bar" />}
+          </div>
+        );
+      })}
+      {isOnHold && <div className="adm-pipe-hold">On Hold</div>}
+    </div>
+  );
+}
+
+function ReuploadModal({ docName, docId, serviceId, onClose }: { docName: string; docId: string; serviceId: string; onClose: () => void }) {
   const [note, setNote] = useState('');
   const qc = useQueryClient();
 
@@ -111,26 +112,26 @@ function ReuploadModal({
   });
 
   return (
-    <div className="aq-modal-overlay" onClick={onClose}>
-      <div className="aq-modal" onClick={e => e.stopPropagation()}>
-        <div className="aq-modal-header">
-          <h3 className="aq-modal-title">Request Re-upload</h3>
-          <button className="aq-modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="aq-modal-body">
-          <p style={{ fontSize: '0.875rem', color: 'var(--ink-600)', marginBottom: '1rem' }}>
-            Document: <strong>{docName}</strong>
-          </p>
-          <div className="form-group">
-            <label className="form-label">Note to client (optional)</label>
-            <textarea className="form-input" rows={3} value={note} onChange={e => setNote(e.target.value)}
-              placeholder="Explain what's wrong or what's needed…" />
+    <div className="adm-modal-overlay" onClick={onClose}>
+      <div className="adm-modal" onClick={e => e.stopPropagation()}>
+        <div className="adm-modal-head">
+          <div>
+            <p className="adm-modal-eyebrow">— Document</p>
+            <h3 className="adm-modal-title">Request Re-upload</h3>
+            <p className="adm-modal-sub">{docName}</p>
           </div>
-          {mut.isError && <p className="aq-modal-error">{(mut.error as any)?.response?.data?.error}</p>}
+          <button className="adm-modal-x" onClick={onClose} aria-label="Close">{Icon.x}</button>
         </div>
-        <div className="aq-modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={mut.isPending} onClick={() => mut.mutate()}>
+        <div className="adm-modal-body">
+          <div className="adm-field">
+            <label className="adm-label">Note to client <span className="adm-label-opt">(optional)</span></label>
+            <textarea className="adm-textarea" rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Explain what's wrong or what's needed…" />
+          </div>
+          {mut.isError && <p className="adm-modal-err">{Icon.alert}{(mut.error as any)?.response?.data?.error}</p>}
+        </div>
+        <div className="adm-modal-foot">
+          <button className="adm-btn adm-btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="adm-btn adm-btn--accent" disabled={mut.isPending} onClick={() => mut.mutate()}>
             {mut.isPending ? 'Sending…' : 'Request Re-upload'}
           </button>
         </div>
@@ -139,9 +140,7 @@ function ReuploadModal({
   );
 }
 
-function AssignTexpertModal({
-  serviceId, onClose,
-}: { serviceId: string; onClose: () => void }) {
+function AssignTexpertModal({ serviceId, onClose }: { serviceId: string; onClose: () => void }) {
   const [texpertId, setTexpertId] = useState('');
   const qc = useQueryClient();
 
@@ -152,34 +151,35 @@ function AssignTexpertModal({
 
   const assign = useMutation({
     mutationFn: () => apiClient.post('/admin/assign', { clientServiceId: serviceId, texpertId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-service-detail', serviceId] });
-      onClose();
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', serviceId] }); onClose(); },
   });
 
   return (
-    <div className="aq-modal-overlay" onClick={onClose}>
-      <div className="aq-modal" onClick={e => e.stopPropagation()}>
-        <div className="aq-modal-header">
-          <h3 className="aq-modal-title">Assign / Reassign Taxpert</h3>
-          <button className="aq-modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="aq-modal-body">
-          <div className="form-group">
-            <label className="form-label">Select Taxpert</label>
-            <select className="form-input" value={texpertId} onChange={e => setTexpertId(e.target.value)}>
-              <option value="">-- Choose a Taxpert --</option>
-              {(taxperts ?? []).map((t: any) => (
-                <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
-              ))}
-            </select>
+    <div className="adm-modal-overlay" onClick={onClose}>
+      <div className="adm-modal" onClick={e => e.stopPropagation()}>
+        <div className="adm-modal-head">
+          <div>
+            <p className="adm-modal-eyebrow">— Assignment</p>
+            <h3 className="adm-modal-title">Assign / Reassign Taxpert</h3>
           </div>
-          {assign.isError && <p className="aq-modal-error">{(assign.error as any)?.response?.data?.error}</p>}
+          <button className="adm-modal-x" onClick={onClose} aria-label="Close">{Icon.x}</button>
         </div>
-        <div className="aq-modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={!texpertId || assign.isPending} onClick={() => assign.mutate()}>
+        <div className="adm-modal-body">
+          <div className="adm-field">
+            <label className="adm-label">Select Taxpert</label>
+            <div className="adm-select-wrap">
+              <select className="adm-select" value={texpertId} onChange={e => setTexpertId(e.target.value)}>
+                <option value="">— Choose a Taxpert —</option>
+                {(taxperts ?? []).map((t: any) => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
+              </select>
+              <span className="adm-select-ico">{Icon.chevronD}</span>
+            </div>
+          </div>
+          {assign.isError && <p className="adm-modal-err">{Icon.alert}{(assign.error as any)?.response?.data?.error}</p>}
+        </div>
+        <div className="adm-modal-foot">
+          <button className="adm-btn adm-btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="adm-btn adm-btn--accent" disabled={!texpertId || assign.isPending} onClick={() => assign.mutate()}>
             {assign.isPending ? 'Assigning…' : 'Assign'}
           </button>
         </div>
@@ -196,26 +196,20 @@ export default function AdminServiceDetailPage() {
   const qc = useQueryClient();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
-  // Modal state
   const [reuploadDoc, setReuploadDoc] = useState<{ id: string; name: string } | null>(null);
   const [showAssign, setShowAssign] = useState(false);
 
-  // Add-doc form
   const [showAddDoc, setShowAddDoc] = useState(false);
   const [docName, setDocName] = useState('');
 
-  // Log-note form
   const [showLogNote, setShowLogNote] = useState(false);
   const [noteText, setNoteText] = useState('');
 
-  // Add-task form
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
   const [taskDue, setTaskDue] = useState('');
 
-
-  // Settings form
   const [settingsStatus, setSettingsStatus] = useState('');
   const [settingsNotes, setSettingsNotes] = useState('');
   const [settingsPinned, setSettingsPinned] = useState('');
@@ -229,7 +223,6 @@ export default function AdminServiceDetailPage() {
     enabled: isAdmin && !!id,
   });
 
-  // Mutations
   const addToQueue = useMutation({
     mutationFn: () => apiClient.post('/admin/queue', { clientServiceId: id }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }),
@@ -248,30 +241,19 @@ export default function AdminServiceDetailPage() {
 
   const addDoc = useMutation({
     mutationFn: () => apiClient.post(`/admin/client-services/${id}/docs`, { document_name: docName }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-service-detail', id] });
-      setDocName(''); setShowAddDoc(false);
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setDocName(''); setShowAddDoc(false); },
   });
 
   const logNote = useMutation({
     mutationFn: () => apiClient.post(`/admin/client-services/${id}/events`, { message: noteText }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-service-detail', id] });
-      setNoteText(''); setShowLogNote(false);
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setNoteText(''); setShowLogNote(false); },
   });
 
   const addTask = useMutation({
     mutationFn: () => apiClient.post(`/admin/client-services/${id}/tasks`, {
-      title: taskTitle,
-      description: taskDesc || undefined,
-      due_at: taskDue || undefined,
+      title: taskTitle, description: taskDesc || undefined, due_at: taskDue || undefined,
     }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-service-detail', id] });
-      setTaskTitle(''); setTaskDesc(''); setTaskDue(''); setShowAddTask(false);
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setTaskTitle(''); setTaskDesc(''); setTaskDue(''); setShowAddTask(false); },
   });
 
   const updateTask = useMutation({
@@ -281,15 +263,13 @@ export default function AdminServiceDetailPage() {
   });
 
   const deleteTask = useMutation({
-    mutationFn: (taskId: string) =>
-      apiClient.delete(`/admin/client-services/${id}/tasks/${taskId}`),
+    mutationFn: (taskId: string) => apiClient.delete(`/admin/client-services/${id}/tasks/${taskId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }),
   });
 
-
   if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
-  if (error || !data) return <div className="db-page-new"><div className="db-alert-error">Service not found.</div></div>;
+  if (error || !data) return <div className="adm-root"><div className="adm-banner adm-banner--err">Service not found.</div></div>;
 
   const client      = data.client as any;
   const service     = data.service as any;
@@ -301,6 +281,8 @@ export default function AdminServiceDetailPage() {
   const uploadedDocs = docs.filter(d => d.file_path || d.file_url).length;
   const pendingDocs = docs.filter(d => !d.file_path && !d.file_url).length;
   const reuploads = docs.filter(d => d.reupload_requested).length;
+  const openTasks = tasks.filter((t: any) => t.status !== 'done' && t.status !== 'cancelled').length;
+  const doneTasks = tasks.filter((t: any) => t.status === 'done').length;
 
   function initSettings() {
     setSettingsStatus(data.status ?? '');
@@ -311,173 +293,137 @@ export default function AdminServiceDetailPage() {
     setSettingsDirty(true);
   }
 
+  const TABS: [DetailTab, string, React.ReactNode][] = [
+    ['docs', `Documents (${docs.length})`, Icon.docs],
+    ['timeline', `Timeline (${events.length})`, Icon.timeline],
+    ['tasks', `Tasks (${tasks.length})`, Icon.tasks],
+    ['payment', 'Payment', Icon.pay],
+    ['workflow', 'Workflow', Icon.flow],
+    ['settings', 'Settings', Icon.cog],
+  ];
+
   return (
-    <div className="db-page-new">
-      {/* Header */}
-      <div className="db-page-header">
-        <div>
-          <div className="aq-back-link" onClick={() => navigate(`/admin/users/client/${client?.id}`)}>
-            ← {client?.first_name} {client?.last_name}
+    <div className="adm-root">
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <header className="adm-hero">
+        <div className="adm-hero-glow" />
+        <button className="adm-back" onClick={() => navigate(`/admin/users/client/${client?.id}`)}>
+          {Icon.back} {client?.first_name} {client?.last_name}
+        </button>
+        <div className="adm-hero-bar">
+          <div>
+            <p className="adm-hero-eyebrow">— Service</p>
+            <h1 className="adm-hero-title">{service?.name ?? 'Service Detail'}</h1>
+            <p className="adm-hero-date">
+              {data.fiscal_year && <span>{data.fiscal_year} · </span>}
+              <span style={{ textTransform: 'capitalize' }}>{(data.status ?? '').replace(/_/g, ' ')}</span>
+            </p>
           </div>
-          <h1 className="db-page-title">{service?.name ?? 'Service Detail'}</h1>
-          <p className="db-page-sub">
-            {data.fiscal_year && <span>{data.fiscal_year} · </span>}
-            {badge(STATUS_BADGE[data.status] ?? 'aq-badge-pending', data.status)}
-          </p>
-        </div>
-        <div className="aq-header-actions">
-          {!texpert && !['completed', 'cancelled'].includes(data.status) && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => addToQueue.mutate()}
-              disabled={addToQueue.isPending}
-              title="Add this service to the open queue so a texpert can self-assign"
-            >
-              {addToQueue.isPending ? 'Adding…' : addToQueue.isError ? '⚠ Failed — retry' : '+ Add to Queue'}
+          <div className="adm-hero-aside" style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {!texpert && !['completed', 'cancelled'].includes(data.status) && (
+              <button className="adm-btn adm-btn--ghost" onClick={() => addToQueue.mutate()} disabled={addToQueue.isPending} style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--lp-on-dark)' }}>
+                {addToQueue.isPending ? 'Adding…' : addToQueue.isError ? 'Failed — retry' : 'Add to Queue'}
+              </button>
+            )}
+            <button className="adm-btn adm-btn--accent" onClick={() => setShowAssign(true)}>
+              {texpert ? 'Reassign Taxpert' : 'Assign Taxpert'}
             </button>
-          )}
-          <button className="btn btn-secondary" onClick={() => setShowAssign(true)}>
-            {texpert ? 'Reassign Taxpert' : 'Assign Taxpert'}
-          </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Stats overview */}
-      <div className="aq-stats-row">
-        <div className="db-stat-card-new">
-          <div className="db-stat-card-label">Documents</div>
-          <div className="db-stat-card-value">{docs.length}</div>
-          <div className="db-stat-card-sub">{uploadedDocs} uploaded · {pendingDocs} pending</div>
+      <div className="adm-stats">
+        <div className="adm-stat">
+          <div className="adm-stat-top"><span className="adm-stat-ico">{Icon.docs}</span><span className="adm-stat-lbl">Documents</span></div>
+          <div className="adm-stat-val">{docs.length}</div>
+          <div className="adm-stat-sub">{uploadedDocs} uploaded · {pendingDocs} pending</div>
         </div>
-        <div className="db-stat-card-new">
-          <div className="db-stat-card-label">Payment</div>
-          <div className="db-stat-card-value" style={{ textTransform: 'capitalize' }}>
-            {(data.payment_status ?? 'pending').replace(/_/g, ' ')}
-          </div>
-          {service?.price && <div className="db-stat-card-sub">₹{(service.price / 100).toLocaleString('en-IN')}</div>}
+        <div className="adm-stat">
+          <div className="adm-stat-top"><span className="adm-stat-ico">{Icon.pay}</span><span className="adm-stat-lbl">Payment</span></div>
+          <div className="adm-stat-val" style={{ fontSize: '1.05rem', textTransform: 'capitalize' }}>{(data.payment_status ?? 'pending').replace(/_/g, ' ')}</div>
+          {service?.price && <div className="adm-stat-sub">₹{(service.price / 100).toLocaleString('en-IN')}</div>}
         </div>
-        <div className="db-stat-card-new">
-          <div className="db-stat-card-label">Taxpert</div>
-          <div className="db-stat-card-value" style={{ fontSize: '1rem' }}>
-            {texpert ? `${texpert.first_name} ${texpert.last_name}` : 'Unassigned'}
-          </div>
-          {texpert && <div className="db-stat-card-sub">{texpert.email}</div>}
+        <div className="adm-stat">
+          <div className="adm-stat-top"><span className="adm-stat-ico">{Icon.tasks}</span><span className="adm-stat-lbl">Taxpert</span></div>
+          <div className="adm-stat-val" style={{ fontSize: '1.05rem' }}>{texpert ? `${texpert.first_name} ${texpert.last_name}` : 'Unassigned'}</div>
+          {texpert && <div className="adm-stat-sub">{texpert.email}</div>}
         </div>
-        <div className="db-stat-card-new">
-          <div className="db-stat-card-label">Tasks</div>
-          <div className="db-stat-card-value">{tasks.filter((t: any) => t.status !== 'done' && t.status !== 'cancelled').length}</div>
-          <div className="db-stat-card-sub">{tasks.filter((t: any) => t.status === 'done').length} done</div>
+        <div className="adm-stat">
+          <div className="adm-stat-top"><span className="adm-stat-ico">{Icon.tasks}</span><span className="adm-stat-lbl">Tasks</span></div>
+          <div className="adm-stat-val">{openTasks}</div>
+          <div className="adm-stat-sub">{doneTasks} done</div>
         </div>
         {reuploads > 0 && (
-          <div className="db-stat-card-new" style={{ borderColor: 'var(--gold-400)' }}>
-            <div className="db-stat-card-label">Re-upload Pending</div>
-            <div className="db-stat-card-value" style={{ color: 'var(--gold-600)' }}>{reuploads}</div>
+          <div className="adm-stat" style={{ borderColor: 'var(--lp-accent)' }}>
+            <div className="adm-stat-top"><span className="adm-stat-ico">{Icon.alert}</span><span className="adm-stat-lbl">Re-upload Pending</span></div>
+            <div className="adm-stat-val" style={{ color: 'var(--lp-accent)' }}>{reuploads}</div>
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="aq-tabs">
-        {([
-          ['docs', `Documents (${docs.length})`],
-          ['timeline', `Timeline (${events.length})`],
-          ['tasks', `Tasks (${tasks.length})`],
-          ['payment', 'Payment'],
-          ['workflow', 'Workflow'],
-          ['settings', 'Settings'],
-        ] as [DetailTab, string][]).map(([t, label]) => (
-          <button key={t} className={`aq-tab ${tab === t ? 'aq-tab-active' : ''}`} onClick={() => setTab(t)}>
-            {label}
+      <nav className="adm-seg" role="tablist">
+        {TABS.map(([t, label, ico]) => (
+          <button key={t} role="tab" aria-selected={tab === t} className={`adm-seg-btn${tab === t ? ' is-active' : ''}`} onClick={() => setTab(t)}>
+            {ico}{label}
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* ── Documents ── */}
       {tab === 'docs' && (
-        <div>
-          <div className="asd-tab-header">
-            <span className="asd-tab-header-count">{docs.length} document{docs.length !== 1 ? 's' : ''}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowAddDoc(v => !v)}>
-              + Add Document
-            </button>
+        <section className="adm-panel">
+          <div className="adm-panel-head">
+            <div className="adm-panel-titles">
+              <h2 className="adm-panel-title">Documents<span className="adm-count">{docs.length}</span></h2>
+            </div>
+            <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowAddDoc(v => !v)}>+ Add Document</button>
           </div>
 
           {showAddDoc && (
-            <div className="asd-add-form">
-              <input
-                className="form-input"
-                placeholder="Document name (e.g. Bank Statement Q2)"
-                value={docName}
-                onChange={e => setDocName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && docName.trim() && addDoc.mutate()}
-              />
-              {addDoc.isError && <p className="aq-modal-error">{(addDoc.error as any)?.response?.data?.error}</p>}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => { setShowAddDoc(false); setDocName(''); }}>Cancel</button>
-                <button className="btn btn-primary btn-sm" disabled={!docName.trim() || addDoc.isPending} onClick={() => addDoc.mutate()}>
-                  {addDoc.isPending ? 'Adding…' : 'Add Slot'}
-                </button>
+            <div className="adm-addbar" style={{ marginBottom: '1.15rem' }}>
+              <div className="adm-field" style={{ flex: 1, minWidth: 240 }}>
+                <label className="adm-label">Document name</label>
+                <input className="adm-input" placeholder="e.g. Bank Statement Q2" value={docName} onChange={e => setDocName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && docName.trim() && addDoc.mutate()} />
               </div>
+              <button className="adm-btn adm-btn--ghost" onClick={() => { setShowAddDoc(false); setDocName(''); }}>Cancel</button>
+              <button className="adm-btn adm-btn--accent" disabled={!docName.trim() || addDoc.isPending} onClick={() => addDoc.mutate()}>
+                {addDoc.isPending ? 'Adding…' : 'Add Slot'}
+              </button>
             </div>
           )}
+          {addDoc.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(addDoc.error as any)?.response?.data?.error}</p>}
 
           {docs.length === 0 ? (
-            <div className="db-empty-card">
-              <p className="db-empty-title">No documents yet</p>
-              <p className="db-empty-desc">No document slots have been created for this service.</p>
-            </div>
+            <div className="adm-empty-box"><span className="adm-empty-ico">{Icon.docs}</span><p className="adm-empty-txt">No document slots have been created for this service.</p></div>
           ) : (
-            <div className="asd-doc-list">
+            <div className="adm-list">
               {docs.map((doc: any) => {
                 const hasFile = !!(doc.file_path || doc.file_url);
                 return (
-                  <div key={doc.id} className={`asd-doc-row${doc.reupload_requested ? ' asd-doc-row--reupload' : ''}`}>
-                    <div className="asd-doc-info">
-                      <div className="asd-doc-name">{doc.document_name}</div>
-                      <div className="asd-doc-meta">
-                        {badge(DOC_STATUS_BADGE[doc.status] ?? 'aq-badge-pending', doc.status ?? 'pending')}
-                        {doc.reupload_requested && <span className="aq-badge aq-badge-docs">Re-upload requested</span>}
-                        {doc.uploaded_at && <span className="asd-doc-date">Uploaded {fmtDate(doc.uploaded_at)}</span>}
-                        {!hasFile && <span className="asd-doc-date" style={{ color: 'var(--ink-400)' }}>Not uploaded</span>}
+                  <div key={doc.id} className={`adm-row${doc.reupload_requested ? ' adm-row--flag' : ''}`}>
+                    <div className="adm-row-main">
+                      <div className="adm-row-name">{doc.document_name}</div>
+                      <div className="adm-row-meta">
+                        {badge(doc.status ?? 'pending')}
+                        {doc.reupload_requested && <span className="adm-badge adm-badge--amber"><span className="adm-badge-dot" />Re-upload requested</span>}
+                        {doc.uploaded_at && <span className="adm-row-date">Uploaded {fmtDate(doc.uploaded_at)}</span>}
+                        {!hasFile && <span className="adm-row-date">Not uploaded</span>}
                       </div>
-                      {doc.reupload_note && <div className="asd-doc-note">Note: {doc.reupload_note}</div>}
+                      {doc.reupload_note && <div className="adm-row-note">Note: {doc.reupload_note}</div>}
                     </div>
-                    <div className="asd-doc-actions">
-                      {hasFile && (
-                        <a
-                          href={doc.signed_url || doc.file_url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-sm btn-secondary"
-                        >
-                          View
-                        </a>
-                      )}
+                    <div className="adm-row-actions">
+                      {hasFile && <a href={doc.signed_url || doc.file_url || '#'} target="_blank" rel="noopener noreferrer" className="adm-btn adm-btn--sm adm-btn--ghost">{Icon.ext} View</a>}
                       {hasFile && doc.status !== 'approved' && (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          disabled={docAction.isPending}
-                          onClick={() => docAction.mutate({ docId: doc.id, action: 'approve' })}
-                        >
-                          Approve
-                        </button>
+                        <button className="adm-btn adm-btn--sm adm-btn--accent" disabled={docAction.isPending} onClick={() => docAction.mutate({ docId: doc.id, action: 'approve' })}>Approve</button>
                       )}
                       {hasFile && doc.status !== 'rejected' && (
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          disabled={docAction.isPending}
-                          onClick={() => docAction.mutate({ docId: doc.id, action: 'reject' })}
-                        >
-                          Reject
-                        </button>
+                        <button className="adm-btn adm-btn--sm adm-btn--ghost" disabled={docAction.isPending} onClick={() => docAction.mutate({ docId: doc.id, action: 'reject' })}>Reject</button>
                       )}
                       {hasFile && !doc.reupload_requested && (
-                        <button
-                          className="btn btn-sm btn-gold"
-                          onClick={() => setReuploadDoc({ id: doc.id, name: doc.document_name })}
-                        >
-                          Re-upload
-                        </button>
+                        <button className="adm-btn adm-btn--sm adm-btn--danger" onClick={() => setReuploadDoc({ id: doc.id, name: doc.document_name })}>Re-upload</button>
                       )}
                     </div>
                   </div>
@@ -486,438 +432,270 @@ export default function AdminServiceDetailPage() {
             </div>
           )}
 
-          {/* Output documents — generated by Taxpert */}
           {outputDocs.length > 0 && (
-            <div style={{ marginTop: '1.75rem', borderTop: '1.5px solid var(--line, #e2e8f0)', paddingTop: '1.25rem' }}>
-              <div className="asd-tab-header" style={{ marginBottom: '0.75rem' }}>
-                <div>
-                  <span className="asd-tab-header-count" style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--ink-800)' }}>
-                    Output Documents
-                  </span>
-                  <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--ink-400)' }}>
-                    Generated by Taxpert · {outputDocs.length} file{outputDocs.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              </div>
-              <div className="asd-doc-list">
+            <div style={{ marginTop: '1.75rem' }}>
+              <div className="adm-sub-head"><div><h3 className="adm-sub-title">Output Documents</h3><p className="adm-sub-desc">Generated by Taxpert · {outputDocs.length} file{outputDocs.length !== 1 ? 's' : ''}</p></div></div>
+              <div className="adm-list">
                 {outputDocs.map((doc: any) => (
-                  <div key={doc.id} className="asd-doc-row" style={{ borderLeft: '3px solid var(--green-400, #4ade80)' }}>
-                    <div className="asd-doc-info">
-                      <div className="asd-doc-name">{doc.document_name}</div>
-                      <div className="asd-doc-meta">
-                        <span className="aq-badge aq-badge-done">Output</span>
-                        {doc.description && <span className="asd-doc-date">{doc.description}</span>}
-                        {doc.uploader_name && <span className="asd-doc-date">By {doc.uploader_name}</span>}
-                        {doc.uploaded_at && <span className="asd-doc-date">{fmtDate(doc.uploaded_at)}</span>}
+                  <div key={doc.id} className="adm-row" style={{ borderLeft: '3px solid var(--lp-green)' }}>
+                    <div className="adm-row-main">
+                      <div className="adm-row-name">{doc.document_name}</div>
+                      <div className="adm-row-meta">
+                        <span className="adm-badge adm-badge--green"><span className="adm-badge-dot" />Output</span>
+                        {doc.description && <span className="adm-row-date">{doc.description}</span>}
+                        {doc.uploader_name && <span className="adm-row-date">By {doc.uploader_name}</span>}
+                        {doc.uploaded_at && <span className="adm-row-date">{fmtDate(doc.uploaded_at)}</span>}
                       </div>
                     </div>
-                    <div className="asd-doc-actions">
-                      {doc.signed_url && (
-                        <a href={doc.signed_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-secondary">
-                          View
-                        </a>
-                      )}
+                    <div className="adm-row-actions">
+                      {doc.signed_url && <a href={doc.signed_url} target="_blank" rel="noopener noreferrer" className="adm-btn adm-btn--sm adm-btn--ghost">{Icon.ext} View</a>}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* ── Timeline ── */}
       {tab === 'timeline' && (
-        <div>
-          <div className="asd-tab-header">
-            <span className="asd-tab-header-count">{events.length} event{events.length !== 1 ? 's' : ''}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowLogNote(v => !v)}>
-              + Log Note
-            </button>
+        <section className="adm-panel">
+          <div className="adm-panel-head">
+            <div className="adm-panel-titles"><h2 className="adm-panel-title">Timeline<span className="adm-count">{events.length}</span></h2></div>
+            <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowLogNote(v => !v)}>+ Log Note</button>
           </div>
 
           {showLogNote && (
-            <div className="asd-add-form">
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Internal note (e.g. 'Called client, confirmed documents will arrive by Friday')"
-                value={noteText}
-                onChange={e => setNoteText(e.target.value)}
-              />
-              {logNote.isError && <p className="aq-modal-error">{(logNote.error as any)?.response?.data?.error}</p>}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => { setShowLogNote(false); setNoteText(''); }}>Cancel</button>
-                <button className="btn btn-primary btn-sm" disabled={!noteText.trim() || logNote.isPending} onClick={() => logNote.mutate()}>
-                  {logNote.isPending ? 'Logging…' : 'Log Note'}
-                </button>
+            <div className="adm-addbar" style={{ marginBottom: '1.15rem', alignItems: 'stretch' }}>
+              <div className="adm-field" style={{ flex: 1, minWidth: 240 }}>
+                <label className="adm-label">Internal note</label>
+                <textarea className="adm-textarea" rows={2} placeholder="e.g. Called client, confirmed documents will arrive by Friday" value={noteText} onChange={e => setNoteText(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+                <button className="adm-btn adm-btn--ghost" onClick={() => { setShowLogNote(false); setNoteText(''); }}>Cancel</button>
+                <button className="adm-btn adm-btn--accent" disabled={!noteText.trim() || logNote.isPending} onClick={() => logNote.mutate()}>{logNote.isPending ? 'Logging…' : 'Log Note'}</button>
               </div>
             </div>
           )}
 
           {events.length === 0 ? (
-            <div className="db-empty-card">
-              <p className="db-empty-title">No events yet</p>
-              <p className="db-empty-desc">Actions on this service will appear here.</p>
-            </div>
+            <div className="adm-empty-box"><span className="adm-empty-ico">{Icon.timeline}</span><p className="adm-empty-txt">Actions on this service will appear here.</p></div>
           ) : (
-            <div className="asd-timeline">
+            <div className="adm-tl">
               {events.map((ev: any) => (
-                <div key={ev.id} className="asd-event">
-                  <div className="asd-event-icon">
-                    {EVENT_ICON[ev.event_type] ?? EVENT_ICON.default}
-                  </div>
-                  <div className="asd-event-body">
-                    <div className="asd-event-msg">{ev.message}</div>
-                    <div className="asd-event-meta">
-                      <span className="asd-event-type">{ev.event_type.replace(/_/g, ' ')}</span>
-                      <span className="asd-event-time">{fmtDateTime(ev.created_at)}</span>
+                <div key={ev.id} className="adm-tl-item">
+                  <div className="adm-tl-ico"><EventIcon type={ev.event_type} /></div>
+                  <div className="adm-tl-body">
+                    <div className="adm-tl-msg">{ev.message}</div>
+                    <div className="adm-tl-meta">
+                      <span className="adm-tl-type">{ev.event_type.replace(/_/g, ' ')}</span>
+                      <span className="adm-tl-time">{fmtDateTime(ev.created_at)}</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* ── Tasks ── */}
       {tab === 'tasks' && (
-        <div>
-          <div className="asd-tab-header">
-            <span className="asd-tab-header-count">{tasks.length} task{tasks.length !== 1 ? 's' : ''}</span>
-            <button className="btn btn-sm btn-secondary" onClick={() => setShowAddTask(v => !v)}>
-              + Add Task
-            </button>
+        <section className="adm-panel">
+          <div className="adm-panel-head">
+            <div className="adm-panel-titles"><h2 className="adm-panel-title">Tasks<span className="adm-count">{tasks.length}</span></h2></div>
+            <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowAddTask(v => !v)}>+ Add Task</button>
           </div>
 
           {showAddTask && (
-            <div className="asd-add-form">
-              <input
-                className="form-input"
-                placeholder="Task title *"
-                value={taskTitle}
-                onChange={e => setTaskTitle(e.target.value)}
-              />
-              <input
-                className="form-input"
-                placeholder="Description (optional)"
-                value={taskDesc}
-                onChange={e => setTaskDesc(e.target.value)}
-              />
-              <input
-                className="form-input"
-                type="date"
-                value={taskDue}
-                onChange={e => setTaskDue(e.target.value)}
-                title="Due date (optional)"
-              />
-              {addTask.isError && <p className="aq-modal-error">{(addTask.error as any)?.response?.data?.error}</p>}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => { setShowAddTask(false); setTaskTitle(''); setTaskDesc(''); setTaskDue(''); }}>Cancel</button>
-                <button className="btn btn-primary btn-sm" disabled={!taskTitle.trim() || addTask.isPending} onClick={() => addTask.mutate()}>
-                  {addTask.isPending ? 'Adding…' : 'Add Task'}
-                </button>
+            <div className="adm-addbar" style={{ marginBottom: '1.15rem', flexWrap: 'wrap' }}>
+              <div className="adm-field" style={{ flex: '2 1 200px' }}>
+                <label className="adm-label">Title *</label>
+                <input className="adm-input" placeholder="Task title" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} />
+              </div>
+              <div className="adm-field" style={{ flex: '2 1 200px' }}>
+                <label className="adm-label">Description</label>
+                <input className="adm-input" placeholder="Optional" value={taskDesc} onChange={e => setTaskDesc(e.target.value)} />
+              </div>
+              <div className="adm-field">
+                <label className="adm-label">Due</label>
+                <input className="adm-input adm-input--date" type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+                <button className="adm-btn adm-btn--ghost" onClick={() => { setShowAddTask(false); setTaskTitle(''); setTaskDesc(''); setTaskDue(''); }}>Cancel</button>
+                <button className="adm-btn adm-btn--accent" disabled={!taskTitle.trim() || addTask.isPending} onClick={() => addTask.mutate()}>{addTask.isPending ? 'Adding…' : 'Add Task'}</button>
               </div>
             </div>
           )}
 
           {tasks.length === 0 ? (
-            <div className="db-empty-card">
-              <p className="db-empty-title">No tasks</p>
-              <p className="db-empty-desc">Add tasks to track work items for this service.</p>
-            </div>
+            <div className="adm-empty-box"><span className="adm-empty-ico">{Icon.tasks}</span><p className="adm-empty-txt">Add tasks to track work items for this service.</p></div>
           ) : (
-            <div className="asd-task-list">
+            <div className="adm-list">
               {tasks.map((task: any) => (
-                <div key={task.id} className="asd-task-row">
-                  <div className="asd-task-status-dot" data-status={task.status} />
-                  <div className="asd-task-info">
-                    <div className="asd-task-title" style={{ textDecoration: task.status === 'done' ? 'line-through' : 'none', color: task.status === 'done' ? 'var(--ink-400)' : undefined }}>
-                      {task.title}
-                    </div>
-                    {task.description && <div className="asd-task-desc">{task.description}</div>}
-                    <div className="asd-task-meta">
-                      {badge(task.status === 'done' ? 'aq-badge-done' : task.status === 'in_progress' ? 'aq-badge-active' : 'aq-badge-pending', task.status)}
-                      {task.due_at && <span className="asd-doc-date">Due {fmtDate(task.due_at)}</span>}
-                      {task.completed_at && <span className="asd-doc-date">Done {fmtDate(task.completed_at)}</span>}
+                <div key={task.id} className="adm-row">
+                  <div className="adm-row-main">
+                    <div className="adm-row-name" style={{ textDecoration: task.status === 'done' ? 'line-through' : 'none', color: task.status === 'done' ? 'var(--lp-ink-faint)' : undefined }}>{task.title}</div>
+                    {task.description && <div className="adm-row-desc">{task.description}</div>}
+                    <div className="adm-row-meta">
+                      {badge(task.status === 'in_progress' ? 'in_progress' : task.status)}
+                      {task.due_at && <span className="adm-row-date">Due {fmtDate(task.due_at)}</span>}
+                      {task.completed_at && <span className="adm-row-date">Done {fmtDate(task.completed_at)}</span>}
                     </div>
                   </div>
-                  <div className="asd-task-actions">
+                  <div className="adm-row-actions">
                     {task.status === 'todo' && (
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        disabled={updateTask.isPending}
-                        onClick={() => updateTask.mutate({ taskId: task.id, status: 'in_progress' })}
-                      >
-                        Start
-                      </button>
+                      <button className="adm-btn adm-btn--sm adm-btn--ghost" disabled={updateTask.isPending} onClick={() => updateTask.mutate({ taskId: task.id, status: 'in_progress' })}>Start</button>
                     )}
                     {task.status !== 'done' && task.status !== 'cancelled' && (
-                      <button
-                        className="btn btn-sm btn-primary"
-                        disabled={updateTask.isPending}
-                        onClick={() => updateTask.mutate({ taskId: task.id, status: 'done' })}
-                        title="Mark done"
-                      >
-                        ✓ Done
-                      </button>
+                      <button className="adm-btn adm-btn--sm adm-btn--accent" disabled={updateTask.isPending} onClick={() => updateTask.mutate({ taskId: task.id, status: 'done' })}>Done</button>
                     )}
-                    <button
-                      className="btn btn-sm asd-task-delete-btn"
-                      disabled={deleteTask.isPending}
-                      onClick={() => deleteTask.mutate(task.id)}
-                      title="Delete task"
-                    >
-                      ✕
-                    </button>
+                    <button className="adm-btn adm-btn--sm adm-btn--danger" disabled={deleteTask.isPending} onClick={() => deleteTask.mutate(task.id)} title="Delete task">{Icon.x}</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* ── Payment ── */}
       {tab === 'payment' && (
-        <div className="asd-section">
-          <h3 className="asd-section-title">Payment Information</h3>
-          <div className="aq-profile-card" style={{ marginBottom: '1.5rem' }}>
-            <div className="aq-profile-row">
-              <span className="aq-profile-label">Status</span>
-              <span>{badge(PAYMENT_BADGE[data.payment_status] ?? 'aq-badge-pending', data.payment_status ?? 'pending')}</span>
-            </div>
-            {service?.price && (
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Service Price</span>
-                <span>₹{(service.price / 100).toLocaleString('en-IN')}</span>
-              </div>
-            )}
-            {data.razorpay_order_id && (
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Razorpay Order</span>
-                <span className="aq-mono">{data.razorpay_order_id}</span>
-              </div>
-            )}
-            {data.payment_id && (
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Payment ID</span>
-                <span className="aq-mono">{data.payment_id}</span>
-              </div>
-            )}
+        <section className="adm-panel">
+          <div className="adm-sub-head"><h3 className="adm-sub-title">Payment Information</h3></div>
+          <div className="adm-kv">
+            <div className="adm-kv-row"><span className="adm-kv-label">Status</span><span className="adm-kv-val">{badge(data.payment_status ?? 'pending')}</span></div>
+            {service?.price && <div className="adm-kv-row"><span className="adm-kv-label">Service Price</span><span className="adm-kv-val"><span className="adm-money">₹{(service.price / 100).toLocaleString('en-IN')}</span></span></div>}
+            {data.razorpay_order_id && <div className="adm-kv-row"><span className="adm-kv-label">Razorpay Order</span><span className="adm-kv-val"><code className="adm-code">{data.razorpay_order_id}</code></span></div>}
+            {data.payment_id && <div className="adm-kv-row"><span className="adm-kv-label">Payment ID</span><span className="adm-kv-val"><code className="adm-code">{data.payment_id}</code></span></div>}
           </div>
-
-        </div>
+        </section>
       )}
 
       {/* ── Workflow ── */}
       {tab === 'workflow' && (
-        <div className="asd-section">
-          <h3 className="asd-section-title">Current Status</h3>
+        <section className="adm-panel">
+          <div className="adm-sub-head"><h3 className="adm-sub-title">Current Status</h3></div>
           <WorkflowPipeline status={data.status} />
 
           {!texpert && !['completed', 'cancelled'].includes(data.status) && (
-            <div className="aq-modal-error" style={{ marginTop: '1rem' }}>
-              Assign a Taxpert before updating the workflow status. Use the <strong>Assign Taxpert</strong> button at the top of this page.
-            </div>
+            <div className="adm-banner adm-banner--err" style={{ marginTop: '1.25rem' }}>{Icon.alert}Assign a Taxpert before updating the workflow status — use the Assign Taxpert button at the top.</div>
           )}
-
           {data.status === 'payment' && data.payment_status !== 'paid' && (
-            <div className="aq-modal-error" style={{ marginTop: '1rem' }}>
-              Awaiting payment from the client. The service can be marked <strong>Completed</strong> only after payment is confirmed.
-            </div>
+            <div className="adm-banner adm-banner--err" style={{ marginTop: '1rem' }}>{Icon.alert}Awaiting payment. The service can be marked Completed only after payment is confirmed.</div>
           )}
 
           {data.status !== 'cancelled' && (
             <>
-              <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Manual Status Change</h3>
-              {updateService.isError && (
-                <p className="aq-modal-error">{(updateService.error as any)?.response?.data?.error ?? 'Failed to update status'}</p>
-              )}
-              <div className="tx-status-grid">
+              <div className="adm-sub-head" style={{ marginTop: '2rem' }}><h3 className="adm-sub-title">Manual Status Change</h3></div>
+              {updateService.isError && <p className="adm-modal-err">{Icon.alert}{(updateService.error as any)?.response?.data?.error ?? 'Failed to update status'}</p>}
+              <div className="adm-status-grid">
                 {WORKFLOW_STEPS.map(s => {
                   const isCurrent = data.status === s.key;
-                  // Completion is gated on confirmed payment; all progress is gated on an assigned Taxpert.
                   const blockComplete = s.key === 'completed' && data.payment_status !== 'paid';
                   return (
-                    <button key={s.key}
-                      className={`tx-status-btn ${isCurrent ? 'tx-status-current' : ''}`}
+                    <button key={s.key} className={`adm-status-btn${isCurrent ? ' is-current' : ''}`}
                       disabled={!texpert || isCurrent || blockComplete || updateService.isPending}
                       title={!texpert ? 'Assign a Taxpert first' : blockComplete ? 'Payment must be confirmed before completing' : undefined}
                       onClick={() => updateService.mutate({ status: s.key })}>
-                      {s.label}
-                      {isCurrent && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
+                      {s.label}{isCurrent && <span className="adm-status-cur">· Current</span>}
                     </button>
                   );
                 })}
-                <button className="tx-status-btn tx-status-hold"
+                <button className="adm-status-btn adm-status-btn--hold"
                   disabled={!texpert || data.status === 'on_hold' || updateService.isPending}
                   title={!texpert ? 'Assign a Taxpert first' : undefined}
                   onClick={() => updateService.mutate({ status: 'on_hold' })}>
-                  On Hold
-                  {data.status === 'on_hold' && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
+                  On Hold{data.status === 'on_hold' && <span className="adm-status-cur">· Current</span>}
                 </button>
               </div>
             </>
           )}
 
-          <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Service Metadata</h3>
-          <div className="aq-profile-card">
-            <div className="aq-profile-row"><span className="aq-profile-label">Created</span><span>{fmtDateTime(data.created_at)}</span></div>
-            <div className="aq-profile-row"><span className="aq-profile-label">Last Updated</span><span>{fmtDateTime(data.updated_at)}</span></div>
-            <div className="aq-profile-row">
-              <span className="aq-profile-label">Payment</span>
-              <span>{badge(PAYMENT_BADGE[data.payment_status] ?? 'aq-badge-pending', data.payment_status ?? 'pending')}</span>
-            </div>
-            {data.payment_id && (
-              <div className="aq-profile-row"><span className="aq-profile-label">Payment ID</span><span className="aq-mono">{data.payment_id}</span></div>
-            )}
-            {data.is_blocked && (
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Blocked</span>
-                <span className="aq-badge aq-badge-hold">Yes{data.blocked_reason ? ` — ${data.blocked_reason}` : ''}</span>
-              </div>
-            )}
+          <div className="adm-sub-head" style={{ marginTop: '2rem' }}><h3 className="adm-sub-title">Service Metadata</h3></div>
+          <div className="adm-kv">
+            <div className="adm-kv-row"><span className="adm-kv-label">Created</span><span className="adm-kv-val">{fmtDateTime(data.created_at)}</span></div>
+            <div className="adm-kv-row"><span className="adm-kv-label">Last Updated</span><span className="adm-kv-val">{fmtDateTime(data.updated_at)}</span></div>
+            <div className="adm-kv-row"><span className="adm-kv-label">Payment</span><span className="adm-kv-val">{badge(data.payment_status ?? 'pending')}</span></div>
+            {data.payment_id && <div className="adm-kv-row"><span className="adm-kv-label">Payment ID</span><span className="adm-kv-val"><code className="adm-code">{data.payment_id}</code></span></div>}
+            {data.is_blocked && <div className="adm-kv-row"><span className="adm-kv-label">Blocked</span><span className="adm-kv-val"><span className="adm-badge adm-badge--red"><span className="adm-badge-dot" />Yes{data.blocked_reason ? ` — ${data.blocked_reason}` : ''}</span></span></div>}
           </div>
-        </div>
+        </section>
       )}
 
       {/* ── Settings ── */}
       {tab === 'settings' && (
-        <div className="asd-section">
-          <h3 className="asd-section-title">Service Controls</h3>
+        <section className="adm-panel">
+          <div className="adm-sub-head"><h3 className="adm-sub-title">Service Controls</h3></div>
           {!settingsDirty ? (
-            <div className="aq-profile-card" style={{ marginBottom: '1.5rem' }}>
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Status</span>
-                <span>{badge(STATUS_BADGE[data.status] ?? 'aq-badge-pending', data.status)}</span>
-              </div>
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Fiscal Year</span>
-                <span>{data.fiscal_year ?? '—'}</span>
-              </div>
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Notes</span>
-                <span>{data.notes ?? '—'}</span>
-              </div>
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Pinned Message</span>
-                <span>{data.pinned_message ?? '—'}</span>
-              </div>
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Blocked</span>
-                <span className={`aq-badge ${data.is_blocked ? 'aq-badge-hold' : 'aq-badge-done'}`}>
-                  {data.is_blocked ? 'Yes' : 'No'}
-                </span>
-              </div>
-              {data.blocked_reason && (
-                <div className="aq-profile-row">
-                  <span className="aq-profile-label">Block Reason</span>
-                  <span>{data.blocked_reason}</span>
-                </div>
-              )}
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Created</span>
-                <span>{fmtDate(data.created_at)}</span>
-              </div>
-              <div className="aq-profile-row">
-                <span className="aq-profile-label">Last Updated</span>
-                <span>{fmtDate(data.updated_at)}</span>
-              </div>
-              <div style={{ marginTop: '1rem' }}>
-                <button className="btn btn-primary" onClick={initSettings}>Edit</button>
-              </div>
+            <div className="adm-kv">
+              <div className="adm-kv-row"><span className="adm-kv-label">Status</span><span className="adm-kv-val">{badge(data.status)}</span></div>
+              <div className="adm-kv-row"><span className="adm-kv-label">Fiscal Year</span><span className="adm-kv-val">{data.fiscal_year ?? '—'}</span></div>
+              <div className="adm-kv-row"><span className="adm-kv-label">Notes</span><span className="adm-kv-val">{data.notes ?? '—'}</span></div>
+              <div className="adm-kv-row"><span className="adm-kv-label">Pinned Message</span><span className="adm-kv-val">{data.pinned_message ?? '—'}</span></div>
+              <div className="adm-kv-row"><span className="adm-kv-label">Blocked</span><span className="adm-kv-val"><span className={`adm-badge ${data.is_blocked ? 'adm-badge--red' : 'adm-badge--green'}`}><span className="adm-badge-dot" />{data.is_blocked ? 'Yes' : 'No'}</span></span></div>
+              {data.blocked_reason && <div className="adm-kv-row"><span className="adm-kv-label">Block Reason</span><span className="adm-kv-val">{data.blocked_reason}</span></div>}
+              <div className="adm-kv-row"><span className="adm-kv-label">Created</span><span className="adm-kv-val">{fmtDate(data.created_at)}</span></div>
+              <div className="adm-kv-row"><span className="adm-kv-label">Last Updated</span><span className="adm-kv-val">{fmtDate(data.updated_at)}</span></div>
+              <div className="adm-kv-row" style={{ borderBottom: 'none' }}><span className="adm-kv-label" /><span className="adm-kv-val"><button className="adm-btn adm-btn--accent adm-btn--sm" onClick={initSettings}>Edit</button></span></div>
             </div>
           ) : (
-            <div className="aq-notify-card" style={{ maxWidth: '560px' }}>
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-input" value={settingsStatus} onChange={e => setSettingsStatus(e.target.value)}>
-                  {STATUS_OPTIONS.map(s => (
-                    <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
+            <div className="adm-form" style={{ maxWidth: 560 }}>
+              <div className="adm-field">
+                <label className="adm-label">Status</label>
+                <div className="adm-select-wrap">
+                  <select className="adm-select" value={settingsStatus} onChange={e => setSettingsStatus(e.target.value)}>
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+                  </select>
+                  <span className="adm-select-ico">{Icon.chevronD}</span>
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Internal Notes</label>
-                <textarea className="form-input" rows={3} value={settingsNotes} onChange={e => setSettingsNotes(e.target.value)} />
+              <div className="adm-field">
+                <label className="adm-label">Internal Notes</label>
+                <textarea className="adm-textarea" rows={3} value={settingsNotes} onChange={e => setSettingsNotes(e.target.value)} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Pinned Message <span style={{ fontWeight: 400, color: 'var(--ink-400)' }}>(shown to client)</span></label>
-                <input className="form-input" value={settingsPinned} onChange={e => setSettingsPinned(e.target.value)}
-                  placeholder="e.g. Awaiting GST portal access from client" />
+              <div className="adm-field">
+                <label className="adm-label">Pinned Message <span className="adm-label-opt">(shown to client)</span></label>
+                <input className="adm-input" value={settingsPinned} onChange={e => setSettingsPinned(e.target.value)} placeholder="e.g. Awaiting GST portal access from client" />
               </div>
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input type="checkbox" id="svc-blocked" checked={settingsBlocked} onChange={e => setSettingsBlocked(e.target.checked)} />
-                <label htmlFor="svc-blocked" className="form-label" style={{ marginBottom: 0 }}>Mark as Blocked</label>
-              </div>
+              <label className="adm-check">
+                <input type="checkbox" checked={settingsBlocked} onChange={e => setSettingsBlocked(e.target.checked)} />
+                Mark as Blocked
+              </label>
               {settingsBlocked && (
-                <div className="form-group">
-                  <label className="form-label">Block Reason</label>
-                  <input className="form-input" value={settingsBlockedReason} onChange={e => setSettingsBlockedReason(e.target.value)}
-                    placeholder="Why is this service blocked?" />
+                <div className="adm-field">
+                  <label className="adm-label">Block Reason</label>
+                  <input className="adm-input" value={settingsBlockedReason} onChange={e => setSettingsBlockedReason(e.target.value)} placeholder="Why is this service blocked?" />
                 </div>
               )}
-              {updateService.isError && (
-                <p className="aq-modal-error">{(updateService.error as any)?.response?.data?.error}</p>
-              )}
-              {updateService.isSuccess && (
-                <p style={{ color: 'var(--green-600)', fontSize: '0.875rem' }}>Saved successfully.</p>
-              )}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-secondary" onClick={() => setSettingsDirty(false)}>Cancel</button>
-                <button
-                  className="btn btn-primary"
-                  disabled={updateService.isPending}
-                  onClick={() => updateService.mutate({
-                    status: settingsStatus,
-                    notes: settingsNotes,
-                    pinned_message: settingsPinned,
-                    is_blocked: settingsBlocked,
-                    blocked_reason: settingsBlockedReason,
-                  })}
-                >
-                  {updateService.isPending ? 'Saving…' : 'Save Changes'}
+              {updateService.isError && <p className="adm-modal-err">{Icon.alert}{(updateService.error as any)?.response?.data?.error}</p>}
+              {updateService.isSuccess && <p className="adm-banner adm-banner--ok" style={{ margin: 0 }}>{Icon.check}Saved successfully.</p>}
+              <div className="adm-savebar" style={{ justifyContent: 'flex-start' }}>
+                <button className="adm-btn adm-btn--ghost" onClick={() => setSettingsDirty(false)}>Cancel</button>
+                <button className="adm-submit" disabled={updateService.isPending} onClick={() => updateService.mutate({
+                  status: settingsStatus, notes: settingsNotes, pinned_message: settingsPinned,
+                  is_blocked: settingsBlocked, blocked_reason: settingsBlockedReason,
+                })}>
+                  {updateService.isPending ? <><span className="adm-submit-spin" /> Saving…</> : 'Save Changes'}
                 </button>
               </div>
             </div>
           )}
 
-          <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Client Information</h3>
-          <div className="aq-profile-card">
-            <div className="aq-profile-row">
-              <span className="aq-profile-label">Name</span>
-              <span>{client?.first_name} {client?.last_name}</span>
-            </div>
-            <div className="aq-profile-row">
-              <span className="aq-profile-label">Email</span>
-              <span>{client?.email}</span>
-            </div>
-            <div className="aq-profile-row">
-              <span className="aq-profile-label">Mobile</span>
-              <span>{client?.mobile ?? '—'}</span>
-            </div>
-            <div className="aq-profile-row">
-              <span className="aq-profile-label">PAN</span>
-              <span className="aq-mono">{client?.pan ?? '—'}</span>
-            </div>
+          <div className="adm-sub-head" style={{ marginTop: '2rem' }}><h3 className="adm-sub-title">Client Information</h3></div>
+          <div className="adm-kv">
+            <div className="adm-kv-row"><span className="adm-kv-label">Name</span><span className="adm-kv-val">{client?.first_name} {client?.last_name}</span></div>
+            <div className="adm-kv-row"><span className="adm-kv-label">Email</span><span className="adm-kv-val">{client?.email}</span></div>
+            <div className="adm-kv-row"><span className="adm-kv-label">Mobile</span><span className="adm-kv-val">{client?.mobile ?? '—'}</span></div>
+            <div className="adm-kv-row"><span className="adm-kv-label">PAN</span><span className="adm-kv-val"><code className="adm-code">{client?.pan ?? '—'}</code></span></div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Modals */}
-      {reuploadDoc && (
-        <ReuploadModal
-          docId={reuploadDoc.id}
-          docName={reuploadDoc.name}
-          serviceId={id!}
-          onClose={() => setReuploadDoc(null)}
-        />
-      )}
-      {showAssign && (
-        <AssignTexpertModal serviceId={id!} onClose={() => setShowAssign(false)} />
-      )}
+      {reuploadDoc && <ReuploadModal docId={reuploadDoc.id} docName={reuploadDoc.name} serviceId={id!} onClose={() => setReuploadDoc(null)} />}
+      {showAssign && <AssignTexpertModal serviceId={id!} onClose={() => setShowAssign(false)} />}
     </div>
   );
 }

@@ -37,13 +37,59 @@ const DEFAULTS: Settings = {
   payment_instructions: "Pay via UPI, NEFT, or the secure online payment link above.",
 };
 
+/* ── Inline line icons ───────────────────────────────────────── */
+const Icon = {
+  building: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M8 10h.01M16 10h.01M12 10h.01M8 14h.01M16 14h.01M12 14h.01" />
+    </svg>
+  ),
+  bank: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+    </svg>
+  ),
+  doc: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6M9 17h6" />
+    </svg>
+  ),
+  check: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
+    </svg>
+  ),
+  alert: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+    </svg>
+  ),
+};
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
+    <div className="adm-field">
+      <label className="adm-label">{label}</label>
       {children}
-      {hint && <p style={{ fontSize: "0.72rem", color: "var(--ink-400)", marginTop: 3 }}>{hint}</p>}
+      {hint && <p className="adm-field-hint">{hint}</p>}
     </div>
+  );
+}
+
+function Section({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <section className="adm-panel">
+      <div className="adm-sub-head">
+        <div className="adm-section-head" style={{ margin: 0, gap: '0.65rem' }}>
+          <span className="adm-stat-ico">{icon}</span>
+          <div>
+            <h3 className="adm-sub-title">{title}</h3>
+            <p className="adm-sub-desc">{desc}</p>
+          </div>
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -84,110 +130,103 @@ export default function InvoiceSettingsPage() {
   if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
+  const SaveBtn = (
+    <button className="adm-submit" disabled={mutation.isPending} onClick={() => mutation.mutate(form)}>
+      {mutation.isPending ? <><span className="adm-submit-spin" /> Saving…</> : "Save Settings"}
+    </button>
+  );
+
   return (
-    <div className="db-page-new">
-      <div className="db-page-header">
-        <div>
-          <h1 className="db-page-title">Invoice Settings</h1>
-          <p className="db-page-sub">Controls what appears on every invoice sent to clients. Changes apply immediately.</p>
+    <div className="adm-root" style={{ maxWidth: 880 }}>
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <header className="adm-hero">
+        <div className="adm-hero-glow" />
+        <div className="adm-hero-bar">
+          <div>
+            <p className="adm-hero-eyebrow">— Billing</p>
+            <h1 className="adm-hero-title">Invoice Settings</h1>
+            <p className="adm-hero-date">Controls what appears on every invoice sent to clients. Changes apply immediately.</p>
+          </div>
+          <div className="adm-hero-aside">{SaveBtn}</div>
         </div>
-        <button
-          className="btn btn-primary"
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate(form)}
-        >
-          {mutation.isPending ? "Saving…" : "Save Settings"}
-        </button>
-      </div>
+      </header>
 
       {saved && (
-        <div className="db-alert-ok" style={{ fontSize: "0.85rem" }}>Settings saved — invoices will reflect these changes immediately.</div>
+        <div className="adm-banner adm-banner--ok" style={{ marginBottom: '1rem' }}>{Icon.check} Settings saved — invoices reflect these changes immediately.</div>
       )}
       {mutation.isError && (
-        <div className="db-alert-error" style={{ fontSize: "0.85rem" }}>{(mutation.error as any)?.response?.data?.error ?? "Failed to save settings."}</div>
+        <div className="adm-banner adm-banner--err" style={{ marginBottom: '1rem' }}>{Icon.alert} {(mutation.error as any)?.response?.data?.error ?? "Failed to save settings."}</div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 720 }}>
-
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
         {/* Business Identity */}
-        <div className="asd-section">
-          <h3 className="asd-section-title">Business Identity</h3>
-          <p style={{ fontSize: "0.8rem", color: "var(--ink-400)", marginBottom: "1.25rem", marginTop: "-0.5rem" }}>
-            Appears in the invoice header — your company's name, contact, and prefix for invoice numbers.
-          </p>
-          <div className="isv-grid">
+        <Section icon={Icon.building} title="Business Identity" desc="Appears in the invoice header — company name, contact, and invoice-number prefix.">
+          <div className="adm-form-grid">
             <Field label="Business Name *">
-              <input className="form-input" value={form.business_name} onChange={set("business_name")} placeholder="TheTaxpert" required />
+              <input className="adm-input" value={form.business_name} onChange={set("business_name")} placeholder="TheTaxpert" required />
             </Field>
             <Field label="Invoice Prefix *" hint="Used in invoice numbers, e.g. TTP-00042">
-              <input className="form-input" value={form.invoice_prefix} onChange={set("invoice_prefix")} placeholder="TTP" required maxLength={6} style={{ textTransform: "uppercase" }} />
+              <input className="adm-input" value={form.invoice_prefix} onChange={set("invoice_prefix")} placeholder="TTP" required maxLength={6} style={{ textTransform: "uppercase" }} />
             </Field>
             <Field label="Support Email *">
-              <input className="form-input" type="email" value={form.support_email} onChange={set("support_email")} placeholder="info@thetaxpert.com" required />
+              <input className="adm-input" type="email" value={form.support_email} onChange={set("support_email")} placeholder="info@thetaxpert.com" required />
             </Field>
             <Field label="Support Phone">
-              <input className="form-input" type="tel" value={form.support_phone} onChange={set("support_phone")} placeholder="+91 XXXXX XXXXX" />
+              <input className="adm-input" type="tel" value={form.support_phone} onChange={set("support_phone")} placeholder="+91 XXXXX XXXXX" />
             </Field>
             <Field label="Website">
-              <input className="form-input" type="url" value={form.website} onChange={set("website")} placeholder="https://thetaxpert.com" />
+              <input className="adm-input" type="url" value={form.website} onChange={set("website")} placeholder="https://thetaxpert.com" />
             </Field>
             <Field label="Business PAN" hint="Shown on invoices for GST compliance">
-              <input className="form-input" value={form.pan} onChange={set("pan")} placeholder="AAAAA0000A" style={{ textTransform: "uppercase" }} maxLength={10} />
+              <input className="adm-input" value={form.pan} onChange={set("pan")} placeholder="AAAAA0000A" style={{ textTransform: "uppercase" }} maxLength={10} />
             </Field>
           </div>
-        </div>
+        </Section>
 
         {/* Banking Details */}
-        <div className="asd-section">
-          <h3 className="asd-section-title">Banking Details</h3>
-          <p style={{ fontSize: "0.8rem", color: "var(--ink-400)", marginBottom: "1.25rem", marginTop: "-0.5rem" }}>
-            Printed on the invoice so clients can pay by bank transfer. Leave blank if not accepting NEFT/IMPS.
-          </p>
-          <div className="isv-grid">
+        <Section icon={Icon.bank} title="Banking Details" desc="Printed on the invoice so clients can pay by bank transfer. Leave blank if not accepting NEFT/IMPS.">
+          <div className="adm-form-grid">
             <Field label="Bank Name">
-              <input className="form-input" value={form.bank_name} onChange={set("bank_name")} placeholder="HDFC Bank" />
+              <input className="adm-input" value={form.bank_name} onChange={set("bank_name")} placeholder="HDFC Bank" />
             </Field>
             <Field label="Account Holder Name">
-              <input className="form-input" value={form.account_holder_name} onChange={set("account_holder_name")} placeholder="TheTaxpert Pvt Ltd" />
+              <input className="adm-input" value={form.account_holder_name} onChange={set("account_holder_name")} placeholder="TheTaxpert Pvt Ltd" />
             </Field>
             <Field label="Account Number">
-              <input className="form-input" value={form.account_number} onChange={set("account_number")} placeholder="XXXX XXXX XXXX" />
+              <input className="adm-input" value={form.account_number} onChange={set("account_number")} placeholder="XXXX XXXX XXXX" />
             </Field>
             <Field label="IFSC Code">
-              <input className="form-input" value={form.ifsc} onChange={set("ifsc")} placeholder="HDFC0001234" style={{ textTransform: "uppercase" }} />
+              <input className="adm-input" value={form.ifsc} onChange={set("ifsc")} placeholder="HDFC0001234" style={{ textTransform: "uppercase" }} />
             </Field>
             <Field label="UPI ID" hint="Clients can scan/pay via UPI">
-              <input className="form-input" value={form.upi_id} onChange={set("upi_id")} placeholder="payments@thetaxpert" />
+              <input className="adm-input" value={form.upi_id} onChange={set("upi_id")} placeholder="payments@thetaxpert" />
             </Field>
           </div>
-        </div>
+        </Section>
 
         {/* Invoice Content */}
-        <div className="asd-section">
-          <h3 className="asd-section-title">Invoice Content</h3>
-          <p style={{ fontSize: "0.8rem", color: "var(--ink-400)", marginBottom: "1.25rem", marginTop: "-0.5rem" }}>
-            Text printed at the bottom of every invoice.
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <Section icon={Icon.doc} title="Invoice Content" desc="Text printed at the bottom of every invoice.">
+          <div className="adm-form">
             <Field label="Default Terms" hint="e.g. payment due date, late fee policy">
-              <textarea className="form-input" rows={3} value={form.default_terms} onChange={set("default_terms")}
+              <textarea className="adm-textarea" rows={3} value={form.default_terms} onChange={set("default_terms")}
                 placeholder="Payment is due within 7 days of invoice date." />
             </Field>
             <Field label="Payment Instructions" hint="Shown below the total — guides client on how to pay">
-              <textarea className="form-input" rows={3} value={form.payment_instructions} onChange={set("payment_instructions")}
+              <textarea className="adm-textarea" rows={3} value={form.payment_instructions} onChange={set("payment_instructions")}
                 placeholder="Pay via UPI, NEFT, or the secure online payment link above." />
             </Field>
           </div>
-        </div>
+        </Section>
 
         {/* Preview strip */}
-        <div className="isv-preview">
-          <div className="isv-preview-label">Invoice footer preview</div>
-          <div className="isv-preview-body">
+        <div className="adm-preview">
+          <div className="adm-preview-glow" />
+          <p className="adm-preview-label">— Invoice footer preview</p>
+          <div className="adm-preview-body">
             {(form.bank_name || form.upi_id || form.account_number) && (
-              <div style={{ marginBottom: "0.75rem" }}>
-                <div style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#94a3b8", marginBottom: 4 }}>Payment Details</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem 1.5rem", fontSize: "0.78rem", color: "#475569" }}>
+              <div style={{ marginBottom: "0.85rem" }}>
+                <p className="adm-preview-sub">Payment Details</p>
+                <div className="adm-preview-pay">
                   {form.bank_name && <span>{form.bank_name}</span>}
                   {form.account_number && <span>A/C: {form.account_number}</span>}
                   {form.ifsc && <span>IFSC: {form.ifsc}</span>}
@@ -195,23 +234,15 @@ export default function InvoiceSettingsPage() {
                 </div>
               </div>
             )}
-            {form.default_terms && <p style={{ fontSize: "0.75rem", color: "#64748b", margin: "0 0 4px" }}><strong>Terms:</strong> {form.default_terms}</p>}
-            {form.payment_instructions && <p style={{ fontSize: "0.75rem", color: "#64748b", margin: 0 }}><strong>Payment:</strong> {form.payment_instructions}</p>}
-            <p style={{ fontSize: "0.72rem", color: "#94a3b8", margin: "8px 0 0", textAlign: "center" }}>
+            {form.default_terms && <p className="adm-preview-line"><strong>Terms:</strong> {form.default_terms}</p>}
+            {form.payment_instructions && <p className="adm-preview-line"><strong>Payment:</strong> {form.payment_instructions}</p>}
+            <p className="adm-preview-foot">
               {form.business_name} · {form.support_email}{form.website ? ` · ${form.website}` : ""}
             </p>
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            className="btn btn-primary"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate(form)}
-          >
-            {mutation.isPending ? "Saving…" : "Save Settings"}
-          </button>
-        </div>
+        <div className="adm-savebar">{SaveBtn}</div>
       </div>
     </div>
   );

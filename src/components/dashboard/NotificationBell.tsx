@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
+import Loader from '../ui/Loader';
 
 interface Notification {
   id: string;
@@ -25,21 +26,51 @@ function fmtRelative(iso: string): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-const TYPE_ICON: Record<string, string> = {
-  status_changed:    '🔄',
-  document_status:   '📄',
-  document_approved: '✅',
-  document_rejected: '❌',
-  document_reupload: '🔁',
-  document_added:    '📎',
-  payment:           '💳',
-  payment_failed:    '⚠️',
-  service_hold:      '⏸',
-  pinned_message:    '📌',
-  service_queued:    '📥',
-  texpert_assigned:  '👤',
-  default:           '🔔',
-};
+/* ── Crisp SVG type icons (no emojis) ─────────────────────────── */
+function TypeIcon({ type }: { type: string }) {
+  let path: React.ReactNode = <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9Z" /><path d="M10 21a2 2 0 0 0 4 0" /></>;
+  switch (type) {
+    case 'status_changed':
+      path = <><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></>;
+      break;
+    case 'document_status':
+    case 'document_added':
+      path = <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6M9 17h6" /></>;
+      break;
+    case 'document_approved':
+      path = <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>;
+      break;
+    case 'document_rejected':
+      path = <><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></>;
+      break;
+    case 'document_reupload':
+      path = <><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M12 8v5l3 2" /></>;
+      break;
+    case 'payment':
+      path = <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></>;
+      break;
+    case 'payment_failed':
+      path = <><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></>;
+      break;
+    case 'service_hold':
+      path = <><circle cx="12" cy="12" r="10" /><path d="M10 9v6M14 9v6" /></>;
+      break;
+    case 'pinned_message':
+      path = <><path d="M12 17v5" /><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" /></>;
+      break;
+    case 'service_queued':
+      path = <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5M12 15V3" /></>;
+      break;
+    case 'texpert_assigned':
+      path = <><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></>;
+      break;
+  }
+  return (
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {path}
+    </svg>
+  );
+}
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -47,7 +78,7 @@ export default function NotificationBell() {
   const qc = useQueryClient();
   const ref = useRef<HTMLDivElement>(null);
 
-  // Unread count — polled so the red dot stays current
+  // Unread count — polled so the badge stays current
   const { data: countData } = useQuery({
     queryKey: ['notif-unread'],
     queryFn: async () => (await apiClient.get('/notifications/unread-count')).data as { count: number },
@@ -98,22 +129,26 @@ export default function NotificationBell() {
   return (
     <div className="nbell" ref={ref}>
       <button
-        className="nbell-trigger"
+        className={`nbell-trigger${open ? ' is-open' : ''}`}
         onClick={() => setOpen(o => !o)}
         aria-label="Notifications"
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9Z" /><path d="M10 21a2 2 0 0 0 4 0" />
+        <svg className="nbell-glyph" viewBox="0 0 448 512" aria-hidden="true">
+          <path d="M224 0c-17.7 0-32 14.3-32 32V49.9C119.5 61.4 64 124.2 64 200v33.4c0 45.4-15.5 89.5-43.8 124.9L5.3 377c-5.8 7.2-6.9 17.1-2.9 25.4S14.8 416 24 416H424c9.2 0 17.6-5.3 21.6-13.6s2.9-18.2-2.9-25.4l-14.9-18.6C399.5 322.9 384 278.8 384 233.4V200c0-75.8-55.5-138.6-128-150.1V32c0-17.7-14.3-32-32-32zm0 96h8c57.4 0 104 46.6 104 104v33.4c0 47.9 13.9 94.6 39.7 134.6H72.3C98.1 328 112 281.3 112 233.4V200c0-57.4 46.6-104 104-104h8zm64 352H224 160c0 17 6.7 33.3 18.7 45.3s28.3 18.7 45.3 18.7s33.3-6.7 45.3-18.7s18.7-28.3 18.7-45.3z" />
         </svg>
-        {unread > 0 && <span className="nbell-dot" />}
+        {unread > 0 && <span className="nbell-badge">{unread > 9 ? '9+' : unread}</span>}
       </button>
 
       {open && (
         <div className="nbell-panel">
           <div className="nbell-head">
-            <span className="nbell-title">Notifications</span>
+            <span className="nbell-title">
+              Notifications
+              {unread > 0 && <span className="nbell-title-count">{unread}</span>}
+            </span>
             {unread > 0 && (
               <button className="nbell-markall" onClick={() => markAll.mutate()} disabled={markAll.isPending}>
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 Mark all read
               </button>
             )}
@@ -121,11 +156,14 @@ export default function NotificationBell() {
 
           <div className="nbell-list">
             {isLoading ? (
-              <div className="nbell-empty">Loading…</div>
+              <div className="nbell-loading"><Loader size={30} /></div>
             ) : items.length === 0 ? (
               <div className="nbell-empty">
-                <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>🔔</div>
-                You're all caught up.
+                <span className="nbell-empty-ico">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9Z" /><path d="M10 21a2 2 0 0 0 4 0" /></svg>
+                </span>
+                <p className="nbell-empty-title">You're all caught up</p>
+                <p className="nbell-empty-sub">New notifications will show up here.</p>
               </div>
             ) : (
               items.map(n => (
@@ -134,7 +172,7 @@ export default function NotificationBell() {
                   className={`nbell-item${n.is_read ? '' : ' nbell-item--unread'}`}
                   onClick={() => handleClick(n)}
                 >
-                  <span className="nbell-ico">{TYPE_ICON[n.type] ?? TYPE_ICON.default}</span>
+                  <span className="nbell-ico"><TypeIcon type={n.type} /></span>
                   <span className="nbell-body">
                     <span className="nbell-item-title">{n.title}</span>
                     {n.body && <span className="nbell-item-sub">{n.body}</span>}
@@ -147,47 +185,6 @@ export default function NotificationBell() {
           </div>
         </div>
       )}
-
-      <style>{`
-        .nbell { position: relative; }
-        .nbell-trigger {
-          position: relative; display: flex; align-items: center; justify-content: center;
-          width: 34px; height: 34px; border-radius: 9px; border: 1px solid #e2e8f0;
-          background: #fff; color: #475569; cursor: pointer; transition: background .12s, color .12s;
-        }
-        .nbell-trigger:hover { background: #f8fafc; color: #0f172a; }
-        .nbell-dot {
-          position: absolute; top: 6px; right: 7px; width: 8px; height: 8px;
-          background: #ef4444; border-radius: 50%; border: 2px solid #fff;
-        }
-        .nbell-panel {
-          position: absolute; top: calc(100% + 8px); right: 0; width: 340px; max-width: 90vw;
-          background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-          box-shadow: 0 12px 32px rgba(15,23,42,0.16); z-index: 100; overflow: hidden;
-        }
-        .nbell-head {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0.7rem 0.9rem; border-bottom: 1px solid #f1f5f9;
-        }
-        .nbell-title { font-size: 0.85rem; font-weight: 700; color: #0f172a; }
-        .nbell-markall { background: none; border: none; color: #2563eb; font-size: 0.72rem; font-weight: 600; cursor: pointer; }
-        .nbell-markall:hover { text-decoration: underline; }
-        .nbell-list { max-height: 380px; overflow-y: auto; }
-        .nbell-empty { text-align: center; padding: 2rem 1rem; color: #94a3b8; font-size: 0.82rem; }
-        .nbell-item {
-          display: flex; gap: 0.6rem; width: 100%; text-align: left; align-items: flex-start;
-          padding: 0.7rem 0.9rem; background: #fff; border: none; border-bottom: 1px solid #f5f7fa;
-          cursor: pointer; transition: background .1s; position: relative;
-        }
-        .nbell-item:hover { background: #f8fbff; }
-        .nbell-item--unread { background: #f5f9ff; }
-        .nbell-ico { font-size: 1rem; flex-shrink: 0; line-height: 1.3; }
-        .nbell-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-        .nbell-item-title { font-size: 0.8rem; font-weight: 600; color: #1e293b; }
-        .nbell-item-sub { font-size: 0.74rem; color: #64748b; line-height: 1.35; }
-        .nbell-time { font-size: 0.68rem; color: #94a3b8; margin-top: 1px; }
-        .nbell-unread-dot { width: 7px; height: 7px; border-radius: 50%; background: #2563eb; flex-shrink: 0; margin-top: 4px; }
-      `}</style>
     </div>
   );
 }

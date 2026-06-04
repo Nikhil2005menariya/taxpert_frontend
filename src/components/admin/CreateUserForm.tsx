@@ -34,80 +34,101 @@ export default function CreateUserForm({ isSuperAdmin = false }: Props) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    
+
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
-    
+
     mutation.mutate(data);
     if (!mutation.isError) {
-        (e.target as HTMLFormElement).reset();
+      (e.target as HTMLFormElement).reset();
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-          <div className="form-group">
-            <label className="form-label">First Name</label>
-            <input name="first_name" className="form-input" placeholder="Rajesh" required />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Last Name</label>
-            <input name="last_name" className="form-input" placeholder="Kumar" required />
-          </div>
+    <form onSubmit={handleSubmit} noValidate className="adm-form">
+      <div className="adm-form-grid">
+        <div className="adm-field">
+          <label className="adm-label">First Name</label>
+          <input name="first_name" className="adm-input" placeholder="Rajesh" required />
         </div>
-
-        <div className="form-group">
-          <label className="form-label">Email</label>
-          <input name="email" type="email" className="form-input" placeholder="user@example.com" required />
+        <div className="adm-field">
+          <label className="adm-label">Last Name</label>
+          <input name="last_name" className="adm-input" placeholder="Kumar" required />
         </div>
+      </div>
 
-        <div className="form-group">
-          <label className="form-label">Mobile</label>
-          <input name="mobile" type="tel" className="form-input" placeholder="9876543210" required />
+      <div className="adm-field">
+        <label className="adm-label">Email</label>
+        <input name="email" type="email" className="adm-input" placeholder="user@example.com" required />
+      </div>
+
+      <div className="adm-form-grid">
+        <div className="adm-field">
+          <label className="adm-label">Mobile</label>
+          <input name="mobile" type="tel" className="adm-input" placeholder="9876543210" required />
         </div>
-
-        <div className="form-group">
-          <label className="form-label">PAN</label>
-          <input name="pan" className="form-input" placeholder="ABCDE1234F" style={{ textTransform: "uppercase" }} required />
+        <div className="adm-field">
+          <label className="adm-label">PAN</label>
+          <input name="pan" className="adm-input" placeholder="ABCDE1234F" style={{ textTransform: "uppercase" }} required />
         </div>
+      </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-          <div className="form-group">
-            <label className="form-label">Role</label>
-            <select name="role" className="form-input" required defaultValue="client">
+      <div className="adm-form-grid">
+        <div className="adm-field">
+          <label className="adm-label">Role</label>
+          <div className="adm-select-wrap">
+            <select name="role" className="adm-select" required defaultValue="client">
               <option value="client">Client</option>
               <option value="staff">Staff</option>
               <option value="expert">Taxpert</option>
               {isSuperAdmin && <option value="admin">Admin</option>}
               {isSuperAdmin && <option value="super_admin">Super Admin</option>}
             </select>
-            {!isSuperAdmin && (
-              <p style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "0.3rem" }}>
-                Admin and Super Admin roles require Super Admin access.
-              </p>
-            )}
+            <span className="adm-select-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </span>
           </div>
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input name="password" type="password" className="form-input" placeholder="Min. 8 characters" required />
-          </div>
+          {!isSuperAdmin && (
+            <p className="adm-field-hint">Admin and Super Admin roles require Super Admin access.</p>
+          )}
         </div>
-
-        {error && <div className="banner banner-error">{error}</div>}
-        {success && <div className="banner banner-success">{success}</div>}
-
-        <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? "Creating..." : "Create User"}
-        </button>
+        <div className="adm-field">
+          <label className="adm-label">Password</label>
+          <input name="password" type="password" className="adm-input" placeholder="Min. 8 characters" minLength={8} required />
+        </div>
       </div>
 
-      <style>{`
-        .banner { padding: 0.6rem 0.75rem; border-radius: 0.5rem; font-size: 0.85rem; }
-        .banner-error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
-        .banner-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #057a55; }
-      `}</style>
+      {error && (
+        <div className="adm-banner adm-banner--err">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+          </svg>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="adm-banner adm-banner--ok">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
+          </svg>
+          {success}
+        </div>
+      )}
+
+      <button type="submit" className="adm-submit" disabled={loading}>
+        {loading ? (
+          <><span className="adm-submit-spin" /> Creating…</>
+        ) : (
+          <>
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />
+            </svg>
+            Create User
+          </>
+        )}
+      </button>
     </form>
   );
 }

@@ -3,15 +3,57 @@ import Loader from "../../components/ui/Loader";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 
 function paiseToRupees(p: number) {
   return `₹${(p / 100).toLocaleString("en-IN")}`;
 }
 
+/* ── Inline line icons ───────────────────────────────────────── */
+const Icon = {
+  search: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+    </svg>
+  ),
+  x: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  ),
+  chevronD: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  ),
+  docs: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h6M9 17h6" />
+    </svg>
+  ),
+  empty: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+    </svg>
+  ),
+};
+
+function AddButton({ title, onClick }: { title: string; onClick: () => void }) {
+  return (
+    <button className="adm-add" type="button" title={title} aria-label={title} onClick={onClick}>
+      <svg viewBox="0 0 24 24" height="46" width="46" xmlns="http://www.w3.org/2000/svg">
+        <path strokeWidth="1.5" d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" />
+        <path strokeWidth="1.5" d="M8 12H16" />
+        <path strokeWidth="1.5" d="M12 16V8" />
+      </svg>
+    </button>
+  );
+}
+
 export default function ServicesConfigPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const isSuperAdmin = profile?.role === "super_admin";
   const isAdmin = profile?.role === "admin" || isSuperAdmin;
 
@@ -44,9 +86,7 @@ export default function ServicesConfigPage() {
   });
 
   if (authLoading || isLoading) {
-    return (
-      <div className="page-loader"><Loader /></div>
-    );
+    return <div className="page-loader"><Loader /></div>;
   }
 
   if (!isAdmin) {
@@ -55,6 +95,7 @@ export default function ServicesConfigPage() {
 
   const services = data?.services ?? [];
   const categories = data?.categories ?? [];
+  const activeCount = services.filter((s: any) => s.is_active).length;
 
   const filtered = services.filter((s: any) => {
     const matchSearch = !search.trim() ||
@@ -75,60 +116,88 @@ export default function ServicesConfigPage() {
   const groups = [...catMap.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
 
   return (
-    <div className="svc-cfg-page">
-      <div className="page-header" style={{ marginBottom: "1.5rem" }}>
-        <div>
-          <p className="svc-kicker">Service Configuration</p>
-          <h1 className="page-title">Services Catalog</h1>
-          <p className="svc-subtitle">
-            Manage all services, categories, document requirements, and compliance deadlines.
-            {!isSuperAdmin && " Contact Super Admin to create or archive services."}
-          </p>
+    <div className="adm-root">
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <header className="adm-hero">
+        <div className="adm-hero-glow" />
+        <div className="adm-hero-bar">
+          <div>
+            <p className="adm-hero-eyebrow">— Service Configuration</p>
+            <h1 className="adm-hero-title">Services Catalog</h1>
+            <p className="adm-hero-date">
+              Manage services, categories, document requirements, and compliance deadlines.
+              {!isSuperAdmin && " Contact Super Admin to create or archive services."}
+            </p>
+          </div>
+          <div className="adm-hero-stats">
+            <div className="adm-hero-stat"><div className="adm-hero-stat-val">{services.length}</div><div className="adm-hero-stat-lbl">Services</div></div>
+            <div className="adm-hero-stat"><div className="adm-hero-stat-val">{activeCount}</div><div className="adm-hero-stat-lbl">Active</div></div>
+            <div className="adm-hero-stat"><div className="adm-hero-stat-val">{categories.length}</div><div className="adm-hero-stat-lbl">Categories</div></div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-          <Link to="/admin/document-types" className="btn btn-secondary" style={{ fontSize: "0.85rem" }}>
-            Document Types
-          </Link>
-          <Link to="/admin/services/new" className="btn btn-primary" style={{ fontSize: "0.85rem" }}>
-            + New Service
-          </Link>
-        </div>
-      </div>
+      </header>
 
-      <div className="sc-shell">
-        <div className="sc-toolbar">
-          <input
-            type="search"
-            placeholder="Search services or slugs…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="sc-search"
-          />
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="sc-select">
-            <option value="all">All Categories</option>
-            {categories.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <select value={filterActive} onChange={e => setFilterActive(e.target.value as any)} className="sc-select">
-            <option value="active">Active only</option>
-            <option value="inactive">Inactive only</option>
-            <option value="all">All statuses</option>
-          </select>
-          <span className="sc-count">{filtered.length} services</span>
+      <section className="adm-panel">
+        <div className="adm-panel-head">
+          <div className="adm-panel-titles">
+            <h2 className="adm-panel-title">All services<span className="adm-count">{filtered.length}</span></h2>
+            <p className="adm-panel-desc">Grouped by category. Edit pricing, documents, and deadlines per service.</p>
+          </div>
+          <div className="adm-actions">
+            <Link to="/admin/document-types" className="adm-btn adm-btn--ghost">
+              {Icon.docs} Document Types
+            </Link>
+            <AddButton title="New service" onClick={() => navigate("/admin/services/new")} />
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div className="adm-toolbar">
+          <div className="adm-search">
+            <span className="adm-search-ico">{Icon.search}</span>
+            <input
+              className="adm-search-input"
+              placeholder="Search services or slugs…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className="adm-search-clear" onClick={() => setSearch("")} aria-label="Clear search">{Icon.x}</button>
+            )}
+          </div>
+          <div className="adm-filter">
+            <select className="adm-filter-select" value={filterCat} onChange={e => setFilterCat(e.target.value)}>
+              <option value="all">All categories</option>
+              {categories.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <span className="adm-filter-ico">{Icon.chevronD}</span>
+          </div>
+          <div className="adm-filter">
+            <select className="adm-filter-select" value={filterActive} onChange={e => setFilterActive(e.target.value as any)}>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+              <option value="all">All statuses</option>
+            </select>
+            <span className="adm-filter-ico">{Icon.chevronD}</span>
+          </div>
         </div>
 
         {groups.length === 0 ? (
-          <div className="sc-empty">No services match your filters.</div>
+          <div className="adm-empty-box">
+            <span className="adm-empty-ico">{Icon.empty}</span>
+            <p className="adm-empty-txt">No services match your filters.</p>
+          </div>
         ) : (
           groups.map(([catId, { label, services: svcs }]) => (
-            <div key={catId} className="sc-group">
-              <div className="sc-group-header">
-                <span className="sc-group-title">{label}</span>
-                <span className="sc-group-count">{svcs.length} service{svcs.length !== 1 ? "s" : ""}</span>
+            <div key={catId} className="adm-group">
+              <div className="adm-group-head">
+                <span className="adm-group-title">{label}</span>
+                <span className="adm-group-count">{svcs.length} service{svcs.length !== 1 ? "s" : ""}</span>
               </div>
-              <div className="sc-table-wrap">
-                <table className="sc-table">
+              <div className="adm-tbl-wrap">
+                <table className="adm-tbl">
                   <thead>
                     <tr>
                       <th>Service</th>
@@ -136,41 +205,44 @@ export default function ServicesConfigPage() {
                       <th>Price</th>
                       <th>FY Required</th>
                       <th>Status</th>
-                      <th>Actions</th>
+                      <th className="adm-th-actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {svcs.map(svc => (
-                      <tr key={svc.id} className={!svc.is_active ? "sc-row-inactive" : ""}>
-                        <td className="sc-name">
-                          {svc.name}
-                          {!svc.is_active && <span className="sc-badge sc-badge-inactive">Inactive</span>}
-                        </td>
-                        <td><code className="sc-slug">{svc.slug}</code></td>
-                        <td className="sc-price">{paiseToRupees(svc.price)}</td>
+                      <tr key={svc.id} style={{ opacity: svc.is_active ? 1 : 0.55 }}>
                         <td>
-                          <span className={`sc-badge ${svc.requires_fy ? "sc-badge-fy" : "sc-badge-no"}`}>
-                            {svc.requires_fy ? "Yes" : "No"}
+                          <div className="adm-tbl-name">{svc.name}</div>
+                        </td>
+                        <td><code className="adm-code">{svc.slug}</code></td>
+                        <td><span className="adm-money">{paiseToRupees(svc.price)}</span></td>
+                        <td>
+                          <span className={`adm-badge ${svc.requires_fy ? "adm-badge--green" : "adm-badge--neutral"}`}>
+                            <span className="adm-badge-dot" />{svc.requires_fy ? "Yes" : "No"}
                           </span>
                         </td>
                         <td>
-                          <span className={`sc-status-dot ${svc.is_active ? "sc-dot-active" : "sc-dot-inactive"}`} />
-                          {svc.is_active ? "Active" : "Inactive"}
+                          <span className={`adm-badge ${svc.is_active ? "adm-badge--green" : "adm-badge--neutral"}`}>
+                            <span className="adm-badge-dot" />{svc.is_active ? "Active" : "Inactive"}
+                          </span>
                         </td>
-                        <td>
-                          <div className="sc-actions">
-                            <Link to={`/admin/services/${svc.id}`} className="sc-btn sc-btn-edit">
-                              Edit
-                            </Link>
+                        <td className="adm-cell-actions">
+                          <div className="adm-actions">
                             {isSuperAdmin && (
                               <button
-                                className={`sc-btn ${svc.is_active ? "sc-btn-deactivate" : "sc-btn-activate"}`}
+                                className={`adm-btn adm-btn--sm ${svc.is_active ? "adm-btn--ghost" : "adm-btn--accent"}`}
                                 disabled={toggleMutation.isPending}
                                 onClick={() => toggleMutation.mutate({ id: svc.id, current: svc.is_active })}
                               >
                                 {svc.is_active ? "Deactivate" : "Activate"}
                               </button>
                             )}
+                            <Link to={`/admin/services/${svc.id}`} className="adm-view">
+                              Edit
+                              <span className="adm-view-ico">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                              </span>
+                            </Link>
                           </div>
                         </td>
                       </tr>
@@ -181,96 +253,7 @@ export default function ServicesConfigPage() {
             </div>
           ))
         )}
-      </div>
-
-      <style>{`
-        .svc-cfg-page { padding-bottom: 3rem; }
-        .svc-kicker { margin: 0 0 0.35rem; color: #7c3aed; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
-        .svc-subtitle { font-size: 0.83rem; color: #94a3b8; margin: 0.3rem 0 0; max-width: 60ch; }
-        .sc-shell { display: flex; flex-direction: column; gap: 1.5rem; }
-
-        .sc-toolbar {
-          display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
-          background: white; border: 1px solid #e2e8f0; border-radius: 1rem;
-          padding: 0.85rem 1rem;
-        }
-        .sc-search {
-          flex: 1; min-width: 200px; padding: 0.5rem 0.875rem; border-radius: 0.5rem;
-          border: 1px solid #e2e8f0; font-size: 0.875rem; outline: none;
-          background: #f8fafc; color: #0f172a;
-        }
-        .sc-search:focus { border-color: #7c3aed; background: white; }
-        .sc-select {
-          padding: 0.5rem 0.75rem; border-radius: 0.5rem; border: 1px solid #e2e8f0;
-          font-size: 0.82rem; background: #f8fafc; color: #475569; outline: none;
-        }
-        .sc-count { font-size: 0.78rem; color: #94a3b8; white-space: nowrap; margin-left: auto; }
-
-        .sc-group { }
-        .sc-group-header {
-          display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.6rem;
-        }
-        .sc-group-title {
-          font-size: 0.8rem; font-weight: 700; color: #475569;
-          text-transform: uppercase; letter-spacing: 0.08em;
-        }
-        .sc-group-count {
-          font-size: 0.72rem; background: #f1f5f9; color: #94a3b8;
-          padding: 0.1rem 0.5rem; border-radius: 999px;
-        }
-
-        .sc-table-wrap {
-          border: 1px solid #e2e8f0; border-radius: 0.875rem; overflow: hidden;
-          box-shadow: 0 2px 12px rgba(15,23,42,0.04);
-        }
-        .sc-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; background: white; }
-        .sc-table thead tr { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-        .sc-table th {
-          padding: 0.65rem 1rem; text-align: left; font-size: 0.72rem; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; white-space: nowrap;
-        }
-        .sc-table td { padding: 0.85rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-        .sc-table tbody tr:last-child td { border-bottom: none; }
-        .sc-table tbody tr:hover td { background: #fafbff; }
-        .sc-row-inactive td { opacity: 0.55; }
-
-        .sc-name { font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 0.5rem; }
-        .sc-slug {
-          font-family: 'Courier New', monospace; font-size: 0.75rem;
-          background: #f1f5f9; color: #475569; padding: 0.15rem 0.5rem;
-          border-radius: 4px; border: 1px solid #e2e8f0;
-        }
-        .sc-price { font-weight: 600; color: #059669; }
-
-        .sc-badge {
-          display: inline-flex; align-items: center; padding: 0.18rem 0.5rem;
-          border-radius: 999px; font-size: 0.7rem; font-weight: 700; white-space: nowrap;
-        }
-        .sc-badge-inactive { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-        .sc-badge-fy       { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
-        .sc-badge-no       { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
-
-        .sc-status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; margin-right: 0.4rem; }
-        .sc-dot-active   { background: #22c55e; }
-        .sc-dot-inactive { background: #cbd5e1; }
-
-        .sc-actions { display: flex; gap: 0.4rem; }
-        .sc-btn {
-          font-size: 0.75rem; font-weight: 600; padding: 0.3rem 0.75rem; border-radius: 6px;
-          border: 1px solid transparent; cursor: pointer; transition: opacity 0.15s;
-          text-decoration: none; display: inline-flex; align-items: center;
-        }
-        .sc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .sc-btn-edit       { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-        .sc-btn-deactivate { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
-        .sc-btn-activate   { background: #f0fdf4; color: #059669; border-color: #bbf7d0; }
-        .sc-btn:hover:not(:disabled) { opacity: 0.75; }
-
-        .sc-empty {
-          text-align: center; padding: 3rem; background: #fafafa;
-          border: 1.5px dashed #e2e8f0; border-radius: 1rem; color: #94a3b8; font-size: 0.9rem;
-        }
-      `}</style>
+      </section>
     </div>
   );
 }

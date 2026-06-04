@@ -14,12 +14,101 @@ const LIMIT = 20;
 
 const STAFF_ROLES: { value: string; label: string }[] = [
   { value: '',            label: 'All roles' },
-  { value: 'expert',     label: 'Expert' },
-  { value: 'ca',         label: 'CA' },
-  { value: 'admin',      label: 'Admin' },
-  { value: 'staff',      label: 'Staff' },
-  { value: 'super_admin',label: 'Super Admin' },
+  { value: 'expert',      label: 'Expert' },
+  { value: 'ca',          label: 'CA' },
+  { value: 'admin',       label: 'Admin' },
+  { value: 'staff',       label: 'Staff' },
+  { value: 'super_admin', label: 'Super Admin' },
 ];
+
+/* ── Inline line icons ───────────────────────────────────────── */
+const Icon = {
+  clients: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  staff: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  ),
+  create: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M19 8v6M22 11h-6" />
+    </svg>
+  ),
+  search: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  ),
+  x: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  ),
+  chevronL: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  ),
+  chevronR: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  ),
+  chevronD: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  ),
+  shield: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  ),
+  usersEmpty: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    </svg>
+  ),
+};
+
+/* ── Rotating + add button (themed to accent) ───────────────── */
+function AddButton({ title, onClick }: { title: string; onClick: () => void }) {
+  return (
+    <button className="adm-add" type="button" title={title} aria-label={title} onClick={onClick}>
+      <svg viewBox="0 0 24 24" height="46" width="46" xmlns="http://www.w3.org/2000/svg">
+        <path strokeWidth="1.5" d="M12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22Z" />
+        <path strokeWidth="1.5" d="M8 12H16" />
+        <path strokeWidth="1.5" d="M12 16V8" />
+      </svg>
+    </button>
+  );
+}
+
+/* ── View button (slides toward detail) ─────────────────────── */
+function ViewButton({ to }: { to: string }) {
+  return (
+    <Link to={to} className="adm-view">
+      View
+      <span className="adm-view-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </span>
+    </Link>
+  );
+}
 
 function useDebounce(raw: string, delay = 300): string {
   const [debounced, setDebounced] = useState(raw);
@@ -35,12 +124,20 @@ function useDebounce(raw: string, delay = 300): string {
 function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
   if (totalPages <= 1) return null;
   return (
-    <div className="aq-pagination">
-      <button className="btn btn-sm btn-secondary" disabled={page <= 1} onClick={() => onChange(page - 1)}>← Prev</button>
-      <span className="aq-pagination-info">Page {page} of {totalPages}</span>
-      <button className="btn btn-sm btn-secondary" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next →</button>
+    <div className="adm-pager">
+      <button className="adm-pager-btn" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        {Icon.chevronL}<span>Prev</span>
+      </button>
+      <span className="adm-pager-info">Page <b>{page}</b> of <b>{totalPages}</b></span>
+      <button className="adm-pager-btn" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+        <span>Next</span>{Icon.chevronR}
+      </button>
     </div>
   );
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function AdminPage() {
@@ -56,7 +153,6 @@ export default function AdminPage() {
   const [clientPage, setClientPage] = useState(1);
   const clientSearch = useDebounce(clientRaw);
 
-  // Reset page when search changes
   const prevClientSearch = useRef(clientSearch);
   useEffect(() => {
     if (clientSearch !== prevClientSearch.current) {
@@ -66,9 +162,9 @@ export default function AdminPage() {
   }, [clientSearch]);
 
   // ── Staff tab state ───────────────────────────────────────────
-  const [staffRaw, setStaffRaw]     = useState('');
-  const [staffPage, setStaffPage]   = useState(1);
-  const [staffRole, setStaffRole]   = useState('');
+  const [staffRaw, setStaffRaw]   = useState('');
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffRole, setStaffRole] = useState('');
   const staffSearch = useDebounce(staffRaw);
 
   const prevStaffSearch = useRef(staffSearch);
@@ -120,73 +216,93 @@ export default function AdminPage() {
   const staffTotalPages: number = Math.ceil(staffCount / LIMIT);
 
   const tabs = [
-    { id: 'clients', label: 'Clients' },
-    { id: 'staff',   label: 'Staff & Experts' },
-    { id: 'create',  label: '+ Create User' },
+    { id: 'clients', label: 'Clients',          icon: Icon.clients },
+    { id: 'staff',   label: 'Staff & Experts',  icon: Icon.staff },
+    { id: 'create',  label: 'Create User',      icon: Icon.create },
   ];
 
   return (
-    <div className="adm-page">
-      <div className="page-header" style={{ marginBottom: '1.5rem' }}>
-        <div>
-          <p className="adm-kicker">{isSuperAdmin ? 'Super Admin · Operations' : 'Operations'}</p>
-          <h1 className="page-title">Admin Panel</h1>
+    <div className="adm-root adm-um">
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <header className="adm-hero">
+        <div className="adm-hero-glow" />
+        <div className="adm-hero-bar">
+          <div>
+            <p className="adm-hero-eyebrow">— Administration</p>
+            <h1 className="adm-hero-title">User Management</h1>
+            <p className="adm-hero-date">Manage client accounts, staff, and experts across the platform.</p>
+          </div>
+          <div className="adm-hero-aside">
+            {isSuperAdmin ? (
+              <>
+                <span className="adm-hero-badge">{Icon.shield} Super Admin</span>
+                <p className="adm-hero-note">Full platform control, including role assignment.</p>
+              </>
+            ) : (
+              <span className="adm-hero-live">
+                <span className="adm-hero-live-dot" /> Operations
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
-      {isSuperAdmin && (
-        <div className="sa-banner">
-          <span className="sa-badge">Super Admin</span>
-          You have full platform control including role assignment.
-        </div>
-      )}
-
-      <nav className="adm-tabs">
+      {/* ── Tabs ───────────────────────────────────────────────── */}
+      <nav className="adm-seg" role="tablist">
         {tabs.map(t => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => setSearchParams({ tab: t.id })}
-            className={`adm-tab${tab === t.id ? ' adm-tab-active' : ''}`}
+            className={`adm-seg-btn${tab === t.id ? ' is-active' : ''}`}
           >
+            {t.icon}
             {t.label}
           </button>
         ))}
       </nav>
 
-      {/* ── Clients tab ─────────────────────────────────────── */}
+      {/* ── Clients tab ────────────────────────────────────────── */}
       {tab === 'clients' && (
-        <section className="adm-section">
-          <div className="adm-section-header">
-            <div>
-              <h2 className="adm-section-title">Client Accounts</h2>
-              <p className="adm-section-desc">
-                {clientCount > 0 ? `${clientCount} client${clientCount !== 1 ? 's' : ''} found` : 'All registered client accounts.'}
-              </p>
+        <section className="adm-panel">
+          <div className="adm-panel-head">
+            <div className="adm-panel-titles">
+              <h2 className="adm-panel-title">
+                Client accounts
+                {clientCount > 0 && <span className="adm-count">{clientCount}</span>}
+              </h2>
+              <p className="adm-panel-desc">All registered client accounts on the platform.</p>
             </div>
-            <button onClick={() => setSearchParams({ tab: 'create' })} className="btn btn-primary" style={{ fontSize: '0.875rem' }}>
-              + Add Client
-            </button>
+            <AddButton title="Add client" onClick={() => setSearchParams({ tab: 'create' })} />
           </div>
 
-          <div className="aq-search-row">
-            <input
-              className="form-input aq-search-input"
-              placeholder="Search by name, PAN, or phone number…"
-              value={clientRaw}
-              onChange={e => setClientRaw(e.target.value)}
-            />
+          <div className="adm-toolbar">
+            <div className="adm-search">
+              <span className="adm-search-ico">{Icon.search}</span>
+              <input
+                className="adm-search-input"
+                placeholder="Search by name, PAN, or phone number…"
+                value={clientRaw}
+                onChange={e => setClientRaw(e.target.value)}
+              />
+              {clientRaw && (
+                <button className="adm-search-clear" onClick={() => setClientRaw('')} aria-label="Clear search">{Icon.x}</button>
+              )}
+            </div>
           </div>
 
           {clientLoading ? (
-            <div className="page-loader"><Loader /></div>
+            <div className="adm-loading"><Loader /></div>
           ) : clientUsers.length === 0 ? (
-            <div className="adm-empty">
-              {clientRaw ? 'No clients match your search.' : 'No clients registered yet.'}
+            <div className="adm-empty-box">
+              <span className="adm-empty-ico">{Icon.usersEmpty}</span>
+              <p className="adm-empty-txt">{clientRaw ? 'No clients match your search.' : 'No clients registered yet.'}</p>
             </div>
           ) : (
             <>
-              <div className="adm-table-wrap">
-                <table className="adm-table">
+              <div className="adm-tbl-wrap">
+                <table className="adm-tbl">
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -196,31 +312,34 @@ export default function AdminPage() {
                       <th>Services</th>
                       <th>Completed</th>
                       <th>Since</th>
-                      <th>Password</th>
-                      <th></th>
+                      <th className="adm-th-actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {clientUsers.map((u: any) => (
                       <tr key={u.id}>
-                        <td className="adm-name">
-                          <div className="adm-avatar">{u.first_name[0]}{u.last_name[0]}</div>
-                          {u.first_name} {u.last_name}
-                        </td>
-                        <td className="adm-muted">{u.email}</td>
-                        <td><code className="adm-code">{u.pan}</code></td>
-                        <td className="adm-muted">{u.mobile || '—'}</td>
-                        <td><span className="adm-count">{u.total_services}</span></td>
                         <td>
-                          <span className="adm-count" style={u.completed_services ? { background: '#f0fdf4', color: '#057a55' } : {}}>
+                          <div className="adm-tbl-name">
+                            <span className="adm-avatar">{u.first_name?.[0]}{u.last_name?.[0]}</span>
+                            {u.first_name} {u.last_name}
+                          </div>
+                        </td>
+                        <td className="adm-mono adm-cell-email" title={u.email}>{u.email}</td>
+                        <td><code className="adm-code">{u.pan}</code></td>
+                        <td className="adm-mono">{u.mobile || '—'}</td>
+                        <td><span className="adm-chip-num">{u.total_services}</span></td>
+                        <td>
+                          <span className={`adm-chip-num${u.completed_services ? ' adm-chip-num--done' : ' adm-chip-num--zero'}`}>
                             {u.completed_services}
                           </span>
                         </td>
-                        <td className="adm-muted">
-                          {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        <td className="adm-mono">{fmtDate(u.created_at)}</td>
+                        <td className="adm-cell-actions">
+                          <div className="adm-actions">
+                            <ResetPasswordButton userId={u.id} userName={`${u.first_name} ${u.last_name}`} />
+                            <ViewButton to={`/admin/users/client/${u.id}`} />
+                          </div>
                         </td>
-                        <td><ResetPasswordButton userId={u.id} userName={`${u.first_name} ${u.last_name}`} /></td>
-                        <td><Link to={`/admin/users/client/${u.id}`} className="btn btn-sm btn-secondary">View</Link></td>
                       </tr>
                     ))}
                   </tbody>
@@ -232,50 +351,60 @@ export default function AdminPage() {
         </section>
       )}
 
-      {/* ── Staff tab ────────────────────────────────────────── */}
+      {/* ── Staff tab ──────────────────────────────────────────── */}
       {tab === 'staff' && (
-        <section className="adm-section">
-          <div className="adm-section-header">
-            <div>
-              <h2 className="adm-section-title">Staff & Experts</h2>
-              <p className="adm-section-desc">
-                {staffCount > 0 ? `${staffCount} member${staffCount !== 1 ? 's' : ''} found` : 'Taxperts, staff, and admins.'}
-                {isSuperAdmin ? ' As Super Admin, you can assign any role.' : ''}
+        <section className="adm-panel">
+          <div className="adm-panel-head">
+            <div className="adm-panel-titles">
+              <h2 className="adm-panel-title">
+                Staff &amp; Experts
+                {staffCount > 0 && <span className="adm-count">{staffCount}</span>}
+              </h2>
+              <p className="adm-panel-desc">
+                Taxperts, staff, and admins.{isSuperAdmin ? ' As Super Admin, you can assign any role inline.' : ''}
               </p>
             </div>
-            <button onClick={() => setSearchParams({ tab: 'create' })} className="btn btn-primary" style={{ fontSize: '0.875rem' }}>
-              + Add Staff
-            </button>
+            <AddButton title="Add staff" onClick={() => setSearchParams({ tab: 'create' })} />
           </div>
 
-          <div className="aq-search-row">
-            <input
-              className="form-input aq-search-input"
-              placeholder="Search by name or phone number…"
-              value={staffRaw}
-              onChange={e => setStaffRaw(e.target.value)}
-            />
-            <select
-              className="form-input aq-filter-select"
-              value={staffRole}
-              onChange={e => handleStaffRole(e.target.value)}
-            >
-              {STAFF_ROLES.map(r => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
+          <div className="adm-toolbar">
+            <div className="adm-search">
+              <span className="adm-search-ico">{Icon.search}</span>
+              <input
+                className="adm-search-input"
+                placeholder="Search by name or phone number…"
+                value={staffRaw}
+                onChange={e => setStaffRaw(e.target.value)}
+              />
+              {staffRaw && (
+                <button className="adm-search-clear" onClick={() => setStaffRaw('')} aria-label="Clear search">{Icon.x}</button>
+              )}
+            </div>
+            <div className="adm-filter">
+              <select
+                className="adm-filter-select"
+                value={staffRole}
+                onChange={e => handleStaffRole(e.target.value)}
+              >
+                {STAFF_ROLES.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              <span className="adm-filter-ico">{Icon.chevronD}</span>
+            </div>
           </div>
 
           {staffLoading ? (
-            <div className="page-loader"><Loader /></div>
+            <div className="adm-loading"><Loader /></div>
           ) : staffUsers.length === 0 ? (
-            <div className="adm-empty">
-              {staffRaw || staffRole ? 'No staff match your search.' : 'No staff accounts yet.'}
+            <div className="adm-empty-box">
+              <span className="adm-empty-ico">{Icon.usersEmpty}</span>
+              <p className="adm-empty-txt">{staffRaw || staffRole ? 'No staff match your search.' : 'No staff accounts yet.'}</p>
             </div>
           ) : (
             <>
-              <div className="adm-table-wrap">
-                <table className="adm-table">
+              <div className="adm-tbl-wrap">
+                <table className="adm-tbl">
                   <thead>
                     <tr>
                       <th>Name</th>
@@ -284,8 +413,7 @@ export default function AdminPage() {
                       <th>Mobile</th>
                       <th>Role</th>
                       <th>Since</th>
-                      <th>Password</th>
-                      <th></th>
+                      <th className="adm-th-actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -293,13 +421,15 @@ export default function AdminPage() {
                       const isTaxpert = u.role === 'expert' || u.role === 'ca';
                       return (
                         <tr key={u.id}>
-                          <td className="adm-name">
-                            <div className="adm-avatar">{u.first_name[0]}{u.last_name[0]}</div>
-                            {u.first_name} {u.last_name}
+                          <td>
+                            <div className="adm-tbl-name">
+                              <span className="adm-avatar">{u.first_name?.[0]}{u.last_name?.[0]}</span>
+                              {u.first_name} {u.last_name}
+                            </div>
                           </td>
-                          <td className="adm-muted">{u.email}</td>
+                          <td className="adm-mono adm-cell-email" title={u.email}>{u.email}</td>
                           <td><code className="adm-code">{u.pan}</code></td>
-                          <td className="adm-muted">{u.mobile || '—'}</td>
+                          <td className="adm-mono">{u.mobile || '—'}</td>
                           <td>
                             <UserRoleBadge
                               userId={u.id}
@@ -307,14 +437,12 @@ export default function AdminPage() {
                               viewerRole={(profile?.role ?? 'admin') as ValidRole}
                             />
                           </td>
-                          <td className="adm-muted">
-                            {new Date(u.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </td>
-                          <td><ResetPasswordButton userId={u.id} userName={`${u.first_name} ${u.last_name}`} /></td>
-                          <td>
-                            {isTaxpert && (
-                              <Link to={`/admin/users/taxpert/${u.id}`} className="btn btn-sm btn-secondary">View</Link>
-                            )}
+                          <td className="adm-mono">{fmtDate(u.created_at)}</td>
+                          <td className="adm-cell-actions">
+                            <div className="adm-actions">
+                              <ResetPasswordButton userId={u.id} userName={`${u.first_name} ${u.last_name}`} />
+                              {isTaxpert && <ViewButton to={`/admin/users/taxpert/${u.id}`} />}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -328,89 +456,65 @@ export default function AdminPage() {
         </section>
       )}
 
-      {/* ── Create tab ───────────────────────────────────────── */}
+      {/* ── Create tab ─────────────────────────────────────────── */}
       {tab === 'create' && (
-        <section className="adm-section">
-          <h2 className="adm-section-title">Create New User</h2>
-          <p className="adm-section-desc" style={{ marginBottom: '1.5rem' }}>
-            Accounts created here are auto-confirmed and immediately ready for platform access.
-          </p>
-          <div className="adm-create-wrap">
-            <div className="card">
-              <CreateUserForm isSuperAdmin={isSuperAdmin} />
+        <div className="adm-create">
+          <section className="adm-panel">
+            <div className="adm-panel-titles" style={{ marginBottom: '1.25rem' }}>
+              <h2 className="adm-panel-title">Create new user</h2>
+              <p className="adm-panel-desc">
+                Accounts created here are auto-confirmed and immediately ready for platform access.
+              </p>
             </div>
-          </div>
-        </section>
+            <CreateUserForm isSuperAdmin={isSuperAdmin} />
+          </section>
+
+          <aside className="adm-create-aside">
+            <div className="adm-aside-glow" />
+            <p className="adm-aside-eyebrow">— What happens</p>
+            <h3 className="adm-aside-title">Onboarding, handled for you</h3>
+            <ul className="adm-aside-list">
+              <li className="adm-aside-item">
+                <span className="adm-aside-ico">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="adm-aside-h">Auto-confirmed</p>
+                  <p className="adm-aside-p">No email verification step — the account is active the moment it's created.</p>
+                </div>
+              </li>
+              <li className="adm-aside-item">
+                <span className="adm-aside-ico">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="adm-aside-h">Role-scoped access</p>
+                  <p className="adm-aside-p">
+                    {isSuperAdmin
+                      ? 'You may assign any role, including Admin and Super Admin.'
+                      : 'Admin and Super Admin roles require Super Admin access.'}
+                  </p>
+                </div>
+              </li>
+              <li className="adm-aside-item">
+                <span className="adm-aside-ico">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="adm-aside-h">Secure credentials</p>
+                  <p className="adm-aside-p">Set an initial password now — it can be reset anytime from the user table.</p>
+                </div>
+              </li>
+            </ul>
+          </aside>
+        </div>
       )}
-
-      <style>{`
-        .adm-page { padding-bottom: 3rem; }
-        .adm-kicker { margin: 0 0 0.35rem; color: #2563eb; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
-
-        .sa-banner {
-          display: flex; align-items: center; gap: 0.75rem;
-          background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-          border: 1px solid #c7d2fe; border-radius: 0.875rem;
-          padding: 0.75rem 1.1rem; font-size: 0.82rem; color: #4338ca;
-          font-weight: 500; margin-bottom: 1.25rem;
-        }
-        .sa-badge {
-          background: #4338ca; color: #fff; font-size: 0.68rem; font-weight: 800;
-          padding: 0.2rem 0.6rem; border-radius: 999px; letter-spacing: 0.05em; white-space: nowrap;
-        }
-
-        .adm-tabs {
-          display: flex; gap: 0.2rem; flex-wrap: wrap; margin-bottom: 1.75rem;
-          background: #f8fafc; border: 1px solid #e2e8f0;
-          border-radius: 0.875rem; padding: 0.28rem; width: fit-content;
-        }
-        .adm-tab {
-          padding: 0.5rem 1.1rem; border-radius: 0.6rem; font-size: 0.82rem;
-          font-weight: 500; color: #64748b; white-space: nowrap;
-          border: none; background: transparent; cursor: pointer; transition: background 0.15s, color 0.15s;
-        }
-        .adm-tab:hover { color: #0f172a; background: rgba(255,255,255,0.8); }
-        .adm-tab-active { background: #fff; color: #1d4ed8; font-weight: 600; box-shadow: 0 1px 6px rgba(15,23,42,0.1); }
-
-        .adm-section-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-        .adm-section-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0 0 0.2rem; }
-        .adm-section-desc { font-size: 0.82rem; color: #94a3b8; margin: 0; max-width: 60ch; }
-
-        .adm-table-wrap { overflow-x: auto; border-radius: 1.1rem; border: 1px solid rgba(226,232,240,0.9); box-shadow: 0 4px 20px rgba(15,23,42,0.05); }
-        .adm-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; background: #fff; }
-        .adm-table thead tr { background: linear-gradient(to right, #f8fafc, #f1f5f9); border-bottom: 1px solid #e2e8f0; }
-        .adm-table th { text-align: left; padding: 0.75rem 1rem; color: #94a3b8; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; }
-        .adm-table td { padding: 0.9rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-        .adm-table tbody tr:last-child td { border-bottom: none; }
-        .adm-table tbody tr { transition: background 0.12s; }
-        .adm-table tbody tr:hover td { background: #f8fbff; }
-
-        .adm-name { display: flex; align-items: center; gap: 0.65rem; font-weight: 600; color: #0f172a; white-space: nowrap; }
-        .adm-muted { color: #64748b; font-size: 0.82rem; }
-        .adm-avatar {
-          width: 34px; height: 34px; border-radius: 999px;
-          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-          color: #1d4ed8; display: flex; align-items: center; justify-content: center;
-          font-size: 0.7rem; font-weight: 800; flex-shrink: 0;
-          box-shadow: 0 0 0 2px #fff, 0 0 0 3px #bfdbfe;
-        }
-        .adm-code {
-          background: #f1f5f9; color: #475569; padding: 0.18rem 0.5rem;
-          border-radius: 5px; font-size: 0.76rem; font-family: 'Courier New', monospace;
-          white-space: nowrap; letter-spacing: 0.04em; border: 1px solid #e2e8f0;
-        }
-        .adm-count {
-          background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
-          border-radius: 999px; padding: 0.18rem 0.6rem;
-          font-size: 0.76rem; font-weight: 700; display: inline-block;
-        }
-
-        .adm-create-wrap { max-width: 560px; }
-        .adm-empty {
-          text-align: center; padding: 3rem 2rem; color: #94a3b8; font-size: 0.9rem;
-          background: #fafafa; border: 1.5px dashed #e2e8f0; border-radius: 1.1rem;
-        }
-      `}</style>
     </div>
   );
 }

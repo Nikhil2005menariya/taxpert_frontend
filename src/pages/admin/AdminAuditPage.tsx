@@ -9,32 +9,32 @@ import { apiClient } from '../../api/client';
 
 const ACTION_META: Record<string, { label: string; group: string; color: string }> = {
   user_signup:               { label: 'Signed Up',              group: 'Auth',    color: '#6366f1' },
-  user_login:                { label: 'Logged In',               group: 'Auth',    color: '#10b981' },
-  user_logout:               { label: 'Logged Out',              group: 'Auth',    color: '#94a3b8' },
-  login_failed:              { label: 'Login Failed',            group: 'Auth',    color: '#ef4444' },
-  password_change:           { label: 'Password Changed',        group: 'Auth',    color: '#f59e0b' },
-  email_verified:            { label: 'Email Verified',          group: 'Auth',    color: '#10b981' },
-  create_texpert:            { label: 'Created Taxpert',         group: 'Admin',   color: '#1d4ed8' },
-  update_texpert:            { label: 'Updated Taxpert',         group: 'Admin',   color: '#1d4ed8' },
-  deactivate_texpert:        { label: 'Deactivated Taxpert',     group: 'Admin',   color: '#dc2626' },
-  remove_texpert:            { label: 'Removed Taxpert',         group: 'Admin',   color: '#dc2626' },
+  user_login:                { label: 'Logged In',               group: 'Auth',    color: '#2f7a5b' },
+  user_logout:               { label: 'Logged Out',              group: 'Auth',    color: '#8b857a' },
+  login_failed:              { label: 'Login Failed',            group: 'Auth',    color: '#c43d33' },
+  password_change:           { label: 'Password Changed',        group: 'Auth',    color: '#a96a16' },
+  email_verified:            { label: 'Email Verified',          group: 'Auth',    color: '#2f7a5b' },
+  create_texpert:            { label: 'Created Taxpert',         group: 'Admin',   color: '#5a5fb8' },
+  update_texpert:            { label: 'Updated Taxpert',         group: 'Admin',   color: '#5a5fb8' },
+  deactivate_texpert:        { label: 'Deactivated Taxpert',     group: 'Admin',   color: '#c43d33' },
+  remove_texpert:            { label: 'Removed Taxpert',         group: 'Admin',   color: '#c43d33' },
   assign_texpert:            { label: 'Assigned Taxpert',        group: 'Admin',   color: '#7c3aed' },
-  unassign_texpert:          { label: 'Unassigned Taxpert',      group: 'Admin',   color: '#94a3b8' },
-  add_to_queue:              { label: 'Added to Queue',          group: 'Admin',   color: '#f59e0b' },
-  self_assign_service:       { label: 'Self-Assigned',           group: 'Admin',   color: '#1d4ed8' },
+  unassign_texpert:          { label: 'Unassigned Taxpert',      group: 'Admin',   color: '#8b857a' },
+  add_to_queue:              { label: 'Added to Queue',          group: 'Admin',   color: '#a96a16' },
+  self_assign_service:       { label: 'Self-Assigned',           group: 'Admin',   color: '#5a5fb8' },
   send_notification:         { label: 'Sent Notification',       group: 'Admin',   color: '#6366f1' },
-  admin_update_service:      { label: 'Admin Updated Service',   group: 'Admin',   color: '#f59e0b' },
-  update_service_status:     { label: 'Status Updated',          group: 'Service', color: '#0ea5e9' },
-  approve_document:          { label: 'Document Approved',       group: 'Service', color: '#10b981' },
-  reject_document:           { label: 'Document Rejected',       group: 'Service', color: '#ef4444' },
+  admin_update_service:      { label: 'Admin Updated Service',   group: 'Admin',   color: '#a96a16' },
+  update_service_status:     { label: 'Status Updated',          group: 'Service', color: '#e85220' },
+  approve_document:          { label: 'Document Approved',       group: 'Service', color: '#2f7a5b' },
+  reject_document:           { label: 'Document Rejected',       group: 'Service', color: '#c43d33' },
   document_uploaded:         { label: 'Document Uploaded',       group: 'Service', color: '#6366f1' },
-  order_created:             { label: 'Order Created',           group: 'Payment', color: '#f59e0b' },
-  payment_captured:          { label: 'Payment Captured',        group: 'Payment', color: '#10b981' },
-  payment_failed:            { label: 'Payment Failed',          group: 'Payment', color: '#ef4444' },
+  order_created:             { label: 'Order Created',           group: 'Payment', color: '#a96a16' },
+  payment_captured:          { label: 'Payment Captured',        group: 'Payment', color: '#2f7a5b' },
+  payment_failed:            { label: 'Payment Failed',          group: 'Payment', color: '#c43d33' },
   coupon_consumed:           { label: 'Coupon Used',             group: 'Payment', color: '#6366f1' },
-  referral_rewarded:         { label: 'Referral Rewarded',       group: 'Payment', color: '#10b981' },
-  invoice_overdue_notified:  { label: 'Invoice Overdue',         group: 'Invoice', color: '#f59e0b' },
-  invoice_overdue_escalated: { label: 'Overdue Escalated',       group: 'Invoice', color: '#ef4444' },
+  referral_rewarded:         { label: 'Referral Rewarded',       group: 'Payment', color: '#2f7a5b' },
+  invoice_overdue_notified:  { label: 'Invoice Overdue',         group: 'Invoice', color: '#a96a16' },
+  invoice_overdue_escalated: { label: 'Overdue Escalated',       group: 'Invoice', color: '#c43d33' },
 };
 
 const ACTION_GROUPS: Record<string, string[]> = {
@@ -43,6 +43,24 @@ const ACTION_GROUPS: Record<string, string[]> = {
   Service: ['update_service_status','approve_document','reject_document','document_uploaded'],
   Payment: ['order_created','payment_captured','payment_failed','coupon_consumed','referral_rewarded'],
   Invoice: ['invoice_overdue_notified','invoice_overdue_escalated'],
+};
+
+/* ── Inline line icons ───────────────────────────────────────── */
+const Icon = {
+  chevronL: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+  ),
+  chevronR: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+  ),
+  chevronD: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+  ),
+  empty: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M9 13h4M9 17h6" />
+    </svg>
+  ),
 };
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -79,53 +97,30 @@ function parseUA(ua: string | undefined): { browser: string; os: string; device:
 // ── Atoms ─────────────────────────────────────────────────────
 
 function Dot({ color }: { color: string }) {
-  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />;
-}
-
-function FieldLabel({ children }: { children: string }) {
-  return (
-    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}>
-      {children}
-    </span>
-  );
-}
-
-function FieldVal({ children }: { children: React.ReactNode }) {
-  return <span style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 500 }}>{children}</span>;
+  return <span className="adm-au-dot" style={{ background: color }} />;
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <FieldLabel>{label}</FieldLabel>
-      <FieldVal>{value}</FieldVal>
+    <div className="adm-au-field">
+      <span className="adm-au-field-lbl">{label}</span>
+      <span className="adm-au-field-val">{value}</span>
     </div>
   );
 }
 
 function Card({ title, color, children }: { title: string; color?: string; children: React.ReactNode }) {
   return (
-    <div style={{
-      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
-      padding: '0.875rem 1rem', flex: '1 1 260px',
-    }}>
-      <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: color ?? '#64748b', marginBottom: '0.6rem' }}>
-        {title}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {children}
-      </div>
+    <div className="adm-au-card">
+      <div className="adm-au-card-title" style={{ color: color ?? 'var(--lp-ink-subtle)' }}>{title}</div>
+      <div className="adm-au-card-body">{children}</div>
     </div>
   );
 }
 
 function Mono({ children }: { children: React.ReactNode }) {
-  return (
-    <code style={{ fontSize: '0.74rem', background: '#f1f5f9', padding: '2px 5px', borderRadius: 4, color: '#475569', fontFamily: "'Courier New', monospace" }}>
-      {children}
-    </code>
-  );
+  return <code className="adm-au-mono">{children}</code>;
 }
 
 // ── Expanded detail panel ─────────────────────────────────────
@@ -135,7 +130,6 @@ function AuditDetailPanel({ entry }: { entry: any }) {
   const ua    = parseUA(m.userAgent as string | undefined);
   const group = ACTION_META[action]?.group;
 
-  // Payment amounts — prefer enriched (from DB) over metadata
   const totalAmount    = en.payment_amount    ?? (m.amountPaise      as number | undefined);
   const baseAmount     = en.base_amount       ?? (m.baseAmount       as number | undefined);
   const gstAmount      = en.gst_amount        ?? (m.gstAmount        as number | undefined);
@@ -146,25 +140,20 @@ function AuditDetailPanel({ entry }: { entry: any }) {
   const capturedAt     = en.payment_captured_at ?? entry.created_at;
 
   return (
-    <div style={{ padding: '1rem 1.25rem', background: '#fff', borderTop: '2px solid #f1f5f9' }}>
-      {/* Timestamp line */}
-      <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.85rem' }}>
-        <strong style={{ color: '#0f172a' }}>{ACTION_META[action]?.label ?? action}</strong>
-        {' · '}
-        {fmtDateTime(entry.created_at)}
-        {' · target: '}
+    <div className="adm-au-detail">
+      <div className="adm-au-detail-head">
+        <strong>{ACTION_META[action]?.label ?? action}</strong>
+        {' · '}{fmtDateTime(entry.created_at)}{' · target: '}
         <Mono>{target_type}</Mono>
         {target_id && <> <Mono>{target_id.slice(0, 8)}…</Mono></>}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-start' }}>
-
-        {/* Auth / Session info */}
+      <div className="adm-au-cards">
         {(m.ip || m.userAgent || m.email || m.reason) && (
           <Card title="Session" color="#6366f1">
             {m.email  && <Field label="Email"      value={m.email} />}
             {m.ip && m.ip !== 'unknown' && <Field label="IP Address" value={<Mono>{m.ip}</Mono>} />}
-            {m.reason && <Field label="Reason"     value={<span style={{ color: '#dc2626' }}>{m.reason}</span>} />}
+            {m.reason && <Field label="Reason"     value={<span style={{ color: '#c43d33' }}>{m.reason}</span>} />}
             {ua && (
               <>
                 <Field label="Browser" value={ua.browser} />
@@ -173,14 +162,13 @@ function AuditDetailPanel({ entry }: { entry: any }) {
               </>
             )}
             {m.userAgent && !ua && (
-              <Field label="User Agent" value={<span style={{ fontSize: '0.72rem', color: '#94a3b8', wordBreak: 'break-all' }}>{String(m.userAgent).slice(0, 120)}</span>} />
+              <Field label="User Agent" value={<span style={{ fontSize: '0.72rem', color: 'var(--lp-ink-faint)', wordBreak: 'break-all' }}>{String(m.userAgent).slice(0, 120)}</span>} />
             )}
           </Card>
         )}
 
-        {/* Client */}
         {en.client && (
-          <Card title="Client" color="#0ea5e9">
+          <Card title="Client" color="#e85220">
             <Field label="Name"   value={`${en.client.first_name} ${en.client.last_name}`} />
             <Field label="Email"  value={en.client.email} />
             {en.client.pan    && <Field label="PAN"    value={<Mono>{en.client.pan}</Mono>} />}
@@ -189,7 +177,6 @@ function AuditDetailPanel({ entry }: { entry: any }) {
           </Card>
         )}
 
-        {/* Taxpert */}
         {en.texpert && (
           <Card title="Taxpert" color="#7c3aed">
             <Field label="Name"  value={`${en.texpert.first_name} ${en.texpert.last_name}`} />
@@ -198,7 +185,6 @@ function AuditDetailPanel({ entry }: { entry: any }) {
           </Card>
         )}
 
-        {/* Target user (user CRUD actions) */}
         {en.target_user && (
           <Card title="User" color="#7c3aed">
             <Field label="Name"  value={`${en.target_user.first_name} ${en.target_user.last_name}`} />
@@ -210,9 +196,8 @@ function AuditDetailPanel({ entry }: { entry: any }) {
           </Card>
         )}
 
-        {/* Service context */}
         {(en.service_name || en.service_status || en.fiscal_year) && (
-          <Card title="Service" color="#0ea5e9">
+          <Card title="Service" color="#5a5fb8">
             {en.service_name   && <Field label="Service"     value={en.service_name} />}
             {en.service_status && <Field label="Status"      value={<Mono>{en.service_status}</Mono>} />}
             {en.fiscal_year    && <Field label="Fiscal Year" value={en.fiscal_year} />}
@@ -223,16 +208,15 @@ function AuditDetailPanel({ entry }: { entry: any }) {
           </Card>
         )}
 
-        {/* Payment — full breakdown */}
         {group === 'Payment' && (
-          <Card title="Payment" color="#10b981">
-            <Field label="Date &amp; Time"   value={fmtDateTime(capturedAt)} />
+          <Card title="Payment" color="#2f7a5b">
+            <Field label="Date & Time"   value={fmtDateTime(capturedAt)} />
             <Field label="Total Amount"  value={<strong>{fmtRupees(totalAmount)}</strong>} />
             {baseAmount       != null && baseAmount > 0       && <Field label="Base Amount"     value={fmtRupees(baseAmount)} />}
             {gstAmount        != null && gstAmount > 0        && (
               <Field label={gstRate ? `GST (${gstRate}%)` : 'GST'}  value={fmtRupees(gstAmount)} />
             )}
-            {discountAmount   != null && discountAmount > 0   && <Field label="Discount"        value={<span style={{ color: '#10b981' }}>-{fmtRupees(discountAmount)}</span>} />}
+            {discountAmount   != null && discountAmount > 0   && <Field label="Discount"        value={<span style={{ color: '#2f7a5b' }}>-{fmtRupees(discountAmount)}</span>} />}
             {en.payment_method && <Field label="Payment Method"  value={en.payment_method} />}
             {en.payment_status && <Field label="Status"          value={<Mono>{en.payment_status}</Mono>} />}
             {razorpayId  && <Field label="Payment ID"  value={<Mono>{razorpayId}</Mono>} />}
@@ -243,34 +227,30 @@ function AuditDetailPanel({ entry }: { entry: any }) {
           </Card>
         )}
 
-        {/* Document */}
         {(m.documentName || m.document_name) && (
           <Card title="Document" color="#6366f1">
             <Field label="Document Name" value={String(m.documentName ?? m.document_name)} />
             {m.documentType && <Field label="Type"   value={String(m.documentType)} />}
-            {m.reason       && <Field label="Reason" value={<span style={{ color: '#dc2626' }}>{String(m.reason)}</span>} />}
+            {m.reason       && <Field label="Reason" value={<span style={{ color: '#c43d33' }}>{String(m.reason)}</span>} />}
           </Card>
         )}
 
-        {/* Queue */}
         {action === 'add_to_queue' && (
-          <Card title="Queue" color="#f59e0b">
+          <Card title="Queue" color="#a96a16">
             <Field label="Priority"     value={m.priority !== undefined ? String(m.priority) : '0'} />
             {en.service_name && <Field label="Service" value={en.service_name} />}
           </Card>
         )}
 
-        {/* Invoice */}
         {target_type === 'invoice' && (
-          <Card title="Invoice" color="#f59e0b">
+          <Card title="Invoice" color="#a96a16">
             {m.invoiceNumber && <Field label="Invoice No."  value={<Mono>{String(m.invoiceNumber)}</Mono>} />}
-            {m.daysOverdue   && <Field label="Days Overdue" value={<span style={{ color: '#dc2626' }}>{String(m.daysOverdue)} days</span>} />}
+            {m.daysOverdue   && <Field label="Days Overdue" value={<span style={{ color: '#c43d33' }}>{String(m.daysOverdue)} days</span>} />}
           </Card>
         )}
 
-        {/* Admin service update — show changed fields */}
         {action === 'admin_update_service' && Object.keys(m).length > 0 && (
-          <Card title="Changes" color="#f59e0b">
+          <Card title="Changes" color="#a96a16">
             {Object.entries(m).map(([k, v]) => (
               <Field key={k} label={k.replace(/_/g, ' ')} value={String(v)} />
             ))}
@@ -278,19 +258,10 @@ function AuditDetailPanel({ entry }: { entry: any }) {
         )}
       </div>
 
-      {/* Raw metadata (always available, collapsible) */}
       {Object.keys(m).length > 0 && (
-        <details style={{ marginTop: '0.75rem' }}>
-          <summary style={{ fontSize: '0.72rem', color: '#94a3b8', cursor: 'pointer', userSelect: 'none' }}>
-            Raw metadata
-          </summary>
-          <pre style={{
-            marginTop: '0.4rem', fontSize: '0.72rem', background: '#f8fafc',
-            border: '1px solid #e2e8f0', borderRadius: 6, padding: '0.6rem 0.75rem',
-            overflow: 'auto', maxHeight: 200, color: '#475569', lineHeight: 1.6,
-          }}>
-            {JSON.stringify(m, null, 2)}
-          </pre>
+        <details className="adm-au-raw">
+          <summary>Raw metadata</summary>
+          <pre>{JSON.stringify(m, null, 2)}</pre>
         </details>
       )}
     </div>
@@ -303,7 +274,6 @@ export default function AdminAuditPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
-  // Filter state
   const [page,         setPage]         = useState(1);
   const [filterAction, setFilterAction] = useState('');
   const [filterGroup,  setFilterGroup]  = useState('');
@@ -313,7 +283,6 @@ export default function AdminAuditPage() {
   const [toDate,       setToDate]       = useState('');
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
 
-  // Debounce search 300 ms
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -348,7 +317,6 @@ export default function AdminAuditPage() {
   const count      = data?.count ?? 0;
   const totalPages = Math.ceil(count / 50);
 
-  // Client-side group filter (when no specific action is selected)
   const entries = filterGroup && !filterAction
     ? allEntries.filter(e => (ACTION_GROUPS[filterGroup] ?? []).includes(e.action))
     : allEntries;
@@ -363,204 +331,175 @@ export default function AdminAuditPage() {
   }
 
   return (
-    <div className="db-page-new">
-      <div className="db-page-header">
-        <div>
-          <h1 className="db-page-title">Audit Log</h1>
-          <p className="db-page-sub">{count} entries{hasFilters ? ' (filtered)' : ''}</p>
+    <div className="adm-root">
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <header className="adm-hero">
+        <div className="adm-hero-glow" />
+        <div className="adm-hero-bar">
+          <div>
+            <p className="adm-hero-eyebrow">— Security</p>
+            <h1 className="adm-hero-title">Audit Log</h1>
+            <p className="adm-hero-date">Every action across the platform, captured with full context.</p>
+          </div>
+          <div className="adm-hero-stats">
+            <div className="adm-hero-stat"><div className="adm-hero-stat-val">{count}</div><div className="adm-hero-stat-lbl">{hasFilters ? 'Filtered' : 'Entries'}</div></div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Filter bar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', marginBottom: '1.25rem', alignItems: 'flex-end' }}>
-        {/* Search */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '1 1 220px' }}>
-          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Search</label>
-          <input
-            className="form-input"
-            placeholder="Name, PAN, email, phone…"
-            value={rawSearch}
-            onChange={e => setRawSearch(e.target.value)}
-          />
-        </div>
-
-        {/* Group filter */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Group</label>
-          <select
-            className="form-input"
-            style={{ maxWidth: 145 }}
-            value={filterGroup}
-            onChange={e => { setFilterGroup(e.target.value); setFilterAction(''); resetPage(); }}
-          >
-            <option value="">All groups</option>
-            {Object.keys(ACTION_GROUPS).map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </div>
-
-        {/* Action filter */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</label>
-          <select
-            className="form-input"
-            style={{ maxWidth: 210 }}
-            value={filterAction}
-            onChange={e => { setFilterAction(e.target.value); setFilterGroup(''); resetPage(); }}
-          >
-            <option value="">All actions</option>
-            {Object.entries(ACTION_GROUPS).map(([group, actions]) => (
-              <optgroup key={group} label={group}>
-                {actions.map(a => <option key={a} value={a}>{ACTION_META[a]?.label ?? a}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-
-        {/* Date from */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>From</label>
-          <input
-            type="date"
-            className="form-input"
-            style={{ width: 155 }}
-            value={fromDate}
-            onChange={e => { setFromDate(e.target.value); resetPage(); }}
-          />
+      <section className="adm-panel">
+        {/* Filter bar */}
+        <div className="adm-filterbar">
+          <div className="adm-fgroup" style={{ flex: '1 1 220px' }}>
+            <label className="adm-flabel">Search</label>
+            <input className="adm-input" placeholder="Name, PAN, email, phone…" value={rawSearch} onChange={e => setRawSearch(e.target.value)} />
+          </div>
+          <div className="adm-fgroup">
+            <label className="adm-flabel">Group</label>
+            <div className="adm-select-wrap">
+              <select className="adm-select" value={filterGroup} onChange={e => { setFilterGroup(e.target.value); setFilterAction(''); resetPage(); }}>
+                <option value="">All groups</option>
+                {Object.keys(ACTION_GROUPS).map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <span className="adm-select-ico">{Icon.chevronD}</span>
+            </div>
+          </div>
+          <div className="adm-fgroup">
+            <label className="adm-flabel">Action</label>
+            <div className="adm-select-wrap">
+              <select className="adm-select" value={filterAction} onChange={e => { setFilterAction(e.target.value); setFilterGroup(''); resetPage(); }}>
+                <option value="">All actions</option>
+                {Object.entries(ACTION_GROUPS).map(([group, actions]) => (
+                  <optgroup key={group} label={group}>
+                    {actions.map(a => <option key={a} value={a}>{ACTION_META[a]?.label ?? a}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              <span className="adm-select-ico">{Icon.chevronD}</span>
+            </div>
+          </div>
+          <div className="adm-fgroup">
+            <label className="adm-flabel">From</label>
+            <input type="date" className="adm-input adm-input--date" value={fromDate} onChange={e => { setFromDate(e.target.value); resetPage(); }} />
+          </div>
+          <div className="adm-fgroup">
+            <label className="adm-flabel">To</label>
+            <input type="date" className="adm-input adm-input--date" value={toDate} onChange={e => { setToDate(e.target.value); resetPage(); }} />
+          </div>
+          {hasFilters && (
+            <button className="adm-btn adm-btn--ghost" onClick={clearAll}>Clear all</button>
+          )}
         </div>
 
-        {/* Date to */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>To</label>
-          <input
-            type="date"
-            className="form-input"
-            style={{ width: 155 }}
-            value={toDate}
-            onChange={e => { setToDate(e.target.value); resetPage(); }}
-          />
-        </div>
+        {error && <div className="adm-banner adm-banner--err">Failed to load audit log.</div>}
 
-        {hasFilters && (
-          <button className="btn btn-sm btn-secondary" style={{ alignSelf: 'flex-end' }} onClick={clearAll}>
-            Clear all
-          </button>
-        )}
-      </div>
+        {isLoading ? (
+          <div className="adm-loading"><Loader /></div>
+        ) : entries.length === 0 ? (
+          <div className="adm-empty-box">
+            <span className="adm-empty-ico">{Icon.empty}</span>
+            <p className="adm-empty-txt">{hasFilters ? 'No entries match your filters.' : 'No audit entries yet.'}</p>
+          </div>
+        ) : (
+          <>
+            <div className="adm-tbl-wrap">
+              <table className="adm-tbl adm-au-tbl">
+                <thead>
+                  <tr>
+                    <th style={{ width: 130 }}>Time</th>
+                    <th style={{ width: 190 }}>Actor</th>
+                    <th style={{ width: 190 }}>Action</th>
+                    <th>Context</th>
+                    <th style={{ width: 36 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((e: any) => {
+                    const am     = ACTION_META[e.action];
+                    const isOpen = expandedId === e.id;
+                    const en     = e.enriched ?? {};
+                    const m      = e.metadata ?? {};
 
-      {error && <div className="db-alert-error">Failed to load audit log.</div>}
+                    const contextLine =
+                      en.service_name
+                        ? en.client
+                          ? `${en.service_name} · ${en.client.first_name} ${en.client.last_name}`
+                          : en.service_name
+                        : en.target_user
+                        ? `${en.target_user.first_name} ${en.target_user.last_name} (${en.target_user.role})`
+                        : en.payment_amount != null
+                        ? `${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(en.payment_amount / 100)}`
+                        : m.documentName ?? m.document_name ?? m.invoiceNumber ?? null;
 
-      {isLoading ? (
-        <div className="page-loader"><Loader /></div>
-      ) : entries.length === 0 ? (
-        <div className="db-empty-card">
-          <span className="db-empty-icon">📋</span>
-          <p className="db-empty-title">No entries found</p>
-          <p className="db-empty-desc">{hasFilters ? 'Try clearing the filters.' : 'Actions will appear here as they occur.'}</p>
-        </div>
-      ) : (
-        <>
-          <div className="aq-table-wrap">
-            <table className="aq-table" style={{ tableLayout: 'fixed', width: '100%' }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 130 }}>Time</th>
-                  <th style={{ width: 180 }}>Actor</th>
-                  <th style={{ width: 185 }}>Action</th>
-                  <th>Context</th>
-                  <th style={{ width: 22 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e: any) => {
-                  const am     = ACTION_META[e.action];
-                  const isOpen = expandedId === e.id;
-                  const en     = e.enriched ?? {};
-                  const m      = e.metadata ?? {};
+                    return (
+                      <>
+                        <tr
+                          key={e.id}
+                          onClick={() => setExpandedId(prev => prev === e.id ? null : e.id)}
+                          className={`adm-au-row${isOpen ? ' is-open' : ''}`}
+                        >
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <div className="adm-au-date">{new Date(e.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+                            <div className="adm-au-time">{new Date(e.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                          </td>
 
-                  const contextLine =
-                    en.service_name
-                      ? en.client
-                        ? `${en.service_name} · ${en.client.first_name} ${en.client.last_name}`
-                        : en.service_name
-                      : en.target_user
-                      ? `${en.target_user.first_name} ${en.target_user.last_name} (${en.target_user.role})`
-                      : en.payment_amount != null
-                      ? `${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(en.payment_amount / 100)}`
-                      : m.documentName ?? m.document_name ?? m.invoiceNumber ?? null;
+                          <td style={{ overflow: 'hidden' }}>
+                            {e.actor ? (
+                              <>
+                                <div className="adm-au-actor">{e.actor.first_name} {e.actor.last_name}</div>
+                                <div className="adm-au-actor-sub">{e.actor.email}</div>
+                                <div className="adm-au-actor-role">{e.actor.role}</div>
+                              </>
+                            ) : (
+                              <span className="adm-au-actor-sub">{m.email ?? 'System'}</span>
+                            )}
+                          </td>
 
-                  return (
-                    <>
-                      <tr
-                        key={e.id}
-                        onClick={() => { setExpandedId(prev => prev === e.id ? null : e.id); }}
-                        style={{ cursor: 'pointer', background: isOpen ? '#fafbff' : undefined }}
-                      >
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          <div style={{ fontSize: '0.78rem', color: '#1e293b', fontWeight: 500 }}>
-                            {new Date(e.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                            {new Date(e.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </div>
-                        </td>
+                          <td>
+                            <span className="adm-au-action"><Dot color={am?.color ?? '#aaa498'} />{am?.label ?? e.action}</span>
+                            {am && <div className="adm-au-group">{am.group}</div>}
+                          </td>
 
-                        <td style={{ overflow: 'hidden' }}>
-                          {e.actor ? (
-                            <>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {e.actor.first_name} {e.actor.last_name}
-                              </div>
-                              <div style={{ fontSize: '0.72rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.actor.email}</div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', textTransform: 'capitalize' }}>{e.actor.role}</div>
-                            </>
-                          ) : (
-                            <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{m.email ?? 'System'}</span>
-                          )}
-                        </td>
+                          <td style={{ overflow: 'hidden' }}>
+                            {contextLine
+                              ? <div className="adm-au-context">{contextLine}</div>
+                              : <div className="adm-au-context adm-au-context--faint">{e.target_type}</div>}
+                            {en.fiscal_year && <div className="adm-au-fy">FY {en.fiscal_year}</div>}
+                          </td>
 
-                        <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
-                            <Dot color={am?.color ?? '#94a3b8'} />
-                            {am?.label ?? e.action}
-                          </span>
-                          {am && <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 2 }}>{am.group}</div>}
-                        </td>
-
-                        <td style={{ overflow: 'hidden' }}>
-                          {contextLine
-                            ? <div style={{ fontSize: '0.8rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contextLine}</div>
-                            : <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>{e.target_type}</div>}
-                          {en.fiscal_year && <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>FY {en.fiscal_year}</div>}
-                        </td>
-
-                        <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.7rem' }}>
-                          {isOpen ? '▲' : '▼'}
-                        </td>
-                      </tr>
-
-                      {isOpen && (
-                        <tr key={`${e.id}-detail`}>
-                          <td colSpan={5} style={{ padding: 0 }}>
-                            <AuditDetailPanel entry={e} />
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={`adm-au-chev${isOpen ? ' is-open' : ''}`}>{Icon.chevronD}</span>
                           </td>
                         </tr>
-                      )}
-                    </>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
 
-          {totalPages > 1 && (
-            <div className="aq-pagination">
-              <button className="btn btn-sm btn-secondary" disabled={page <= 1} onClick={() => { setPage(p => p - 1); setExpandedId(null); }}>← Prev</button>
-              <span className="aq-pagination-info">Page {page} of {totalPages}</span>
-              <button className="btn btn-sm btn-secondary" disabled={page >= totalPages} onClick={() => { setPage(p => p + 1); setExpandedId(null); }}>Next →</button>
+                        {isOpen && (
+                          <tr key={`${e.id}-detail`} className="adm-au-detail-tr">
+                            <td colSpan={5} style={{ padding: 0 }}>
+                              <AuditDetailPanel entry={e} />
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </>
-      )}
+
+            {totalPages > 1 && (
+              <div className="adm-pager">
+                <button className="adm-pager-btn" disabled={page <= 1} onClick={() => { setPage(p => p - 1); setExpandedId(null); }}>
+                  {Icon.chevronL}<span>Prev</span>
+                </button>
+                <span className="adm-pager-info">Page <b>{page}</b> of <b>{totalPages}</b></span>
+                <button className="adm-pager-btn" disabled={page >= totalPages} onClick={() => { setPage(p => p + 1); setExpandedId(null); }}>
+                  <span>Next</span>{Icon.chevronR}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

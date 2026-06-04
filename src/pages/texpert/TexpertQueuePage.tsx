@@ -210,7 +210,7 @@ function ClaimModal({ item, onClose }: { item: QueueItem; onClose: () => void })
 
 // ── Main page ─────────────────────────────────────────────────
 
-export default function AdminQueuePage() {
+export default function TexpertQueuePage() {
   const { profile, isLoading: authLoading } = useAuth();
   const [assignItem, setAssignItem] = useState<QueueItem | null>(null);
   const [claimItem,  setClaimItem]  = useState<QueueItem | null>(null);
