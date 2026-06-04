@@ -125,15 +125,16 @@ export default function AdminTexpertDetailPage() {
         ) : (
           <div className="aq-table-wrap">
             <table className="aq-table">
-              <thead><tr><th>Service</th><th>Client</th><th>FY</th><th>Status</th><th>Date</th></tr></thead>
+              <thead><tr><th>Service</th><th>Client</th><th>FY</th><th>Status</th><th>Date</th><th></th></tr></thead>
               <tbody>
                 {services.map((s: any) => (
-                  <tr key={s.id}>
+                  <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/admin/client-services/${s.id}`)}>
                     <td className="aq-td-service">{s.service?.name ?? '—'}</td>
                     <td>{s.client?.first_name} {s.client?.last_name}</td>
                     <td>{s.fiscal_year ?? '—'}</td>
                     <td>{statusBadge(s.status)}</td>
                     <td>{new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
+                    <td style={{ color: 'var(--ink-400)', textAlign: 'right' }}>→</td>
                   </tr>
                 ))}
               </tbody>
