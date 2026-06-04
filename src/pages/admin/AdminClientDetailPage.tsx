@@ -15,7 +15,7 @@ function statusBadge(status: string) {
     under_review: 'aq-badge-review',
     completed: 'aq-badge-done',
     on_hold: 'aq-badge-hold',
-    invoice_pending: 'aq-badge-invoice',
+    payment: 'aq-badge-invoice',
     cancelled: 'aq-badge-hold',
   };
   return <span className={`aq-badge ${map[status] ?? 'aq-badge-pending'}`}>{status.replace(/_/g, ' ')}</span>;
@@ -98,7 +98,7 @@ export default function AdminClientDetailPage() {
     <div className="db-page-new">
       <div className="db-page-header">
         <div>
-          <div className="aq-back-link" onClick={() => navigate('/admin/clients')}>← Clients</div>
+          <div className="aq-back-link" onClick={() => navigate('/admin/users?tab=clients')}>← Users</div>
           <h1 className="db-page-title">{client.first_name} {client.last_name}</h1>
           <p className="db-page-sub">{client.email} · PAN: {client.pan}</p>
         </div>

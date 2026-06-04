@@ -6784,7 +6784,7 @@
 
 .cl-status-pending,
 .cl-status-documents_required,
-.cl-status-invoice_pending {
+.cl-status-payment {
   background: #f6ecd6;
   color: #a96a16;
 }

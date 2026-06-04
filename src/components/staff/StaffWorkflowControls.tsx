@@ -7,8 +7,8 @@ const NEXT_LABEL: Partial<Record<string, string>> = {
   documents_required:  `Move to Documents Received`,
   documents_received:  `Move to In Progress`,
   in_progress:         `Move to Under Review`,
-  under_review:        "Send Invoice",
-  invoice_pending:     "Complete Service",
+  under_review:        "Move to Payment",
+  payment:             "Complete Service",
 };
 
 export default function StaffWorkflowControls({
@@ -67,7 +67,7 @@ export default function StaffWorkflowControls({
   });
 
   const nextLabel = NEXT_LABEL[status];
-  const isPaymentPending = status === "invoice_pending" && paymentStatus !== "paid";
+  const isPaymentPending = status === "payment" && paymentStatus !== "paid";
 
   return (
     <div className="flex flex-col gap-4 mb-6">
@@ -120,7 +120,7 @@ export default function StaffWorkflowControls({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
             </svg>
-            Awaiting invoice payment from client
+            Awaiting payment from client
           </div>
         ) : nextLabel ? (
           <button 

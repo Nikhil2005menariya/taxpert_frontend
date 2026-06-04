@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileNav from "../components/dashboard/MobileNav";
 import TopbarUserMenu from "../components/dashboard/TopbarUserMenu";
+import NotificationBell from "../components/dashboard/NotificationBell";
 import IdleSessionGuard from "../guards/IdleSessionGuard";
 
 function getRoleLabel(role: string): string {
@@ -78,11 +79,7 @@ export default function DashboardLayout() {
 
           {/* Right: notification bell + user menu */}
           <div className="db-topbar-right">
-            <div className="db-topbar-bell" title="Notifications coming soon">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9Z" /><path d="M10 21a2 2 0 0 0 4 0" />
-              </svg>
-            </div>
+            <NotificationBell />
             <div className="db-topbar-divider" />
             <TopbarUserMenu
               firstName={profile?.first_name ?? ""}

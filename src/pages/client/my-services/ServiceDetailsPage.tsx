@@ -12,7 +12,7 @@ import PayButton from "../../../components/ui/PayButton";
 import DownloadButton from "../../../components/ui/DownloadButton";
 import UploadButton from "../../../components/ui/UploadButton";
 
-type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
+type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "payment" | "completed" | "cancelled";
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -21,7 +21,7 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   under_review: "Under Review",
   in_progress: "In Progress",
   action_required: "Action Required",
-  invoice_pending: "Invoice Pending",
+  payment: "Payment",
   completed: "Completed",
   cancelled: "Cancelled",
   on_hold: "On Hold",
@@ -175,28 +175,33 @@ function DocUploadButton({ doc, clientServiceId, onUploaded }: {
 }
 
 // ── Remove Service — header button + modal ────────────────────────────────────
-function RemoveServiceButton({ clientServiceId, hasDocuments, deletionRequested }: {
+function RemoveServiceButton({ clientServiceId, hasTexpert, deletionRequested }: {
   clientServiceId: string;
-  hasDocuments: boolean;
+  hasTexpert: boolean;
   deletionRequested: boolean;
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
 
+  // Approval is required once a Taxpert is assigned (they own the work).
+  // While no Taxpert is assigned, the client removes the service directly — even with docs.
+  const needsApproval = hasTexpert;
+
   const removeMutation = useMutation({
     mutationFn: async () => {
-      if (hasDocuments) {
+      if (needsApproval) {
         await apiClient.post(`/client-services/${clientServiceId}/request-deletion`);
       } else {
         await apiClient.delete(`/client-services/${clientServiceId}`);
       }
     },
     onSuccess: () => {
-      if (hasDocuments) {
+      if (needsApproval) {
         qc.invalidateQueries({ queryKey: ["client-service", clientServiceId] });
         setOpen(false);
       } else {
+        qc.invalidateQueries({ queryKey: ["client-services"] });
         navigate("/client/services");
       }
     },
@@ -260,10 +265,10 @@ function RemoveServiceButton({ clientServiceId, hasDocuments, deletionRequested 
               </button>
             </div>
             <div className="cl-modal-body">
-              {hasDocuments ? (
-                <p>This service has documents attached. A <strong>deletion request</strong> will be sent to your Taxpert for review and approval. You can cancel the request at any time before it's processed.</p>
+              {needsApproval ? (
+                <p>A Taxpert is assigned to this service. A <strong>deletion request</strong> will be sent to your Taxpert (or an admin) for review and approval. You can cancel the request at any time before it's processed.</p>
               ) : (
-                <p>This service has no documents. It will be <strong>permanently removed</strong> immediately.</p>
+                <p>This service will be <strong>permanently removed</strong> immediately. This cannot be undone.</p>
               )}
               {removeMutation.isError && (
                 <p style={{ color: "var(--red-600)", fontSize: "0.85rem", marginTop: "0.75rem" }}>
@@ -279,7 +284,7 @@ function RemoveServiceButton({ clientServiceId, hasDocuments, deletionRequested 
               >
                 {removeMutation.isPending
                   ? "Processing…"
-                  : hasDocuments ? "Request Deletion" : "Remove Now"}
+                  : needsApproval ? "Request Deletion" : "Remove Now"}
               </button>
               <button className="cl-modal-cancel-btn" onClick={() => setOpen(false)} disabled={removeMutation.isPending}>
                 Cancel
@@ -422,7 +427,7 @@ export default function ServiceDetailsPage() {
         {isClient && (
           <RemoveServiceButton
             clientServiceId={cs.id}
-            hasDocuments={docs.length > 0}
+            hasTexpert={!!cs.assigned_texpert_id}
             deletionRequested={!!cs.deletion_requested}
           />
         )}
@@ -456,14 +461,14 @@ export default function ServiceDetailsPage() {
       )}
 
       {/* Pay Now banner */}
-      {isClient && status === "invoice_pending" && cs.payment_status !== "paid" && (
+      {isClient && status === "payment" && cs.payment_status !== "paid" && (
         <div className="cl-pay-now-banner">
           <div className="cl-pay-now-left">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
             </svg>
             <div>
-              <div className="cl-pay-now-title">Invoice pending</div>
+              <div className="cl-pay-now-title">Payment due</div>
               <div className="cl-pay-now-sub">Your service is ready. Complete payment to finalise.</div>
             </div>
           </div>

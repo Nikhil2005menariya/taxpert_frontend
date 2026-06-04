@@ -14,7 +14,7 @@ const STEPS: { key: string; label: string }[] = [
   { key: "documents",    label: "Documents" },
   { key: "in_progress",  label: SERVICE_STATUS_LABELS.in_progress },
   { key: "under_review", label: SERVICE_STATUS_LABELS.under_review },
-  { key: "invoice",      label: "Invoice" },
+  { key: "payment",      label: "Payment" },
   { key: "completed",    label: SERVICE_STATUS_LABELS.completed },
 ];
 
@@ -25,7 +25,7 @@ function stepIndex(status: ServiceStatus): number {
     case "documents_received": return 0;
     case "in_progress":        return 1;
     case "under_review":       return 2;
-    case "invoice_pending":    return 3;
+    case "payment":            return 3;
     case "completed":          return 4;
     default:                   return 0;
   }

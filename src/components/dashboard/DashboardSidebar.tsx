@@ -129,6 +129,13 @@ function IconBell() {
     </svg>
   );
 }
+function IconLayers() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>
+    </svg>
+  );
+}
 function IconActivity() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -205,7 +212,6 @@ export default function DashboardSidebar({
     ...(isTexpert ? [
       { href: "/texpert/services", label: "My Services", Icon: IconClipboard, exact: false, badge: pendingReview || null },
       { href: "/texpert/queue",    label: "Queue",        Icon: IconInbox,     exact: false, badge: queueOpen    || null },
-      { href: "/texpert/payouts",  label: "My Payouts",  Icon: IconDollar,    exact: false, badge: null },
       { href: "/profile",          label: "Profile",      Icon: IconUser,      exact: false, badge: null },
     ] : []),
 
@@ -219,18 +225,14 @@ export default function DashboardSidebar({
 
     // Admin items
     ...(isAdmin ? [
-      { href: "/admin/users",            label: "Users",      Icon: IconUsers,     exact: false, badge: null },
-      { href: "/admin/taxperts",         label: "Taxperts",   Icon: IconUsers,     exact: false, badge: null },
-      { href: "/admin/clients",          label: "Clients",    Icon: IconUser,      exact: false, badge: null },
-      { href: "/admin/queue",            label: "Queue",      Icon: IconInbox,     exact: false, badge: null },
-      { href: "/admin/payouts",          label: "Payouts",    Icon: IconDollar,    exact: false, badge: null },
+      { href: "/admin/users",            label: "Users",           Icon: IconUsers,     exact: false, badge: null },
+      { href: "/admin/inquiries",        label: "Inquiries",        Icon: IconInbox,     exact: false, badge: null },
+      { href: "/admin/client-services", label: "Client Services", Icon: IconLayers,    exact: false, badge: null },
+      { href: "/admin/queue",            label: "Queue",           Icon: IconInbox,     exact: false, badge: null },
       { href: "/admin/payments",         label: "Payments",   Icon: IconCreditCard,exact: false, badge: null },
       { href: "/admin/services",         label: "Services",   Icon: IconGlobe,     exact: false, badge: null },
-      { href: "/admin/document-types",   label: "Doc Types",  Icon: IconFolder,    exact: false, badge: null },
-      { href: "/admin/pricing",          label: "Pricing",    Icon: IconTag,       exact: false, badge: null },
       { href: "/admin/coupons",          label: "Coupons",    Icon: IconDiscount,  exact: false, badge: null },
       { href: "/admin/settings/invoice", label: "Invoice",    Icon: IconBuilding,  exact: false, badge: null },
-      { href: "/admin/notify",           label: "Notify",     Icon: IconBell,      exact: false, badge: null },
       { href: "/admin/audit",            label: "Audit Log",  Icon: IconActivity,  exact: false, badge: null },
     ] : []),
   ];

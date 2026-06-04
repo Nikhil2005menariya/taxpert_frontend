@@ -1,66 +1,88 @@
 import { useState, useEffect } from "react";
 import Loader from "../../components/ui/Loader";
-import { useParams, Link, Navigate } from "react-router-dom";
+import { useParams, useNavigate, Link, Navigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
 
 const MONTHS = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+function toSlug(v: string) {
+  return v.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export default function ServiceEditPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { profile, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
+  const isCreateMode = id === "new";
   const isSuperAdmin = profile?.role === "super_admin";
   const isAdmin = profile?.role === "admin" || isSuperAdmin;
 
   const [tab, setTab] = useState<"details" | "documents" | "duedates">("details");
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  // ── Details form state ──
-  const [name, setName] = useState("");
-  const [catId, setCatId] = useState("");
+  // ── Details form ──
+  const [name, setName]           = useState("");
+  const [slug, setSlug]           = useState("");
+  const [catId, setCatId]         = useState("");
+  const [newCatName, setNewCatName] = useState("");
   const [description, setDescription] = useState("");
-  const [summary, setSummary] = useState("");
-  const [price, setPrice] = useState("");
+  const [summary, setSummary]     = useState("");
+  const [price, setPrice]         = useState("");
   const [requiresFy, setRequiresFy] = useState(false);
-  const [isActive, setIsActive] = useState(false);
+  const [isActive, setIsActive]   = useState(false);
 
-  // ── Document requirements state ──
-  const [addDocId, setAddDocId] = useState("");
+  // ── Document requirements ──
+  const [addDocId, setAddDocId]     = useState("");
   const [addRequired, setAddRequired] = useState(true);
 
-  // ── Due date templates state ──
-  const [ddTitle, setDdTitle] = useState("");
-  const [ddDesc, setDdDesc] = useState("");
+  // ── Due date templates ──
+  const [ddTitle, setDdTitle]         = useState("");
+  const [ddDesc, setDdDesc]           = useState("");
   const [ddRecurrence, setDdRecurrence] = useState<"annual" | "monthly" | "quarterly">("annual");
-  const [ddMonth, setDdMonth] = useState<number>(7);
-  const [ddDay, setDdDay] = useState<number>(31);
+  const [ddMonth, setDdMonth]         = useState<number>(7);
+  const [ddDay, setDdDay]             = useState<number>(31);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-service", id],
+    queryKey: isCreateMode ? ["admin-service-create"] : ["admin-service", id],
     queryFn: async () => {
+      if (isCreateMode) {
+        const [catRes, docsRes] = await Promise.all([
+          apiClient.get("/config/categories"),
+          apiClient.get("/config/document-types"),
+        ]);
+        return {
+          service: null as any,
+          categories: catRes.data.data ?? [],
+          allDocumentTypes: docsRes.data.data ?? [],
+          requirements: [],
+          dueDates: [],
+        };
+      }
       const [svcRes, catRes, docsRes, reqsRes, ddsRes] = await Promise.all([
         apiClient.get(`/config/services/${id}`),
         apiClient.get("/config/categories"),
         apiClient.get("/config/document-types"),
         apiClient.get(`/config/services/${id}/requirements`),
-        apiClient.get(`/config/services/${id}/due-dates`)
+        apiClient.get(`/config/services/${id}/due-dates`),
       ]);
       return {
         service: svcRes.data.data,
         categories: catRes.data.data ?? [],
         allDocumentTypes: docsRes.data.data ?? [],
         requirements: reqsRes.data.data ?? [],
-        dueDates: ddsRes.data.data ?? []
+        dueDates: ddsRes.data.data ?? [],
       };
     },
-    enabled: isAdmin && !!id,
+    enabled: isAdmin,
   });
 
+  // Populate form from fetched service (edit mode only)
   useEffect(() => {
-    if (data?.service) {
+    if (!isCreateMode && data?.service) {
       setName(data.service.name);
       setCatId(data.service.category_id ?? "");
       setDescription(data.service.description ?? "");
@@ -69,24 +91,79 @@ export default function ServiceEditPage() {
       setRequiresFy(data.service.requires_fy);
       setIsActive(data.service.is_active);
     }
-  }, [data?.service]);
+  }, [data?.service, isCreateMode]);
 
   function flash(type: "ok" | "err", text: string) {
     setMsg({ type, text });
-    setTimeout(() => setMsg(null), 3000);
+    setTimeout(() => setMsg(null), 3500);
   }
 
-  const updateDetailsMutation = useMutation({
-    mutationFn: async (updateData: any) => {
-      await apiClient.put(`/config/services/${id}`, updateData);
+  // ── Name → slug auto-generation (create mode) ──
+  function handleNameChange(v: string) {
+    setName(v);
+    if (isCreateMode) setSlug(toSlug(v));
+  }
+
+  // ── Create service ──
+  const createCatMutation = useMutation({
+    mutationFn: async (catName: string) => {
+      const res = await apiClient.post("/config/categories", { name: catName.trim(), slug: toSlug(catName) });
+      return res.data.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-service", id] });
-      flash("ok", "Service updated.");
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await apiClient.post("/config/services", payload);
+      return res.data.data;
     },
-    onError: (err: any) => {
-      flash("err", err.response?.data?.error || "Failed to update service.");
+    onSuccess: (newSvc) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-services-config"] });
+      navigate(`/admin/services/${newSvc.id}`);
+    },
+    onError: (err: any) => flash("err", err.response?.data?.error ?? "Failed to create service."),
+  });
+
+  async function handleCreate() {
+    if (!name.trim()) { flash("err", "Service name is required."); return; }
+    const priceNum = parseFloat(price);
+    if (!price || isNaN(priceNum) || priceNum < 0) { flash("err", "Enter a valid price in ₹."); return; }
+
+    let finalCatId: string | null = catId === "__new__" ? null : (catId || null);
+    let finalCatName = "";
+
+    if (catId === "__new__") {
+      if (!newCatName.trim()) { flash("err", "Enter a name for the new category."); return; }
+      try {
+        const newCat = await createCatMutation.mutateAsync(newCatName.trim());
+        finalCatId   = newCat.id;
+        finalCatName = newCat.name;
+      } catch (err: any) {
+        flash("err", err.response?.data?.error ?? "Failed to create category.");
+        return;
+      }
+    } else {
+      const cat = (data?.categories ?? []).find((c: any) => c.id === catId);
+      finalCatName = cat?.name ?? "";
     }
+
+    createMutation.mutate({
+      name:        name.trim(),
+      slug:        slug.trim() || toSlug(name),
+      category:    finalCatName,
+      category_id: finalCatId,
+      summary:     summary.trim() || null,
+      description: description.trim() || null,
+      price:       Math.round(priceNum * 100),
+      requires_fy: requiresFy,
+    });
+  }
+
+  // ── Update service (edit mode) ──
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (payload: any) => { await apiClient.put(`/config/services/${id}`, payload); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Service updated."); },
+    onError: (err: any) => flash("err", err.response?.data?.error ?? "Failed to update."),
   });
 
   function saveDetails() {
@@ -98,116 +175,71 @@ export default function ServiceEditPage() {
     });
   }
 
-  // Docs mutations
+  // ── Document mutations ──
   const addDocMutation = useMutation({
-    mutationFn: async (docData: any) => {
-      await apiClient.post("/config/requirements", docData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-service", id] });
-      flash("ok", "Document added.");
-      setAddDocId("");
-    },
-    onError: (err: any) => flash("err", err.response?.data?.error || "Error adding document.")
+    mutationFn: async (payload: any) => { await apiClient.post("/config/requirements", payload); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Document added."); setAddDocId(""); },
+    onError: (err: any) => flash("err", err.response?.data?.error ?? "Error adding document."),
   });
-
   const removeDocMutation = useMutation({
-    mutationFn: async (reqId: string) => {
-      await apiClient.delete(`/config/requirements/${reqId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-service", id] });
-      flash("ok", "Removed.");
-    },
-    onError: (err: any) => flash("err", err.response?.data?.error || "Error removing document.")
+    mutationFn: async (reqId: string) => { await apiClient.delete(`/config/requirements/${reqId}`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Removed."); },
+    onError: (err: any) => flash("err", err.response?.data?.error ?? "Error removing."),
   });
-
   const toggleDocMutation = useMutation({
-    mutationFn: async ({ reqId, data }: { reqId: string, data: any }) => {
-      await apiClient.put(`/config/requirements/${reqId}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-service", id] });
-    },
+    mutationFn: async ({ reqId, payload }: { reqId: string; payload: any }) => { await apiClient.put(`/config/requirements/${reqId}`, payload); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-service", id] }),
   });
 
   function handleAddDoc() {
     if (!addDocId) return;
-    const currentReqs = data?.requirements || [];
     addDocMutation.mutate({
-      service_id: id,
-      document_type_id: addDocId,
-      is_required: addRequired,
-      is_optional: !addRequired,
-      sort_order: currentReqs.length + 1,
+      service_id: id, document_type_id: addDocId,
+      is_required: addRequired, is_optional: !addRequired,
+      sort_order: (data?.requirements ?? []).length + 1,
     });
   }
-
   function handleToggleRequired(req: any) {
-    toggleDocMutation.mutate({
-      reqId: req.id,
-      data: {
-        is_required: !req.is_required,
-        is_optional: req.is_required,
-      }
-    });
+    toggleDocMutation.mutate({ reqId: req.id, payload: { is_required: !req.is_required, is_optional: req.is_required } });
   }
 
-  // Due Dates mutations
+  // ── Due date mutations ──
   const addDdMutation = useMutation({
-    mutationFn: async (ddData: any) => {
-      await apiClient.post("/config/due-dates", ddData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-service", id] });
-      flash("ok", "Due date template added.");
-      setDdTitle(""); setDdDesc("");
-    },
-    onError: (err: any) => flash("err", err.response?.data?.error || "Error adding due date.")
+    mutationFn: async (payload: any) => { await apiClient.post("/config/due-dates", payload); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Due date added."); setDdTitle(""); setDdDesc(""); },
+    onError: (err: any) => flash("err", err.response?.data?.error ?? "Error adding due date."),
   });
-
   const removeDdMutation = useMutation({
-    mutationFn: async (ddId: string) => {
-      await apiClient.delete(`/config/due-dates/${ddId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-service", id] });
-      flash("ok", "Removed.");
-    },
-    onError: (err: any) => flash("err", err.response?.data?.error || "Error removing due date.")
+    mutationFn: async (ddId: string) => { await apiClient.delete(`/config/due-dates/${ddId}`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Removed."); },
+    onError: (err: any) => flash("err", err.response?.data?.error ?? "Error removing."),
   });
 
   function handleAddDd() {
     if (!ddTitle.trim() || !ddDay) return;
     addDdMutation.mutate({
-      service_id: id,
-      title: ddTitle,
-      description: ddDesc || null,
+      service_id: id, title: ddTitle, description: ddDesc || null,
       recurrence_type: ddRecurrence,
       applicable_month: ddRecurrence === "annual" ? ddMonth : null,
       applicable_day: ddDay,
     });
   }
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="page-loader"><Loader /></div>
-    );
-  }
+  if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  if (!isCreateMode && !data?.service) return <div className="se-page">Service not found</div>;
 
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  if (!data?.service) return <div>Service not found</div>;
+  const { categories = [], allDocumentTypes = [], requirements = [], dueDates = [] } = data ?? {};
+  const service = data?.service;
 
-  const { service, categories, allDocumentTypes, requirements, dueDates } = data;
-  
-  const reqs = requirements.sort((a: any, b: any) => a.sort_order - b.sort_order);
+  const reqs = [...requirements].sort((a: any, b: any) => a.sort_order - b.sort_order);
   const usedDocTypeIds = new Set(reqs.map((r: any) => r.document_type_id));
   const availableDocTypes = allDocumentTypes.filter((d: any) => !usedDocTypeIds.has(d.id));
-  
-  const pending = updateDetailsMutation.isPending || addDocMutation.isPending || removeDocMutation.isPending || toggleDocMutation.isPending || addDdMutation.isPending || removeDdMutation.isPending;
+  const isNewCat = catId === "__new__";
+
+  const anyPending = updateDetailsMutation.isPending || createMutation.isPending || createCatMutation.isPending
+    || addDocMutation.isPending || removeDocMutation.isPending || toggleDocMutation.isPending
+    || addDdMutation.isPending || removeDdMutation.isPending;
 
   return (
     <div className="se-page">
@@ -215,25 +247,33 @@ export default function ServiceEditPage() {
       <div className="se-header">
         <div>
           <Link to="/admin/services" className="se-back">← Services</Link>
-          <h1 className="page-title" style={{ margin: "0.25rem 0 0" }}>{service.name}</h1>
-          <code className="se-slug">{service.slug}</code>
+          <h1 className="page-title" style={{ margin: "0.25rem 0 0" }}>
+            {isCreateMode ? "New Service" : service?.name}
+          </h1>
+          {!isCreateMode && <code className="se-slug">{service?.slug}</code>}
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <span className={`se-active-badge ${service.is_active ? "se-badge-active" : "se-badge-inactive"}`}>
-            {service.is_active ? "Active" : "Inactive"}
+        {!isCreateMode && (
+          <span className={`se-active-badge ${service?.is_active ? "se-badge-active" : "se-badge-inactive"}`}>
+            {service?.is_active ? "Active" : "Inactive"}
           </span>
-        </div>
+        )}
       </div>
 
-      {msg && (
-        <div className={`se-flash se-flash-${msg.type}`}>{msg.text}</div>
-      )}
+      {msg && <div className={`se-flash se-flash-${msg.type}`}>{msg.text}</div>}
 
       {/* Tabs */}
       <nav className="se-tabs">
         {(["details", "documents", "duedates"] as const).map(t => (
-          <button key={t} className={`se-tab${tab === t ? " se-tab-active" : ""}`} onClick={() => setTab(t)}>
-            {t === "details" ? "Service Details" : t === "documents" ? `Document Requirements (${reqs.length})` : `Due Date Templates (${dueDates.length})`}
+          <button
+            key={t}
+            className={`se-tab${tab === t ? " se-tab-active" : ""}${isCreateMode && t !== "details" ? " se-tab-locked" : ""}`}
+            onClick={() => setTab(t)}
+          >
+            {t === "details"
+              ? "Service Details"
+              : t === "documents"
+              ? `Document Requirements${!isCreateMode ? ` (${reqs.length})` : ""}`
+              : `Due Date Templates${!isCreateMode ? ` (${dueDates.length})` : ""}`}
           </button>
         ))}
       </nav>
@@ -242,32 +282,81 @@ export default function ServiceEditPage() {
       {tab === "details" && (
         <div className="se-card">
           <div className="se-form-grid">
+            {/* Name */}
             <div className="se-field">
-              <label>Service Name</label>
-              <input value={name} onChange={e => setName(e.target.value)} className="se-input" />
+              <label>Service Name *</label>
+              <input
+                value={name}
+                onChange={e => handleNameChange(e.target.value)}
+                className="se-input"
+                placeholder="e.g. GST Registration"
+              />
             </div>
-            <div className="se-field">
+
+            {/* Slug — editable in create mode, readonly in edit */}
+            {isCreateMode ? (
+              <div className="se-field">
+                <label>Slug *</label>
+                <input
+                  value={slug}
+                  onChange={e => setSlug(e.target.value)}
+                  className="se-input"
+                  placeholder="e.g. gst-registration"
+                />
+              </div>
+            ) : (
+              <div className="se-field">
+                <label>Slug</label>
+                <code className="se-input" style={{ background: "#f1f5f9", color: "#64748b", fontFamily: "'Courier New', monospace", fontSize: "0.82rem" }}>
+                  {service?.slug}
+                </code>
+              </div>
+            )}
+
+            {/* Category */}
+            <div className="se-field" style={{ gridColumn: isNewCat ? "1 / -1" : undefined }}>
               <label>Category</label>
-              <select value={catId} onChange={e => setCatId(e.target.value)} className="se-input">
-                <option value="">— Uncategorized —</option>
-                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", flexWrap: "wrap" }}>
+                <select value={catId} onChange={e => { setCatId(e.target.value); setNewCatName(""); }} className="se-input" style={{ flex: 1, minWidth: 180 }}>
+                  <option value="">— Uncategorized —</option>
+                  {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="__new__">＋ New category…</option>
+                </select>
+                {isNewCat && (
+                  <input
+                    value={newCatName}
+                    onChange={e => setNewCatName(e.target.value)}
+                    className="se-input"
+                    placeholder="Category name"
+                    style={{ flex: 1, minWidth: 180 }}
+                    autoFocus
+                  />
+                )}
+              </div>
             </div>
+
+            {/* Price */}
+            <div className="se-field">
+              <label>Price (₹ incl. GST) *</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ color: "#94a3b8" }}>₹</span>
+                <input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} className="se-input" style={{ width: 130 }} placeholder="1499" />
+              </div>
+            </div>
+
+            {/* Summary */}
             <div className="se-field se-field-full">
               <label>Summary (short)</label>
               <input value={summary} onChange={e => setSummary(e.target.value)} className="se-input" placeholder="One-line summary for clients" />
             </div>
+
+            {/* Description */}
             <div className="se-field se-field-full">
               <label>Description (detail)</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} className="se-textarea" rows={3} placeholder="Longer service description" />
+              <textarea value={description} onChange={e => setDescription(e.target.value)} className="se-textarea" rows={3} placeholder="Longer service description shown on the service page" />
             </div>
-            <div className="se-field">
-              <label>Price (₹ incl. GST)</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <span style={{ color: "#94a3b8" }}>₹</span>
-                <input type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} className="se-input" style={{ width: 120 }} />
-              </div>
-            </div>
+
+            {/* FY Required */}
             <div className="se-field">
               <label>FY Required</label>
               <label className="se-toggle">
@@ -275,7 +364,9 @@ export default function ServiceEditPage() {
                 <span>Client must specify fiscal year</span>
               </label>
             </div>
-            {isSuperAdmin && (
+
+            {/* Active — edit mode only */}
+            {!isCreateMode && isSuperAdmin && (
               <div className="se-field">
                 <label>Active</label>
                 <label className="se-toggle">
@@ -285,166 +376,176 @@ export default function ServiceEditPage() {
               </div>
             )}
           </div>
-          <div style={{ marginTop: "1.25rem" }}>
-            <button onClick={saveDetails} disabled={pending} className="btn btn-primary" style={{ fontSize: "0.875rem" }}>
-              {pending ? "Saving…" : "Save Changes"}
-            </button>
+
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
+            {isCreateMode ? (
+              <>
+                <button onClick={handleCreate} disabled={anyPending} className="btn btn-primary" style={{ fontSize: "0.875rem" }}>
+                  {anyPending ? "Creating…" : "Create Service"}
+                </button>
+                <Link to="/admin/services" className="btn btn-secondary" style={{ fontSize: "0.875rem" }}>
+                  Cancel
+                </Link>
+              </>
+            ) : (
+              <button onClick={saveDetails} disabled={anyPending} className="btn btn-primary" style={{ fontSize: "0.875rem" }}>
+                {anyPending ? "Saving…" : "Save Changes"}
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* ── DOCUMENTS TAB ── */}
       {tab === "documents" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {/* Add document */}
+        isCreateMode ? (
           <div className="se-card">
-            <div className="se-card-title">Add Document Requirement</div>
-            <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div className="se-field" style={{ flex: 1, minWidth: 220 }}>
-                <label>Document Type</label>
-                <select value={addDocId} onChange={e => setAddDocId(e.target.value)} className="se-input">
-                  <option value="">— Select document type —</option>
-                  {availableDocTypes.map((d: any) => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="se-field">
-                <label>Mandatory?</label>
-                <select value={addRequired ? "yes" : "no"} onChange={e => setAddRequired(e.target.value === "yes")} className="se-input">
-                  <option value="yes">Required</option>
-                  <option value="no">Optional</option>
-                </select>
-              </div>
-              <button onClick={handleAddDoc} disabled={pending || !addDocId} className="btn btn-primary" style={{ fontSize: "0.85rem" }}>
-                Add
-              </button>
+            <div className="se-empty" style={{ padding: "3rem" }}>
+              Create the service first — then configure document requirements here.
             </div>
           </div>
-
-          {/* Requirements list */}
-          <div className="se-card">
-            <div className="se-card-title">Current Requirements ({reqs.length})</div>
-            {reqs.length === 0 ? (
-              <div className="se-empty">No document requirements configured yet.</div>
-            ) : (
-              <div className="se-doc-list">
-                {reqs.map((req: any, i: number) => {
-                  const dt = req.document_type;
-                  return (
-                    <div key={req.id} className="se-doc-row">
-                      <div className="se-doc-order">{i + 1}</div>
-                      <div className="se-doc-info">
-                        <div className="se-doc-name">{dt?.name ?? "Unknown"}</div>
-                        <code className="se-doc-code">{dt?.code}</code>
-                        {dt?.description && <div className="se-doc-desc">{dt.description}</div>}
-                      </div>
-                      <div className="se-doc-meta">
-                        <span className={`se-badge ${req.is_required ? "se-badge-req" : "se-badge-opt"}`}>
-                          {req.is_required ? "Required" : "Optional"}
-                        </span>
-                        {dt?.is_common_document && <span className="se-badge se-badge-common">Common</span>}
-                      </div>
-                      <div className="se-doc-actions">
-                        <button
-                          onClick={() => handleToggleRequired(req)}
-                          disabled={pending}
-                          className="se-btn se-btn-toggle"
-                        >
-                          Make {req.is_required ? "Optional" : "Required"}
-                        </button>
-                        <button
-                          onClick={() => removeDocMutation.mutate(req.id)}
-                          disabled={pending}
-                          className="se-btn se-btn-remove"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div className="se-card">
+              <div className="se-card-title">Add Document Requirement</div>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", flexWrap: "wrap" }}>
+                <div className="se-field" style={{ flex: 1, minWidth: 220 }}>
+                  <label>Document Type</label>
+                  <select value={addDocId} onChange={e => setAddDocId(e.target.value)} className="se-input">
+                    <option value="">— Select document type —</option>
+                    {availableDocTypes.map((d: any) => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="se-field">
+                  <label>Mandatory?</label>
+                  <select value={addRequired ? "yes" : "no"} onChange={e => setAddRequired(e.target.value === "yes")} className="se-input">
+                    <option value="yes">Required</option>
+                    <option value="no">Optional</option>
+                  </select>
+                </div>
+                <button onClick={handleAddDoc} disabled={anyPending || !addDocId} className="btn btn-primary" style={{ fontSize: "0.85rem" }}>Add</button>
               </div>
-            )}
+            </div>
+            <div className="se-card">
+              <div className="se-card-title">Current Requirements ({reqs.length})</div>
+              {reqs.length === 0 ? (
+                <div className="se-empty">No document requirements configured yet.</div>
+              ) : (
+                <div className="se-doc-list">
+                  {reqs.map((req: any, i: number) => {
+                    const dt = req.document_type;
+                    return (
+                      <div key={req.id} className="se-doc-row">
+                        <div className="se-doc-order">{i + 1}</div>
+                        <div className="se-doc-info">
+                          <div className="se-doc-name">{dt?.name ?? "Unknown"}</div>
+                          <code className="se-doc-code">{dt?.code}</code>
+                          {dt?.description && <div className="se-doc-desc">{dt.description}</div>}
+                        </div>
+                        <div className="se-doc-meta">
+                          <span className={`se-badge ${req.is_required ? "se-badge-req" : "se-badge-opt"}`}>
+                            {req.is_required ? "Required" : "Optional"}
+                          </span>
+                          {dt?.is_common_document && <span className="se-badge se-badge-common">Common</span>}
+                        </div>
+                        <div className="se-doc-actions">
+                          <button onClick={() => handleToggleRequired(req)} disabled={anyPending} className="se-btn se-btn-toggle">
+                            Make {req.is_required ? "Optional" : "Required"}
+                          </button>
+                          <button onClick={() => removeDocMutation.mutate(req.id)} disabled={anyPending} className="se-btn se-btn-remove">
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* ── DUE DATES TAB ── */}
       {tab === "duedates" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {/* Add template */}
+        isCreateMode ? (
           <div className="se-card">
-            <div className="se-card-title">Add Due Date Template</div>
-            <div className="se-form-grid">
-              <div className="se-field se-field-full">
-                <label>Title</label>
-                <input value={ddTitle} onChange={e => setDdTitle(e.target.value)} className="se-input" placeholder="e.g. ITR Filing Deadline" />
-              </div>
-              <div className="se-field se-field-full">
-                <label>Description (optional)</label>
-                <input value={ddDesc} onChange={e => setDdDesc(e.target.value)} className="se-input" placeholder="Brief explanation" />
-              </div>
-              <div className="se-field">
-                <label>Recurrence</label>
-                <select value={ddRecurrence} onChange={e => setDdRecurrence(e.target.value as any)} className="se-input">
-                  <option value="annual">Annual</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                </select>
-              </div>
-              {ddRecurrence === "annual" && (
+            <div className="se-empty" style={{ padding: "3rem" }}>
+              Create the service first — then add due date templates here.
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div className="se-card">
+              <div className="se-card-title">Add Due Date Template</div>
+              <div className="se-form-grid">
+                <div className="se-field se-field-full">
+                  <label>Title</label>
+                  <input value={ddTitle} onChange={e => setDdTitle(e.target.value)} className="se-input" placeholder="e.g. ITR Filing Deadline" />
+                </div>
+                <div className="se-field se-field-full">
+                  <label>Description (optional)</label>
+                  <input value={ddDesc} onChange={e => setDdDesc(e.target.value)} className="se-input" placeholder="Brief explanation" />
+                </div>
                 <div className="se-field">
-                  <label>Month</label>
-                  <select value={ddMonth} onChange={e => setDdMonth(Number(e.target.value))} className="se-input">
-                    {MONTHS.slice(1).map((m, i) => (
-                      <option key={i+1} value={i+1}>{m}</option>
-                    ))}
+                  <label>Recurrence</label>
+                  <select value={ddRecurrence} onChange={e => setDdRecurrence(e.target.value as any)} className="se-input">
+                    <option value="annual">Annual</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
                   </select>
                 </div>
-              )}
-              <div className="se-field">
-                <label>Day of Month</label>
-                <input type="number" min={1} max={31} value={ddDay} onChange={e => setDdDay(Number(e.target.value))} className="se-input" style={{ width: 80 }} />
-              </div>
-            </div>
-            <button onClick={handleAddDd} disabled={pending || !ddTitle.trim()} className="btn btn-primary" style={{ fontSize: "0.85rem", marginTop: "1rem" }}>
-              Add Template
-            </button>
-          </div>
-
-          {/* Templates list */}
-          <div className="se-card">
-            <div className="se-card-title">Configured Templates ({dueDates.length})</div>
-            {dueDates.length === 0 ? (
-              <div className="se-empty">No due date templates. Add one above.</div>
-            ) : (
-              <div className="se-doc-list">
-                {dueDates.map((tpl: any) => (
-                  <div key={tpl.id} className="se-doc-row">
-                    <div className="se-doc-info">
-                      <div className="se-doc-name">{tpl.title}</div>
-                      {tpl.description && <div className="se-doc-desc">{tpl.description}</div>}
-                    </div>
-                    <div className="se-doc-meta">
-                      <span className="se-badge se-badge-rec">{tpl.recurrence_type}</span>
-                      <span className="se-badge se-badge-day">
-                        {tpl.recurrence_type === "annual"
-                          ? `${MONTHS[tpl.applicable_month ?? 1]} ${tpl.applicable_day}`
-                          : `Day ${tpl.applicable_day}`}
-                      </span>
-                    </div>
-                    <div className="se-doc-actions">
-                      <button onClick={() => removeDdMutation.mutate(tpl.id)} disabled={pending} className="se-btn se-btn-remove">
-                        Remove
-                      </button>
-                    </div>
+                {ddRecurrence === "annual" && (
+                  <div className="se-field">
+                    <label>Month</label>
+                    <select value={ddMonth} onChange={e => setDdMonth(Number(e.target.value))} className="se-input">
+                      {MONTHS.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                    </select>
                   </div>
-                ))}
+                )}
+                <div className="se-field">
+                  <label>Day of Month</label>
+                  <input type="number" min={1} max={31} value={ddDay} onChange={e => setDdDay(Number(e.target.value))} className="se-input" style={{ width: 80 }} />
+                </div>
               </div>
-            )}
+              <button onClick={handleAddDd} disabled={anyPending || !ddTitle.trim()} className="btn btn-primary" style={{ fontSize: "0.85rem", marginTop: "1rem" }}>
+                Add Template
+              </button>
+            </div>
+            <div className="se-card">
+              <div className="se-card-title">Configured Templates ({dueDates.length})</div>
+              {dueDates.length === 0 ? (
+                <div className="se-empty">No due date templates. Add one above.</div>
+              ) : (
+                <div className="se-doc-list">
+                  {dueDates.map((tpl: any) => (
+                    <div key={tpl.id} className="se-doc-row">
+                      <div className="se-doc-info">
+                        <div className="se-doc-name">{tpl.title}</div>
+                        {tpl.description && <div className="se-doc-desc">{tpl.description}</div>}
+                      </div>
+                      <div className="se-doc-meta">
+                        <span className="se-badge se-badge-rec">{tpl.recurrence_type}</span>
+                        <span className="se-badge se-badge-day">
+                          {tpl.recurrence_type === "annual"
+                            ? `${MONTHS[tpl.applicable_month ?? 1]} ${tpl.applicable_day}`
+                            : `Day ${tpl.applicable_day}`}
+                        </span>
+                      </div>
+                      <div className="se-doc-actions">
+                        <button onClick={() => removeDdMutation.mutate(tpl.id)} disabled={anyPending} className="se-btn se-btn-remove">
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       <style>{`
@@ -465,6 +566,8 @@ export default function ServiceEditPage() {
         .se-tab { padding: 0.5rem 1.1rem; border-radius: 0.6rem; font-size: 0.82rem; font-weight: 500; color: #64748b; background: none; border: none; cursor: pointer; white-space: nowrap; transition: background 0.12s, color 0.12s; }
         .se-tab:hover { color: #0f172a; background: rgba(255,255,255,0.8); }
         .se-tab-active { background: white; color: #7c3aed; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .se-tab-locked { opacity: 0.45; cursor: default; }
+        .se-tab-locked:hover { background: none; color: #64748b; }
 
         .se-card { background: white; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.5rem; }
         .se-card-title { font-size: 0.85rem; font-weight: 700; color: #0f172a; margin: 0 0 1rem; padding-bottom: 0.65rem; border-bottom: 1px solid #f1f5f9; }
@@ -473,9 +576,9 @@ export default function ServiceEditPage() {
         .se-field { display: flex; flex-direction: column; gap: 0.35rem; }
         .se-field-full { grid-column: 1 / -1; }
         .se-field label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
-        .se-input { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; background: #f8fafc; color: #0f172a; width: 100%; }
+        .se-input { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; background: #f8fafc; color: #0f172a; width: 100%; box-sizing: border-box; }
         .se-input:focus { border-color: #7c3aed; background: white; }
-        .se-textarea { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; background: #f8fafc; color: #0f172a; resize: vertical; width: 100%; font-family: inherit; }
+        .se-textarea { padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; background: #f8fafc; color: #0f172a; resize: vertical; width: 100%; font-family: inherit; box-sizing: border-box; }
         .se-textarea:focus { border-color: #7c3aed; background: white; }
         .se-toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569; cursor: pointer; }
 

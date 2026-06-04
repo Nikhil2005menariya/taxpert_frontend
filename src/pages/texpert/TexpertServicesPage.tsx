@@ -28,7 +28,7 @@ interface ServiceRow {
 
 const STATUS_OPTIONS = [
   'documents_required', 'documents_received', 'in_progress',
-  'under_review', 'invoice_pending', 'completed', 'on_hold', 'cancelled',
+  'under_review', 'payment', 'completed', 'on_hold', 'cancelled',
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -37,7 +37,7 @@ const STATUS_BADGE: Record<string, string> = {
   documents_received:  'aq-badge-docs',
   in_progress:         'aq-badge-active',
   under_review:        'aq-badge-review',
-  invoice_pending:     'aq-badge-invoice',
+  payment:             'aq-badge-invoice',
   completed:           'aq-badge-done',
   on_hold:             'aq-badge-hold',
   cancelled:           'aq-badge-hold',

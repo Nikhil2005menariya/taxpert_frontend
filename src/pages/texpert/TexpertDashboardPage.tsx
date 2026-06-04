@@ -3,7 +3,6 @@ import Loader from "../../components/ui/Loader";
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
-import { formatRupees } from '../../shared/finance-utils';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -11,8 +10,6 @@ interface Stats {
   activeServices:     number;
   pendingReview:      number;
   completedThisMonth: number;
-  earningsThisMonth:  number;
-  totalEarned:        number;
   queueOpen:          number;
 }
 
@@ -22,7 +19,7 @@ interface AttentionItem {
   client_display: string;
   fiscal_year:    string | null;
   status:         string;
-  reason:         'new_docs' | 'overdue_reupload' | 'sla_overdue' | 'sla_attention';
+  reason:         'payment_received' | 'new_docs' | 'overdue_reupload' | 'sla_overdue' | 'sla_attention';
   priority:       number;
   updated_at:     string;
 }
@@ -46,6 +43,7 @@ interface DashboardData {
 // ── Constants ─────────────────────────────────────────────────
 
 const REASON_META: Record<AttentionItem['reason'], { label: string; cls: string; icon: string }> = {
+  payment_received: { label: 'Payment received — ready to complete', cls: 'txd-reason-new', icon: '💳' },
   new_docs:         { label: 'New documents uploaded', cls: 'txd-reason-new',       icon: '📄' },
   overdue_reupload: { label: 'Re-upload pending >3 days', cls: 'txd-reason-stalled', icon: '🔁' },
   sla_overdue:      { label: 'No update in 7+ days',  cls: 'txd-reason-overdue',   icon: '⚠️' },
@@ -58,7 +56,7 @@ const STATUS_BADGE: Record<string, string> = {
   documents_received:  'aq-badge-docs',
   in_progress:         'aq-badge-active',
   under_review:        'aq-badge-review',
-  invoice_pending:     'aq-badge-invoice',
+  payment:             'aq-badge-invoice',
   completed:           'aq-badge-done',
   on_hold:             'aq-badge-hold',
 };
@@ -177,11 +175,6 @@ export default function TexpertDashboardPage() {
             <div className="txd-kpi-label">Completed This Month</div>
             <div className="txd-kpi-value">{stats?.completedThisMonth ?? 0}</div>
             <div className="txd-kpi-sub">Services finished</div>
-          </div>
-          <div className="txd-kpi" style={{ borderTop: '3px solid #10b981' }}>
-            <div className="txd-kpi-label">Earnings This Month</div>
-            <div className="txd-kpi-value">{formatRupees(stats?.earningsThisMonth ?? 0)}</div>
-            <div className="txd-kpi-sub">Total: {formatRupees(stats?.totalEarned ?? 0)}</div>
           </div>
           <div className="txd-kpi" style={{ borderTop: '3px solid #3b82f6' }} onClick={() => navigate('/texpert/queue')}>
             <div className="txd-kpi-label">In Queue</div>

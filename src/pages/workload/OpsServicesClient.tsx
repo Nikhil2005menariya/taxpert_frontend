@@ -30,7 +30,7 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   under_review: "Reviewing",
   in_progress: "In Progress",
   action_required: "Action Needed",
-  invoice_pending: "Invoice Pending",
+  payment: "Payment",
   completed: "Done",
   cancelled: "Cancelled",
 };
@@ -42,7 +42,7 @@ const SERVICE_STATUS_STYLES: Record<string, { fg: string; bg: string }> = {
   under_review:       { fg: "#1d4ed8", bg: "#dbeafe" },
   in_progress:        { fg: "#1d4ed8", bg: "#dbeafe" },
   action_required:    { fg: "#be123c", bg: "#ffe4e6" },
-  invoice_pending:    { fg: "#b45309", bg: "#fef3c7" },
+  payment:            { fg: "#b45309", bg: "#fef3c7" },
   completed:          { fg: "#15803d", bg: "#dcfce7" },
   cancelled:          { fg: "#6b7280", bg: "#f3f4f6" },
 };

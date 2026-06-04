@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
 
-type Tab = 'services' | 'payouts' | 'profile';
+type Tab = 'services' | 'profile';
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
@@ -15,7 +15,7 @@ function statusBadge(status: string) {
     under_review: 'aq-badge-review',
     completed: 'aq-badge-done',
     on_hold: 'aq-badge-hold',
-    invoice_pending: 'aq-badge-invoice',
+    payment: 'aq-badge-invoice',
     cancelled: 'aq-badge-hold',
   };
   return <span className={`aq-badge ${map[status] ?? 'aq-badge-pending'}`}>{status.replace(/_/g, ' ')}</span>;
@@ -56,17 +56,15 @@ export default function AdminTexpertDetailPage() {
 
   const remove = useMutation({
     mutationFn: async () => apiClient.delete(`/admin/taxperts/${id}`),
-    onSuccess: () => navigate('/admin/taxperts'),
+    onSuccess: () => navigate('/admin/users?tab=staff'),
   });
 
   if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
   if (error) return <div className="db-page-new"><div className="db-alert-error">Taxpert not found.</div></div>;
 
-  const { profile: tp, services = [], payouts = [] } = data ?? {};
+  const { profile: tp, services = [] } = data ?? {};
   if (!tp) return null;
-
-  const totalPayout = payouts.reduce((s: number, p: any) => s + p.amount, 0);
 
   function startEdit() {
     setEditForm({ first_name: tp.first_name, last_name: tp.last_name, mobile: tp.mobile ?? '' });
@@ -78,7 +76,7 @@ export default function AdminTexpertDetailPage() {
       {/* Header */}
       <div className="db-page-header">
         <div>
-          <div className="aq-back-link" onClick={() => navigate('/admin/taxperts')}>← Taxperts</div>
+          <div className="aq-back-link" onClick={() => navigate('/admin/users?tab=staff')}>← Users</div>
           <h1 className="db-page-title">{tp.first_name} {tp.last_name}</h1>
           <p className="db-page-sub">{tp.email} · {tp.is_active ? 'Active' : 'Inactive'}</p>
         </div>
@@ -107,15 +105,11 @@ export default function AdminTexpertDetailPage() {
           <div className="db-stat-card-label">Completed</div>
           <div className="db-stat-card-value">{services.filter((s: any) => s.status === 'completed').length}</div>
         </div>
-        <div className="db-stat-card-new">
-          <div className="db-stat-card-label">Total Paid</div>
-          <div className="db-stat-card-value">₹{(totalPayout / 100).toLocaleString('en-IN')}</div>
-        </div>
       </div>
 
       {/* Tabs */}
       <div className="aq-tabs">
-        {(['services', 'payouts', 'profile'] as Tab[]).map(t => (
+        {(['services', 'profile'] as Tab[]).map(t => (
           <button key={t} className={`aq-tab ${tab === t ? 'aq-tab-active' : ''}`} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -140,32 +134,6 @@ export default function AdminTexpertDetailPage() {
                     <td>{s.fiscal_year ?? '—'}</td>
                     <td>{statusBadge(s.status)}</td>
                     <td>{new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-
-      {/* Payouts tab */}
-      {tab === 'payouts' && (
-        payouts.length === 0 ? (
-          <div className="db-empty-card">
-            <p className="db-empty-title">No payouts recorded</p>
-          </div>
-        ) : (
-          <div className="aq-table-wrap">
-            <table className="aq-table">
-              <thead><tr><th>Service</th><th>FY</th><th>Amount</th><th>Date</th><th>Notes</th></tr></thead>
-              <tbody>
-                {payouts.map((p: any) => (
-                  <tr key={p.id}>
-                    <td>{p.client_service?.service?.name ?? '—'}</td>
-                    <td>{p.client_service?.fiscal_year ?? '—'}</td>
-                    <td className="aq-td-amount">₹{(p.amount / 100).toLocaleString('en-IN')}</td>
-                    <td>{new Date(p.paid_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
-                    <td className="aq-client-email">{p.notes ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

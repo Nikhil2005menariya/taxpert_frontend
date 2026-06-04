@@ -171,7 +171,6 @@ export default function MobileNav({
     ...(isTexpert ? [
       { href: "/texpert/services", label: "My Services", Icon: IconFolder,     exact: false },
       { href: "/texpert/queue",    label: "Queue",        Icon: IconCalendar,  exact: false },
-      { href: "/texpert/payouts",  label: "My Payouts",  Icon: IconCreditCard, exact: false },
       { href: "/profile",          label: "Profile",      Icon: IconUser,      exact: false },
     ] : []),
 
@@ -183,13 +182,10 @@ export default function MobileNav({
 
     // Admin-only
     ...(isAdmin ? [
-      { href: "/admin/taxperts", label: "Taxperts",  Icon: IconFolder,     exact: false },
-      { href: "/admin/clients",  label: "Clients",   Icon: IconGift,       exact: false },
-      { href: "/admin/queue",    label: "Queue",      Icon: IconCalendar,  exact: false },
-      { href: "/admin/payouts",  label: "Payouts",   Icon: IconCreditCard, exact: false },
-      { href: "/admin/payments", label: "Payments",  Icon: IconCreditCard, exact: false },
-      { href: "/admin/pricing",  label: "Pricing",   Icon: IconTag,        exact: false },
-      { href: "/admin/coupons",  label: "Coupons",   Icon: IconDiscount,   exact: false },
+      { href: "/admin/client-services", label: "Services",  Icon: IconFolder,     exact: false },
+      { href: "/admin/queue",           label: "Queue",     Icon: IconCalendar,   exact: false },
+      { href: "/admin/payments",        label: "Payments",  Icon: IconCreditCard, exact: false },
+      { href: "/admin/coupons",         label: "Coupons",   Icon: IconDiscount,   exact: false },
     ] : []),
   ];
 

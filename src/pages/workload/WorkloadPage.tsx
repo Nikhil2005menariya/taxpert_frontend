@@ -50,7 +50,7 @@ export default function WorkloadPage() {
   ).length;
   const urgentCount = opsServices.filter(
     (r) =>
-      r.status === "documents_required" || r.status === "invoice_pending",
+      r.status === "documents_required" || r.status === "payment",
   ).length;
 
   return (

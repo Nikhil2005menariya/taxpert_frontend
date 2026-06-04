@@ -18,24 +18,19 @@ import AdminPage from './pages/admin/AdminPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import ServicesConfigPage from './pages/admin/ServicesConfigPage';
 import DocumentTypesPage from './pages/admin/DocumentTypesPage';
-import NewServicePage from './pages/admin/NewServicePage';
 import ServiceEditPage from './pages/admin/ServiceEditPage';
-import PricingPage from './pages/admin/PricingPage';
 import CouponsPage from './pages/admin/CouponsPage';
 import InvoiceSettingsPage from './pages/admin/InvoiceSettingsPage';
-import AdminTaxpertsPage from './pages/admin/AdminTaxpertsPage';
 import AdminTexpertDetailPage from './pages/admin/AdminTexpertDetailPage';
-import AdminClientsPage from './pages/admin/AdminClientsPage';
 import AdminClientDetailPage from './pages/admin/AdminClientDetailPage';
 import AdminQueuePage from './pages/admin/AdminQueuePage';
-import AdminPayoutsPage from './pages/admin/AdminPayoutsPage';
-import AdminNotifyPage from './pages/admin/AdminNotifyPage';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
+import AdminInquiriesPage from './pages/admin/AdminInquiriesPage';
 import AdminServiceDetailPage from './pages/admin/AdminServiceDetailPage';
+import AdminClientServicesPage from './pages/admin/AdminClientServicesPage';
 import TexpertServiceDetailPage from './pages/texpert/TexpertServiceDetailPage';
 import TexpertServicesPage from './pages/texpert/TexpertServicesPage';
 import TexpertDashboardPage from './pages/texpert/TexpertDashboardPage';
-import TexpertPayoutsPage from './pages/texpert/TexpertPayoutsPage';
 import PaymentsPage from './pages/client/payments/PaymentsPage';
 import DueDatesPage from './pages/client/due-dates/DueDatesPage';
 import ReferralsPage from './pages/client/referrals/ReferralsPage';
@@ -105,7 +100,6 @@ function App() {
           <Route path="/texpert/dashboard"    element={<TexpertDashboardPage />} />
           <Route path="/texpert/services"     element={<TexpertServicesPage />} />
           <Route path="/texpert/services/:id" element={<TexpertServiceDetailPage />} />
-          <Route path="/texpert/payouts"      element={<TexpertPayoutsPage />} />
           <Route path="/texpert/queue"        element={<AdminQueuePage />} />
 
           {/* ── Admin ──────────────────────────────────────────── */}
@@ -114,19 +108,15 @@ function App() {
           <Route path="/admin/queue"                  element={<AdminQueuePage />} />
           <Route path="/admin/payments"               element={<PaymentsPage />} />
           <Route path="/admin/services"               element={<ServicesConfigPage />} />
-          <Route path="/admin/services/new"           element={<NewServicePage />} />
           <Route path="/admin/services/:id"           element={<ServiceEditPage />} />
           <Route path="/admin/document-types"         element={<DocumentTypesPage />} />
-          <Route path="/admin/pricing"                element={<PricingPage />} />
           <Route path="/admin/coupons"                element={<CouponsPage />} />
           <Route path="/admin/settings/invoice"       element={<InvoiceSettingsPage />} />
-          <Route path="/admin/taxperts"               element={<AdminTaxpertsPage />} />
-          <Route path="/admin/taxperts/:id"           element={<AdminTexpertDetailPage />} />
-          <Route path="/admin/clients"                element={<AdminClientsPage />} />
-          <Route path="/admin/clients/:id"            element={<AdminClientDetailPage />} />
-          <Route path="/admin/payouts"                element={<AdminPayoutsPage />} />
-          <Route path="/admin/notify"                 element={<AdminNotifyPage />} />
+          <Route path="/admin/users/taxpert/:id"       element={<AdminTexpertDetailPage />} />
+          <Route path="/admin/users/client/:id"        element={<AdminClientDetailPage />} />
           <Route path="/admin/audit"                  element={<AdminAuditPage />} />
+          <Route path="/admin/inquiries"              element={<AdminInquiriesPage />} />
+          <Route path="/admin/client-services"          element={<AdminClientServicesPage />} />
           <Route path="/admin/client-services/:id"    element={<AdminServiceDetailPage />} />
 
           {/* Legacy / shared */}

@@ -10,7 +10,7 @@ import Loader from "../../../components/ui/Loader";
 
 type ServiceStatus =
   | "pending" | "documents_required" | "under_review" | "in_progress"
-  | "action_required" | "completed" | "cancelled";
+  | "action_required" | "payment" | "completed" | "cancelled";
 
 const STATUS_LABELS: Record<ServiceStatus, string> = {
   pending: "Pending",
@@ -18,6 +18,7 @@ const STATUS_LABELS: Record<ServiceStatus, string> = {
   under_review: "Reviewing",
   in_progress: "In progress",
   action_required: "Action needed",
+  payment: "Payment",
   completed: "Done",
   cancelled: "Cancelled",
 };
@@ -28,6 +29,7 @@ const STATUS_TONE: Record<ServiceStatus, { fg: string; bg: string }> = {
   under_review:       { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
   in_progress:        { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
   action_required:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
+  payment:            { fg: "#a96a16", bg: "#f6ecd6" },
   completed:          { fg: "var(--lp-green)", bg: "var(--lp-green-soft)" },
   cancelled:          { fg: "var(--lp-ink-faint)", bg: "var(--lp-surface-2)" },
 };
@@ -199,7 +201,7 @@ export default function DashboardPage() {
         <StatCard label="Total services"  value={s?.total ?? 0}     sub="All time"                                                              tone="default" icon={I.grid} />
       </div>
 
-      {error && <div className="lpd-alert">Failed to load services: {(error as any).message}</div>}
+      {error && !summary && <div className="lpd-alert">Failed to load services: {(error as any).message}</div>}
 
       {/* Empty state */}
       {!all.length ? (

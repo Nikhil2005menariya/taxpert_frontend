@@ -7,7 +7,7 @@ import MilestoneBar from "../../../components/dashboard/MilestoneBar";
 import AddServiceModal from "../../../components/dashboard/AddServiceModal";
 import PayButton from "../../../components/ui/PayButton";
 
-type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "invoice_pending" | "completed" | "cancelled";
+type ServiceStatus = "pending" | "documents_required" | "under_review" | "in_progress" | "action_required" | "payment" | "completed" | "cancelled";
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -16,7 +16,7 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   under_review: "Under Review",
   in_progress: "In Progress",
   action_required: "Action Required",
-  invoice_pending: "Invoice Pending",
+  payment: "Payment",
   completed: "Completed",
   on_hold: "On Hold",
   cancelled: "Cancelled",
@@ -29,7 +29,7 @@ const SERVICE_STATUS_TONE: Record<string, { fg: string; bg: string }> = {
   under_review:       { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
   in_progress:        { fg: "var(--lp-ink-muted)", bg: "var(--lp-surface-2)" },
   action_required:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
-  invoice_pending:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
+  payment:    { fg: "var(--lp-accent-strong)", bg: "var(--lp-accent-soft)" },
   completed:          { fg: "var(--lp-green)", bg: "var(--lp-green-soft)" },
   on_hold:            { fg: "var(--lp-ink-subtle)", bg: "var(--lp-surface-2)" },
   cancelled:          { fg: "var(--lp-ink-faint)", bg: "var(--lp-surface-2)" },
@@ -103,11 +103,11 @@ export default function MyServicesPage() {
             const stats = docStats(cs.client_documents);
             const tone = SERVICE_STATUS_TONE[cs.status] ?? SERVICE_STATUS_TONE.pending;
             const lastUpdated = formatRelative(cs.status_updated_at ?? cs.updated_at);
-            const needsPayment = cs.status === "invoice_pending" && cs.payment_status !== "paid";
+            const needsPayment = cs.status === "payment" && cs.payment_status !== "paid";
 
             const nextAction =
               cs.status === "documents_required" ? "Upload to your Tax Vault"
-              : cs.status === "invoice_pending"  ? "Invoice ready — payment required"
+              : cs.status === "payment"  ? "Ready — payment required"
               : cs.status === "in_progress"      ? "Your filing is being processed"
               : cs.status === "under_review"     ? "Expert is reviewing your documents"
               : cs.status === "completed"        ? "Service completed"

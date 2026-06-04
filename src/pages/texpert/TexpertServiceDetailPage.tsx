@@ -16,7 +16,7 @@ const WORKFLOW_STEPS: { key: string; label: string }[] = [
   { key: 'documents_received', label: 'Docs Received' },
   { key: 'in_progress',        label: 'In Progress' },
   { key: 'under_review',       label: 'Under Review' },
-  { key: 'invoice_pending',    label: 'Invoice Pending' },
+  { key: 'payment',            label: 'Payment' },
   { key: 'completed',          label: 'Completed' },
 ];
 
@@ -26,7 +26,7 @@ const STATUS_BADGE: Record<string, string> = {
   documents_received:  'aq-badge-docs',
   in_progress:         'aq-badge-active',
   under_review:        'aq-badge-review',
-  invoice_pending:     'aq-badge-invoice',
+  payment:             'aq-badge-invoice',
   completed:           'aq-badge-done',
   on_hold:             'aq-badge-hold',
   cancelled:           'aq-badge-hold',
@@ -51,6 +51,7 @@ const EVENT_ICON: Record<string, string> = {
   pinned_updated:                '📌',
   payout_recorded:               '💰',
   payment_captured:              '💳',
+  payment_received:              '💳',
   default:                       '📋',
 };
 
@@ -375,9 +376,6 @@ export default function TexpertServiceDetailPage() {
   const outputDocs  = (data.output_documents ?? []) as any[];
   const events      = (data.service_events ?? []) as any[];
   const tasks       = (data.service_tasks ?? []) as any[];
-  const payouts     = (data.payouts ?? []) as any[];
-  const totalPaid = payouts.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
-
   const uploadedDocs = docs.filter(d => d.file_path || d.file_url).length;
   const pendingDocs  = docs.filter(d => !d.file_path && !d.file_url).length;
   const approvedDocs = docs.filter(d => d.status === 'approved').length;
@@ -468,11 +466,6 @@ export default function TexpertServiceDetailPage() {
           <div className="db-stat-card-label">Open Tasks</div>
           <div className="db-stat-card-value">{openTasks}</div>
           <div className="db-stat-card-sub">{tasks.filter(t => t.status === 'done').length} done</div>
-        </div>
-        <div className="db-stat-card-new">
-          <div className="db-stat-card-label">Your Earnings</div>
-          <div className="db-stat-card-value">{formatRupees(totalPaid)}</div>
-          <div className="db-stat-card-sub">{payouts.length} payout{payouts.length !== 1 ? 's' : ''}</div>
         </div>
         {reuploads > 0 && (
           <div className="db-stat-card-new" style={{ borderColor: 'var(--gold-400)' }}>

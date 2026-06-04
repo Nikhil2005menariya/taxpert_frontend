@@ -89,11 +89,9 @@ export default function ServicesConfigPage() {
           <Link to="/admin/document-types" className="btn btn-secondary" style={{ fontSize: "0.85rem" }}>
             Document Types
           </Link>
-          {isSuperAdmin && (
-            <Link to="/admin/services/new" className="btn btn-primary" style={{ fontSize: "0.85rem" }}>
-              + New Service
-            </Link>
-          )}
+          <Link to="/admin/services/new" className="btn btn-primary" style={{ fontSize: "0.85rem" }}>
+            + New Service
+          </Link>
         </div>
       </div>
 

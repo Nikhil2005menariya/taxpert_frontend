@@ -5,12 +5,43 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../api/client';
 
-type DetailTab = 'docs' | 'timeline' | 'tasks' | 'payment' | 'settings';
+type DetailTab = 'docs' | 'timeline' | 'tasks' | 'payment' | 'workflow' | 'settings';
 
 const STATUS_OPTIONS = [
   'documents_required', 'documents_received', 'in_progress',
-  'under_review', 'invoice_pending', 'completed', 'on_hold', 'cancelled',
+  'under_review', 'payment', 'completed', 'on_hold', 'cancelled',
 ];
+
+// Workflow pipeline order — mirrors the texpert service detail view.
+const WORKFLOW_STEPS: { key: string; label: string }[] = [
+  { key: 'documents_required', label: 'Docs Required' },
+  { key: 'documents_received', label: 'Docs Received' },
+  { key: 'in_progress',        label: 'In Progress' },
+  { key: 'under_review',       label: 'Under Review' },
+  { key: 'payment',            label: 'Payment' },
+  { key: 'completed',          label: 'Completed' },
+];
+
+function WorkflowPipeline({ status }: { status: string }) {
+  const currentIdx = WORKFLOW_STEPS.findIndex(s => s.key === status);
+  const isOnHold = status === 'on_hold';
+  return (
+    <div className="tx-pipeline">
+      {WORKFLOW_STEPS.map((step, i) => {
+        const reached = !isOnHold && currentIdx >= i;
+        const current = !isOnHold && currentIdx === i;
+        return (
+          <div key={step.key} className={`tx-pipeline-step ${reached ? 'tx-step-reached' : ''} ${current ? 'tx-step-current' : ''}`}>
+            <div className="tx-step-dot">{reached ? '✓' : i + 1}</div>
+            <div className="tx-step-label">{step.label}</div>
+            {i < WORKFLOW_STEPS.length - 1 && <div className="tx-step-bar" />}
+          </div>
+        );
+      })}
+      {isOnHold && <div className="tx-pipeline-onhold">⏸ ON HOLD</div>}
+    </div>
+  );
+}
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'aq-badge-pending',
@@ -18,7 +49,7 @@ const STATUS_BADGE: Record<string, string> = {
   documents_received: 'aq-badge-docs',
   in_progress: 'aq-badge-active',
   under_review: 'aq-badge-review',
-  invoice_pending: 'aq-badge-invoice',
+  payment: 'aq-badge-invoice',
   completed: 'aq-badge-done',
   on_hold: 'aq-badge-hold',
   cancelled: 'aq-badge-hold',
@@ -49,6 +80,8 @@ const EVENT_ICON: Record<string, string> = {
   optional_document_added: '📎',
   texpert_assigned: '👤',
   payout_recorded: '💰',
+  payment_received: '💳',
+  payment_captured: '💳',
   task_added: '📋',
   admin_note: '📝',
   default: '📋',
@@ -181,10 +214,6 @@ export default function AdminServiceDetailPage() {
   const [taskDesc, setTaskDesc] = useState('');
   const [taskDue, setTaskDue] = useState('');
 
-  // Payout form
-  const [showAddPayout, setShowAddPayout] = useState(false);
-  const [payoutAmount, setPayoutAmount] = useState('');
-  const [payoutNotes, setPayoutNotes] = useState('');
 
   // Settings form
   const [settingsStatus, setSettingsStatus] = useState('');
@@ -257,16 +286,6 @@ export default function AdminServiceDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }),
   });
 
-  const addPayout = useMutation({
-    mutationFn: () => apiClient.post(`/admin/client-services/${id}/payouts`, {
-      amount_rupees: Number(payoutAmount),
-      notes: payoutNotes || undefined,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-service-detail', id] });
-      setPayoutAmount(''); setPayoutNotes(''); setShowAddPayout(false);
-    },
-  });
 
   if (authLoading || isLoading) return <div className="page-loader"><Loader /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
@@ -279,12 +298,9 @@ export default function AdminServiceDetailPage() {
   const outputDocs: any[] = data.output_documents ?? [];
   const events: any[] = data.service_events ?? [];
   const tasks: any[] = data.service_tasks ?? [];
-  const payouts: any[] = data.payouts ?? [];
-
   const uploadedDocs = docs.filter(d => d.file_path || d.file_url).length;
   const pendingDocs = docs.filter(d => !d.file_path && !d.file_url).length;
   const reuploads = docs.filter(d => d.reupload_requested).length;
-  const totalPayoutPaise = payouts.reduce((sum: number, p: any) => sum + (p.amount ?? 0), 0);
 
   function initSettings() {
     setSettingsStatus(data.status ?? '');
@@ -300,7 +316,7 @@ export default function AdminServiceDetailPage() {
       {/* Header */}
       <div className="db-page-header">
         <div>
-          <div className="aq-back-link" onClick={() => navigate(`/admin/clients/${client?.id}`)}>
+          <div className="aq-back-link" onClick={() => navigate(`/admin/users/client/${client?.id}`)}>
             ← {client?.first_name} {client?.last_name}
           </div>
           <h1 className="db-page-title">{service?.name ?? 'Service Detail'}</h1>
@@ -367,6 +383,7 @@ export default function AdminServiceDetailPage() {
           ['timeline', `Timeline (${events.length})`],
           ['tasks', `Tasks (${tasks.length})`],
           ['payment', 'Payment'],
+          ['workflow', 'Workflow'],
           ['settings', 'Settings'],
         ] as [DetailTab, string][]).map(([t, label]) => (
           <button key={t} className={`aq-tab ${tab === t ? 'aq-tab-active' : ''}`} onClick={() => setTab(t)}>
@@ -691,89 +708,78 @@ export default function AdminServiceDetailPage() {
             )}
           </div>
 
-          <div className="asd-tab-header" style={{ marginBottom: '0.75rem' }}>
-            <h3 className="asd-section-title" style={{ margin: 0 }}>Taxpert Payouts</h3>
-            {texpert && (
-              <button className="btn btn-sm btn-secondary" onClick={() => setShowAddPayout(v => !v)}>
-                + Record Payout
-              </button>
-            )}
-          </div>
+        </div>
+      )}
 
-          {!texpert && (
-            <p style={{ fontSize: '0.82rem', color: 'var(--ink-400)', marginBottom: '1rem' }}>
-              Assign a taxpert first to record a payout.
-            </p>
-          )}
+      {/* ── Workflow ── */}
+      {tab === 'workflow' && (
+        <div className="asd-section">
+          <h3 className="asd-section-title">Current Status</h3>
+          <WorkflowPipeline status={data.status} />
 
-          {showAddPayout && (
-            <div className="asd-add-form" style={{ marginBottom: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Amount (₹)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  placeholder="e.g. 1500"
-                  value={payoutAmount}
-                  onChange={e => setPayoutAmount(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Notes (optional)</label>
-                <input
-                  className="form-input"
-                  placeholder="Payment reference, bank transfer ID…"
-                  value={payoutNotes}
-                  onChange={e => setPayoutNotes(e.target.value)}
-                />
-              </div>
-              {addPayout.isError && <p className="aq-modal-error">{(addPayout.error as any)?.response?.data?.error}</p>}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => { setShowAddPayout(false); setPayoutAmount(''); setPayoutNotes(''); }}>Cancel</button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  disabled={!payoutAmount || Number(payoutAmount) <= 0 || addPayout.isPending}
-                  onClick={() => addPayout.mutate()}
-                >
-                  {addPayout.isPending ? 'Recording…' : 'Record Payout'}
-                </button>
-              </div>
+          {!texpert && !['completed', 'cancelled'].includes(data.status) && (
+            <div className="aq-modal-error" style={{ marginTop: '1rem' }}>
+              Assign a Taxpert before updating the workflow status. Use the <strong>Assign Taxpert</strong> button at the top of this page.
             </div>
           )}
 
-          {payouts.length === 0 ? (
-            <div className="db-empty-card" style={{ padding: '1.5rem' }}>
-              <p className="db-empty-desc">No payouts recorded for this service.</p>
+          {data.status === 'payment' && data.payment_status !== 'paid' && (
+            <div className="aq-modal-error" style={{ marginTop: '1rem' }}>
+              Awaiting payment from the client. The service can be marked <strong>Completed</strong> only after payment is confirmed.
             </div>
-          ) : (
+          )}
+
+          {data.status !== 'cancelled' && (
             <>
-              <div className="asd-payout-total">
-                Total paid: <strong>₹{(totalPayoutPaise / 100).toLocaleString('en-IN')}</strong>
-              </div>
-              <div className="aq-table-wrap">
-                <table className="aq-table">
-                  <thead>
-                    <tr>
-                      <th>Amount</th>
-                      <th>Paid At</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payouts.map((p: any) => (
-                      <tr key={p.id}>
-                        <td>₹{(p.amount / 100).toLocaleString('en-IN')}</td>
-                        <td>{fmtDate(p.paid_at)}</td>
-                        <td>{p.notes ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Manual Status Change</h3>
+              {updateService.isError && (
+                <p className="aq-modal-error">{(updateService.error as any)?.response?.data?.error ?? 'Failed to update status'}</p>
+              )}
+              <div className="tx-status-grid">
+                {WORKFLOW_STEPS.map(s => {
+                  const isCurrent = data.status === s.key;
+                  // Completion is gated on confirmed payment; all progress is gated on an assigned Taxpert.
+                  const blockComplete = s.key === 'completed' && data.payment_status !== 'paid';
+                  return (
+                    <button key={s.key}
+                      className={`tx-status-btn ${isCurrent ? 'tx-status-current' : ''}`}
+                      disabled={!texpert || isCurrent || blockComplete || updateService.isPending}
+                      title={!texpert ? 'Assign a Taxpert first' : blockComplete ? 'Payment must be confirmed before completing' : undefined}
+                      onClick={() => updateService.mutate({ status: s.key })}>
+                      {s.label}
+                      {isCurrent && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
+                    </button>
+                  );
+                })}
+                <button className="tx-status-btn tx-status-hold"
+                  disabled={!texpert || data.status === 'on_hold' || updateService.isPending}
+                  title={!texpert ? 'Assign a Taxpert first' : undefined}
+                  onClick={() => updateService.mutate({ status: 'on_hold' })}>
+                  On Hold
+                  {data.status === 'on_hold' && <span style={{ marginLeft: 6, fontSize: '0.7rem' }}>· Current</span>}
+                </button>
               </div>
             </>
           )}
+
+          <h3 className="asd-section-title" style={{ marginTop: '2rem' }}>Service Metadata</h3>
+          <div className="aq-profile-card">
+            <div className="aq-profile-row"><span className="aq-profile-label">Created</span><span>{fmtDateTime(data.created_at)}</span></div>
+            <div className="aq-profile-row"><span className="aq-profile-label">Last Updated</span><span>{fmtDateTime(data.updated_at)}</span></div>
+            <div className="aq-profile-row">
+              <span className="aq-profile-label">Payment</span>
+              <span>{badge(PAYMENT_BADGE[data.payment_status] ?? 'aq-badge-pending', data.payment_status ?? 'pending')}</span>
+            </div>
+            {data.payment_id && (
+              <div className="aq-profile-row"><span className="aq-profile-label">Payment ID</span><span className="aq-mono">{data.payment_id}</span></div>
+            )}
+            {data.is_blocked && (
+              <div className="aq-profile-row">
+                <span className="aq-profile-label">Blocked</span>
+                <span className="aq-badge aq-badge-hold">Yes{data.blocked_reason ? ` — ${data.blocked_reason}` : ''}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

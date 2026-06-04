@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { apiClient } from "../../api/client";
 
 export default function ConsultationButton() {
-  const [open, setOpen] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [open, setOpen]       = useState(false);
+  const [sent, setSent]       = useState(false);
   const [loading, setLoading] = useState(false);
+  const [err, setErr]         = useState("");
 
-  // ESC key closes modal
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setOpen(false); setSent(false); }
+      if (e.key === "Escape") { setOpen(false); setSent(false); setErr(""); }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -20,11 +20,29 @@ export default function ConsultationButton() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setErr("");
     setLoading(true);
-    // Simulate submission — wire to your preferred email/CRM later
-    await new Promise((r) => setTimeout(r, 900));
-    setSent(true);
-    setLoading(false);
+    const fd = new FormData(e.currentTarget);
+    try {
+      await apiClient.post("/marketing/consultations", {
+        name:           fd.get("name"),
+        phone:          fd.get("phone"),
+        email:          fd.get("email"),
+        service_needed: fd.get("service"),
+        message:        fd.get("message") || undefined,
+      });
+      setSent(true);
+    } catch (e: any) {
+      setErr(e?.response?.data?.error ?? "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleClose() {
+    setOpen(false);
+    setSent(false);
+    setErr("");
   }
 
   return (
@@ -34,23 +52,15 @@ export default function ConsultationButton() {
       </button>
 
       {open && (
-        <div className="consult-backdrop" onClick={() => setOpen(false)}>
+        <div className="consult-backdrop" onClick={handleClose}>
           <div className="consult-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="consult-close" onClick={() => { setOpen(false); setSent(false); }}>
-              ✕
-            </button>
+            <button className="consult-close" onClick={handleClose}>✕</button>
 
             {sent ? (
               <div className="consult-success">
                 <span className="consult-success-icon">✓</span>
                 <h3>Request received!</h3>
-                <p>
-                  Our team will reach out within 1 business day to schedule
-                  your free consultation.
-                </p>
-                <Link to="/contact" className="btn btn-primary" style={{ marginTop: "1rem" }}>
-                  Go to Contact Page
-                </Link>
+                <p>Our team will reach out within 1 business day to schedule your free consultation.</p>
               </div>
             ) : (
               <>
@@ -75,17 +85,22 @@ export default function ConsultationButton() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Service Needed</label>
-                    <select className="form-input" name="service" required>
-                      <option value="">Select a service…</option>
+                    <select className="form-input" name="service" required defaultValue="">
+                      <option value="" disabled>Select a service…</option>
                       <option>Income Tax Filing</option>
                       <option>GST Registration / Filing</option>
                       <option>Company / LLP Registration</option>
                       <option>ROC Compliance</option>
                       <option>TDS Compliance</option>
-                      <option>Accounting & Bookkeeping</option>
+                      <option>Accounting &amp; Bookkeeping</option>
                       <option>Other</option>
                     </select>
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Message <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span></label>
+                    <textarea className="form-input" name="message" rows={3} placeholder="Any specific questions or context…" style={{ resize: "vertical" }} />
+                  </div>
+                  {err && <p style={{ color: "#dc2626", fontSize: "0.82rem", margin: "0 0 0.5rem" }}>{err}</p>}
                   <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: "100%" }}>
                     {loading ? "Sending…" : "Request Consultation"}
                   </button>
