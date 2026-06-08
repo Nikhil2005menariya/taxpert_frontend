@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { serviceCategories } from "../../data/site-content";
 import { apiClient } from "../../api/client";
 import { CategoryIcon } from "../../shared/category-icons";
+
+type Cat = (typeof serviceCategories)[number];
 
 export default function AddServiceModal() {
   const [open, setOpen] = useState(false);
@@ -11,8 +14,20 @@ export default function AddServiceModal() {
   const [message, setMessage] = useState<{ type: "error" | "exists"; text: string; svcId?: string } | null>(null);
   const navigate = useNavigate();
 
+  // Live catalogue from the DB — reflects admin add/edit/activate in ServiceEditPage.
+  // Only active services/categories come back. Static list is a loading fallback.
+  const { data: liveCategories } = useQuery({
+    queryKey: ["marketing-categories"],
+    queryFn: async () => {
+      const res = await apiClient.get("/services");
+      return res.data.data as Cat[];
+    },
+  });
+
+  const categories: Cat[] = liveCategories?.length ? liveCategories : serviceCategories;
+
   const category = categorySlug
-    ? serviceCategories.find(c => c.slug === categorySlug) ?? null
+    ? categories.find(c => c.slug === categorySlug) ?? null
     : null;
 
   function handleOpen() {
@@ -100,7 +115,7 @@ export default function AddServiceModal() {
 
               {!category ? (
                 <div className="asv-cats">
-                  {serviceCategories.map(cat => (
+                  {categories.map(cat => (
                     <button
                       key={cat.slug}
                       className="asv-cat"

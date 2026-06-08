@@ -146,6 +146,51 @@ function RejectModal({ serviceId, docId, docName, onClose }: any) {
   );
 }
 
+function BatchDocModal({ serviceId, docIds, mode, onClose, onDone }: { serviceId: string; docIds: string[]; mode: 'reject' | 'reupload'; onClose: () => void; onDone: () => void }) {
+  const qc = useQueryClient();
+  const [text, setText] = useState('');
+  const n = docIds.length;
+  const isReject = mode === 'reject';
+  const mut = useMutation({
+    mutationFn: () => apiClient.patch(`/texpert/services/${serviceId}/docs/batch`, { action: mode, docIds, note: text }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tx-service-detail', serviceId] }); onDone(); onClose(); },
+  });
+  return (
+    <div className="adm-modal-overlay" onClick={onClose}>
+      <div className="adm-modal" onClick={e => e.stopPropagation()}>
+        <div className="adm-modal-head">
+          <div>
+            <p className="adm-modal-eyebrow">— Documents</p>
+            <h3 className="adm-modal-title">{isReject ? 'Reject Documents (Final)' : 'Request Re-upload'}</h3>
+            <p className="adm-modal-sub">{n} document{n !== 1 ? 's' : ''} selected · the client gets one notification</p>
+          </div>
+          <button className="adm-modal-x" onClick={onClose} aria-label="Close">{Icon.x}</button>
+        </div>
+        <div className="adm-modal-body">
+          {isReject && (
+            <div className="adm-banner adm-banner--err" style={{ margin: 0 }}>{Icon.alert}<span><strong>This is a final rejection.</strong> The client cannot re-upload these slots — use “Request Re-upload” to let them try again.</span></div>
+          )}
+          <div className="adm-field">
+            <label className="adm-label">{isReject ? 'Reason for rejection *' : <>Note to client <span className="adm-label-opt">(optional)</span></>}</label>
+            <textarea className="adm-textarea" rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={isReject ? 'e.g. These documents are not applicable to your filing' : 'e.g. The scans are blurry, please re-upload clearer copies'} />
+          </div>
+          {mut.isError && <p className="adm-modal-err">{Icon.alert}{(mut.error as any)?.response?.data?.error}</p>}
+        </div>
+        <div className="adm-modal-foot">
+          <button className="adm-btn adm-btn--ghost" onClick={onClose}>Cancel</button>
+          <button
+            className={`adm-btn ${isReject ? 'adm-btn--danger' : 'adm-btn--accent'}`}
+            disabled={mut.isPending || (isReject && !text.trim())}
+            onClick={() => mut.mutate()}
+          >
+            {mut.isPending ? 'Sending…' : isReject ? `Reject (${n})` : `Request Re-upload (${n})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusModal({ serviceId, targetStatus, onClose }: any) {
   const qc = useQueryClient();
   const mut = useMutation({
@@ -216,14 +261,15 @@ export default function TexpertServiceDetailPage() {
   const [statusTarget, setStatusTarget] = useState<string | null>(null);
 
   const [showAddDoc, setShowAddDoc] = useState(false);
-  const [docName, setDocName] = useState('');
+  const [docNames, setDocNames] = useState<string[]>(['']);
+
+  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
+  const [batchModal, setBatchModal] = useState<null | 'reject' | 'reupload'>(null);
 
   const [showOutputUpload, setShowOutputUpload] = useState(false);
-  const [outputDocName,    setOutputDocName]    = useState('');
-  const [outputDocDesc,    setOutputDocDesc]    = useState('');
+  const [outputRows,       setOutputRows]       = useState<{ name: string; file: File | null }[]>([{ name: '', file: null }]);
   const [outputUploading,  setOutputUploading]  = useState(false);
   const [outputUploadErr,  setOutputUploadErr]  = useState<string | null>(null);
-  const outputFileRef = useRef<HTMLInputElement>(null);
   const [showAddTask, setShowAddTask] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
@@ -256,9 +302,17 @@ export default function TexpertServiceDetailPage() {
     mutationFn: (docId: string) => apiClient.post(`/texpert/services/${id}/docs/${docId}/approve`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }),
   });
-  const addDoc = useMutation({
-    mutationFn: () => apiClient.post(`/texpert/services/${id}/doc-slots`, { documentName: docName }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }); setDocName(''); setShowAddDoc(false); },
+  const addDocs = useMutation({
+    mutationFn: () => apiClient.post(`/texpert/services/${id}/doc-slots/batch`, {
+      documentNames: docNames.map(s => s.trim()).filter(Boolean),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }); setDocNames(['']); setShowAddDoc(false); },
+  });
+  // Bulk approve across selected uploaded docs (one notification). Reject &
+  // re-upload go through a modal since they carry a reason/note.
+  const batchApprove = useMutation({
+    mutationFn: (docIds: string[]) => apiClient.patch(`/texpert/services/${id}/docs/batch`, { action: 'approve', docIds }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tx-service-detail', id] }); setSelectedDocs(new Set()); },
   });
   const addTask = useMutation({
     mutationFn: () => apiClient.post(`/texpert/services/${id}/tasks`, { title: taskTitle, description: taskDesc || undefined, due_at: taskDue || undefined }),
@@ -299,24 +353,26 @@ export default function TexpertServiceDetailPage() {
     notesTimer.current = setTimeout(() => saveNotes.mutate(val), 800);
   }
 
-  const handleOutputUpload = useCallback(async (file: File) => {
-    if (!outputDocName.trim()) { setOutputUploadErr('Enter a document name first'); return; }
+  const resetOutput = () => { setShowOutputUpload(false); setOutputRows([{ name: '', file: null }]); setOutputUploadErr(null); };
+
+  // Upload every filled row in a single request → one client email + notification.
+  const uploadOutputDocs = useCallback(async () => {
+    const filled = outputRows.filter(r => r.file);
+    if (filled.length === 0) { setOutputUploadErr('Add at least one file'); return; }
     setOutputUploading(true); setOutputUploadErr(null);
     const form = new FormData();
-    form.append('file', file);
-    form.append('document_name', outputDocName.trim());
-    if (outputDocDesc.trim()) form.append('description', outputDocDesc.trim());
+    filled.forEach(r => form.append('files', r.file as File));
+    form.append('names', JSON.stringify(filled.map(r => r.name.trim() || (r.file as File).name.replace(/\.[^.]+$/, ''))));
     try {
-      await apiClient.post(`/texpert/services/${id}/output-docs`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await apiClient.post(`/texpert/services/${id}/output-docs/batch`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
       qc.invalidateQueries({ queryKey: ['tx-service-detail', id] });
-      setOutputDocName(''); setOutputDocDesc(''); setShowOutputUpload(false);
+      setOutputRows([{ name: '', file: null }]); setShowOutputUpload(false);
     } catch (e: any) {
       setOutputUploadErr(e.response?.data?.error ?? 'Upload failed');
     } finally {
       setOutputUploading(false);
-      if (outputFileRef.current) outputFileRef.current.value = '';
     }
-  }, [outputDocName, outputDocDesc, id, qc]);
+  }, [outputRows, id, qc]);
 
   const deleteOutputDoc = useMutation({
     mutationFn: (docId: string) => apiClient.delete(`/texpert/services/${id}/output-docs/${docId}`),
@@ -337,6 +393,24 @@ export default function TexpertServiceDetailPage() {
   const pendingDocs  = docs.filter(d => !d.file_path && !d.file_url).length;
   const approvedDocs = docs.filter(d => d.status === 'approved').length;
   const reuploads    = docs.filter(d => d.reupload_requested).length;
+
+  // Only uploaded docs can be approved/rejected/re-upload-requested → selectable.
+  const selectableDocs  = docs.filter((d: any) => !!(d.file_path || d.file_url));
+  const selectedDocObjs = selectableDocs.filter((d: any) => selectedDocs.has(d.id));
+  const validSelected   = selectedDocObjs.map((d: any) => d.id);
+  const allSelected     = selectableDocs.length > 0 && validSelected.length === selectableDocs.length;
+  const toggleDoc = (docId: string) =>
+    setSelectedDocs(prev => {
+      const next = new Set(prev);
+      next.has(docId) ? next.delete(docId) : next.add(docId);
+      return next;
+    });
+  const toggleAllDocs = () =>
+    setSelectedDocs(allSelected ? new Set() : new Set(selectableDocs.map((d: any) => d.id)));
+  const canBatchApprove  = selectedDocObjs.some((d: any) => d.status !== 'approved');
+  const canBatchReject   = selectedDocObjs.some((d: any) => d.status !== 'rejected');
+  const canBatchReupload = selectedDocObjs.some((d: any) => d.status !== 'rejected' && !d.reupload_requested);
+
   const openTasks    = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').length;
   const doneTasks    = tasks.filter(t => t.status === 'done').length;
 
@@ -498,20 +572,60 @@ export default function TexpertServiceDetailPage() {
         <section className="adm-panel">
           <div className="adm-panel-head">
             <div className="adm-panel-titles"><h2 className="adm-panel-title">Documents<span className="adm-count">{uploadedDocs}/{docs.length}</span></h2></div>
-            {!isCancelled && <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowAddDoc(v => !v)}>+ Add Document</button>}
+            {!isCancelled && (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {selectableDocs.length > 0 && (
+                  <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={toggleAllDocs}>
+                    {allSelected ? 'Clear selection' : 'Select all uploaded'}
+                  </button>
+                )}
+                <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowAddDoc(v => !v)}>+ Add Documents</button>
+              </div>
+            )}
           </div>
 
           {showAddDoc && (
-            <div className="adm-addbar" style={{ marginBottom: '1.15rem' }}>
-              <div className="adm-field" style={{ flex: 1, minWidth: 240 }}>
-                <label className="adm-label">Document name</label>
-                <input className="adm-input" placeholder="e.g. Bank Statement Q4" value={docName} onChange={e => setDocName(e.target.value)} onKeyDown={e => e.key === 'Enter' && docName.trim() && addDoc.mutate()} />
+            <div className="adm-multiadd">
+              <label className="adm-label">Document names</label>
+              {docNames.map((name, i) => (
+                <div key={i} className="adm-multiadd-row">
+                  <input
+                    className="adm-input"
+                    placeholder="e.g. Bank Statement Q4"
+                    value={name}
+                    autoFocus={i === docNames.length - 1}
+                    onChange={e => setDocNames(arr => arr.map((v, j) => (j === i ? e.target.value : v)))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setDocNames(arr => [...arr, '']); } }}
+                  />
+                  {docNames.length > 1 && (
+                    <button className="adm-multiadd-del" title="Remove" onClick={() => setDocNames(arr => arr.filter((_, j) => j !== i))}>{Icon.x}</button>
+                  )}
+                </div>
+              ))}
+              <button className="adm-multiadd-more" onClick={() => setDocNames(arr => [...arr, ''])}>+ Add another</button>
+              <div className="adm-multiadd-foot">
+                <button className="adm-btn adm-btn--ghost" onClick={() => { setShowAddDoc(false); setDocNames(['']); }}>Cancel</button>
+                <button className="adm-btn adm-btn--accent" disabled={docNames.filter(s => s.trim()).length === 0 || addDocs.isPending} onClick={() => addDocs.mutate()}>
+                  {addDocs.isPending ? 'Adding…' : `Add ${docNames.filter(s => s.trim()).length || ''} slot${docNames.filter(s => s.trim()).length !== 1 ? 's' : ''}`.trim()}
+                </button>
               </div>
-              <button className="adm-btn adm-btn--ghost" onClick={() => { setShowAddDoc(false); setDocName(''); }}>Cancel</button>
-              <button className="adm-btn adm-btn--accent" disabled={!docName.trim() || addDoc.isPending} onClick={() => addDoc.mutate()}>{addDoc.isPending ? 'Adding…' : 'Add Slot'}</button>
             </div>
           )}
-          {addDoc.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(addDoc.error as any)?.response?.data?.error}</p>}
+          {addDocs.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(addDocs.error as any)?.response?.data?.error}</p>}
+
+          {/* Bulk action bar */}
+          {!isCancelled && validSelected.length > 0 && (
+            <div className="adm-batchbar">
+              <span className="adm-batchbar-count">{validSelected.length} selected</span>
+              <div className="adm-batchbar-actions">
+                {canBatchApprove && <button className="adm-btn adm-btn--sm adm-btn--accent" disabled={batchApprove.isPending} onClick={() => batchApprove.mutate(validSelected)}>Approve</button>}
+                {canBatchReupload && <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setBatchModal('reupload')}>Request re-upload</button>}
+                {canBatchReject && <button className="adm-btn adm-btn--sm adm-btn--danger" onClick={() => setBatchModal('reject')}>Reject</button>}
+                <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setSelectedDocs(new Set())}>Clear</button>
+              </div>
+            </div>
+          )}
+          {batchApprove.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(batchApprove.error as any)?.response?.data?.error}</p>}
 
           {docs.length === 0 ? (
             <div className="adm-empty-box"><span className="adm-empty-ico">{Icon.docs}</span><p className="adm-empty-txt">No document slots have been created for this service.</p></div>
@@ -520,8 +634,22 @@ export default function TexpertServiceDetailPage() {
               {docs.map(doc => {
                 const hasFile = !!(doc.file_path || doc.file_url);
                 const url     = doc.signed_url || doc.file_url;
+                const selectable = !isCancelled && hasFile;
+                const isSel = selectedDocs.has(doc.id);
                 return (
-                  <div key={doc.id} className={`adm-row${doc.reupload_requested ? ' adm-row--flag' : ''}`}>
+                  <div
+                    key={doc.id}
+                    className={`adm-row${doc.reupload_requested ? ' adm-row--flag' : ''}${isSel ? ' adm-row--selected' : ''}${selectable ? ' adm-row--clickable' : ''}`}
+                    onClick={selectable ? () => toggleDoc(doc.id) : undefined}
+                  >
+                    {selectable ? (
+                      <label className="adm-checkbox" title="Select for bulk action">
+                        <input type="checkbox" checked={isSel} readOnly tabIndex={-1} />
+                        <span className="adm-checkbox-box" aria-hidden="true" />
+                      </label>
+                    ) : (
+                      <span className="adm-checkbox adm-checkbox--placeholder" aria-hidden="true" />
+                    )}
                     <div className="adm-row-main">
                       <div className="adm-row-name">{doc.document_name}</div>
                       <div className="adm-row-meta">
@@ -532,7 +660,7 @@ export default function TexpertServiceDetailPage() {
                       </div>
                       {doc.reupload_note && <div className="adm-row-note">Note to client: {doc.reupload_note}</div>}
                     </div>
-                    <div className="adm-row-actions">
+                    <div className="adm-row-actions" onClick={e => e.stopPropagation()}>
                       {hasFile && url && <a href={url} target="_blank" rel="noopener noreferrer" className="adm-btn adm-btn--sm adm-btn--ghost">{Icon.ext} View</a>}
                       {!isCancelled && hasFile && doc.status !== 'approved' && <button className="adm-btn adm-btn--sm adm-btn--accent" disabled={approve.isPending} onClick={() => approve.mutate(doc.id)}>Approve</button>}
                       {!isCancelled && hasFile && doc.status !== 'rejected' && !doc.reupload_requested && <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setReuploadDoc({ id: doc.id, name: doc.document_name })}>Re-upload</button>}
@@ -552,18 +680,37 @@ export default function TexpertServiceDetailPage() {
             </div>
 
             {showOutputUpload && (
-              <div className="adm-addbar" style={{ marginBottom: '1.15rem', flexWrap: 'wrap' }}>
-                <div className="adm-field" style={{ flex: '2 1 220px' }}>
-                  <label className="adm-label">Document name</label>
-                  <input className="adm-input" placeholder="e.g. ITR Filing Receipt, GST Certificate" value={outputDocName} onChange={e => { setOutputDocName(e.target.value); setOutputUploadErr(null); }} />
+              <div className="adm-multiadd" style={{ marginBottom: '1.15rem' }}>
+                <label className="adm-label">Documents to upload</label>
+                {outputRows.map((row, i) => (
+                  <div key={i} className="adm-multiadd-row">
+                    <input
+                      className="adm-input"
+                      placeholder="Document name (optional)"
+                      value={row.name}
+                      onChange={e => setOutputRows(arr => arr.map((v, j) => (j === i ? { ...v, name: e.target.value } : v)))}
+                    />
+                    <label className={`adm-btn adm-btn--sm ${row.file ? 'adm-btn--ghost' : 'adm-btn--accent'} adm-file-pick`} title={row.file?.name}>
+                      <span className="adm-file-pick-label">{row.file ? row.file.name : 'Choose file'}</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style={{ display: 'none' }}
+                        onChange={e => { const f = e.target.files?.[0] ?? null; setOutputRows(arr => arr.map((v, j) => (j === i ? { ...v, file: f } : v))); setOutputUploadErr(null); }}
+                      />
+                    </label>
+                    {outputRows.length > 1 && (
+                      <button className="adm-multiadd-del" title="Remove" onClick={() => setOutputRows(arr => arr.filter((_, j) => j !== i))}>{Icon.x}</button>
+                    )}
+                  </div>
+                ))}
+                <button className="adm-multiadd-more" onClick={() => setOutputRows(arr => [...arr, { name: '', file: null }])}>+ Add doc</button>
+                <div className="adm-multiadd-foot">
+                  <button className="adm-btn adm-btn--ghost" onClick={resetOutput}>Cancel</button>
+                  <button className="adm-btn adm-btn--accent" disabled={outputUploading || outputRows.every(r => !r.file)} onClick={uploadOutputDocs}>
+                    {outputUploading ? 'Uploading…' : `Upload ${outputRows.filter(r => r.file).length || ''} document${outputRows.filter(r => r.file).length !== 1 ? 's' : ''}`.trim()}
+                  </button>
                 </div>
-                <div className="adm-field" style={{ flex: '2 1 220px' }}>
-                  <label className="adm-label">Description <span className="adm-label-opt">(optional)</span></label>
-                  <input className="adm-input" placeholder="Optional" value={outputDocDesc} onChange={e => setOutputDocDesc(e.target.value)} />
-                </div>
-                <button className="adm-btn adm-btn--accent" disabled={!outputDocName.trim() || outputUploading} onClick={() => outputFileRef.current?.click()}>{outputUploading ? 'Uploading…' : 'Choose file & upload'}</button>
-                <button className="adm-btn adm-btn--ghost" onClick={() => { setShowOutputUpload(false); setOutputDocName(''); setOutputDocDesc(''); setOutputUploadErr(null); }}>Cancel</button>
-                <input ref={outputFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleOutputUpload(f); }} />
               </div>
             )}
             {outputUploadErr && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{outputUploadErr}</p>}
@@ -770,6 +917,7 @@ export default function TexpertServiceDetailPage() {
       {/* ── Modals ── */}
       {reuploadDoc && <ReuploadModal serviceId={id} docId={reuploadDoc.id} docName={reuploadDoc.name} onClose={() => setReuploadDoc(null)} />}
       {rejectDoc && <RejectModal serviceId={id} docId={rejectDoc.id} docName={rejectDoc.name} onClose={() => setRejectDoc(null)} />}
+      {batchModal && <BatchDocModal serviceId={id!} docIds={validSelected} mode={batchModal} onClose={() => setBatchModal(null)} onDone={() => setSelectedDocs(new Set())} />}
       {statusTarget && <StatusModal serviceId={id} targetStatus={statusTarget} onClose={() => setStatusTarget(null)} />}
     </div>
   );

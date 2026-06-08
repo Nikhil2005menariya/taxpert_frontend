@@ -141,6 +141,7 @@ export default function ServiceEditPage() {
     },
     onSuccess: (newSvc) => {
       queryClient.invalidateQueries({ queryKey: ["admin-services-config"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-categories"] });
       navigate(`/admin/services/${newSvc.id}`);
     },
     onError: (err: any) => flash("err", err.response?.data?.error ?? "Failed to create service."),
@@ -183,7 +184,7 @@ export default function ServiceEditPage() {
 
   const updateDetailsMutation = useMutation({
     mutationFn: async (payload: any) => { await apiClient.put(`/config/services/${id}`, payload); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); flash("ok", "Service updated."); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-service", id] }); queryClient.invalidateQueries({ queryKey: ["marketing-categories"] }); flash("ok", "Service updated."); },
     onError: (err: any) => flash("err", err.response?.data?.error ?? "Failed to update."),
   });
 

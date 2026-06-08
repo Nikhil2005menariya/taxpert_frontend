@@ -19,6 +19,8 @@ type Settings = {
   upi_id:               string;
   default_terms:        string;
   payment_instructions: string;
+  gst_enabled:          boolean;
+  gst_rate:             number;
 };
 
 const DEFAULTS: Settings = {
@@ -35,6 +37,8 @@ const DEFAULTS: Settings = {
   upi_id:               "",
   default_terms:        "Payment is due within 7 days of invoice date.",
   payment_instructions: "Pay via UPI, NEFT, or the secure online payment link above.",
+  gst_enabled:          false,
+  gst_rate:             18,
 };
 
 /* ── Inline line icons ───────────────────────────────────────── */
@@ -62,6 +66,11 @@ const Icon = {
   alert: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+    </svg>
+  ),
+  percent: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" />
     </svg>
   ),
 };
@@ -179,6 +188,35 @@ export default function InvoiceSettingsPage() {
             </Field>
             <Field label="Business PAN" hint="Shown on invoices for GST compliance">
               <input className="adm-input" value={form.pan} onChange={set("pan")} placeholder="AAAAA0000A" style={{ textTransform: "uppercase" }} maxLength={10} />
+            </Field>
+          </div>
+        </Section>
+
+        {/* GST */}
+        <Section icon={Icon.percent} title="GST" desc="When enabled, GST is charged on top of every service price and shown as a line on invoices and receipts. When off, no GST is applied and the line stays blank.">
+          <div className="adm-form-grid">
+            <Field label="Charge GST">
+              <label className="adm-check">
+                <input
+                  type="checkbox"
+                  checked={form.gst_enabled}
+                  onChange={e => setForm(f => ({ ...f, gst_enabled: e.target.checked }))}
+                />
+                Apply GST on top of service prices
+              </label>
+            </Field>
+            <Field label="GST Rate (%)" hint="Applied additively, e.g. 18% on a ₹1,499 service = ₹269.82 GST">
+              <input
+                className="adm-input"
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={form.gst_rate}
+                onChange={e => setForm(f => ({ ...f, gst_rate: Number(e.target.value) }))}
+                disabled={!form.gst_enabled}
+                style={!form.gst_enabled ? { opacity: 0.5 } : undefined}
+              />
             </Field>
           </div>
         </Section>

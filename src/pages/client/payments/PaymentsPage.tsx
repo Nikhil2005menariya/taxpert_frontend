@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { apiClient } from '../../../api/client';
-import { formatRupees, calcGst } from '../../../shared/finance-utils';
+import { formatRupees } from '../../../shared/finance-utils';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -107,8 +107,9 @@ function CopyBtn({ text }: { text: string }) {
 // ── Receipt generator ─────────────────────────────────────────
 
 function buildReceiptHtml(p: ClientPaymentRow, biz: any, clientName: string): string {
-  const base     = p.base_amount     ?? calcGst(p.amount, p.gst_rate ?? 18).base;
-  const gst      = p.gst_amount      ?? calcGst(p.amount, p.gst_rate ?? 18).gst;
+  const base     = p.base_amount     ?? p.amount;
+  const gst      = p.gst_amount      ?? 0;
+  const showGst  = gst > 0;
   const discount = p.discount_amount ?? 0;
   const original = p.original_amount ?? p.amount;
   const method   = p.payment_method ? (METHOD_LABELS[p.payment_method.toLowerCase()] ?? p.payment_method.toUpperCase()) : null;
@@ -210,8 +211,8 @@ function buildReceiptHtml(p: ClientPaymentRow, biz: any, clientName: string): st
     </tbody>
   </table>
   <div class="totals">
-    <div class="totals-row"><span>Base amount</span><span>${fmt(base)}</span></div>
-    <div class="totals-row"><span>GST (${p.gst_rate ?? 18}%)</span><span>${fmt(gst)}</span></div>
+    ${showGst ? `<div class="totals-row"><span>Base amount</span><span>${fmt(base)}</span></div>
+    <div class="totals-row"><span>GST (${p.gst_rate ?? 18}%)</span><span>${fmt(gst)}</span></div>` : ''}
     ${discount > 0 ? `<div class="totals-row discount"><span>Discount applied</span><span>−${fmt(discount)}</span></div>` : ''}
     <div class="totals-row total"><span>Total paid</span><span>${fmt(p.amount)}</span></div>
     <div class="totals-row paid"><span>Amount paid</span><span>${fmt(p.amount)}</span></div>
@@ -243,6 +244,9 @@ function ClientPayments() {
   const { profile } = useAuth();
   const clientName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : '';
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const { data: clientData, isLoading } = useQuery({
     queryKey: ['client-payments'],
     queryFn: async () => {
@@ -265,6 +269,24 @@ function ClientPayments() {
   const captured = myPayments.filter(p => p.status === 'captured' || p.status === 'paid');
   const failed   = myPayments.filter(p => p.status === 'failed');
   const totalPaid = captured.reduce((s, p) => s + p.amount, 0);
+
+  // GST is additive — payable = price + GST (when enabled). Mirrors the backend.
+  const gstEnabled = (bizSettings as any)?.gst_enabled === true;
+  const gstRate    = Number((bizSettings as any)?.gst_rate ?? 18);
+  const payable = (price: number) => price + (gstEnabled ? Math.round((price * gstRate) / 100) : 0);
+
+  // Only price-bearing invoices can be combined.
+  const selectable = pendingInvoices.filter((cs: any) => (cs.service?.price ?? 0) > 0);
+  const toggleSelect = (id: string) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const selectedIds = selectable.filter((cs: any) => selected.has(cs.id)).map((cs: any) => cs.id);
+  const selectedTotal = selectable
+    .filter((cs: any) => selected.has(cs.id))
+    .reduce((s: number, cs: any) => s + payable(cs.service?.price ?? 0), 0);
 
   return (
     <div className="pmt-shell">
@@ -301,24 +323,36 @@ function ClientPayments() {
             </div>
             <span className="pmt-action-count">{pendingInvoices.length} pending</span>
           </div>
+          {selectable.length > 1 && (
+            <p className="pmt-combine-hint">Tip: tick two or more invoices to pay them together in one transaction.</p>
+          )}
           <div className="pmt-invoice-list">
             {pendingInvoices.map((cs: any) => {
               const price     = cs.service?.price ?? null;
+              const canSelect = !!price && price > 0;
+              const isSel     = selected.has(cs.id);
               const isOverdue = cs.invoice_status === 'overdue' ||
                 (cs.invoice_due_date && new Date(cs.invoice_due_date) < new Date());
               const dueDate = cs.invoice_due_date
                 ? new Date(cs.invoice_due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
                 : null;
               return (
-                <div key={cs.id} className={`pmt-invoice${isOverdue ? ' pmt-invoice--overdue' : ''}`}>
-                  <div className="pmt-invoice-ico">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                      <line x1="16" y1="13" x2="8" y2="13"/>
-                      <line x1="16" y1="17" x2="8" y2="17"/>
-                    </svg>
-                  </div>
+                <div key={cs.id} className={`pmt-invoice${isOverdue ? ' pmt-invoice--overdue' : ''}${isSel ? ' pmt-invoice--selected' : ''}`}>
+                  {canSelect ? (
+                    <label className="pmt-invoice-check" title="Select to pay together">
+                      <input type="checkbox" checked={isSel} onChange={() => toggleSelect(cs.id)} />
+                      <span className="pmt-invoice-check-box" aria-hidden="true" />
+                    </label>
+                  ) : (
+                    <div className="pmt-invoice-ico">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                      </svg>
+                    </div>
+                  )}
                   <div className="pmt-invoice-info">
                     <div className="pmt-invoice-row">
                       <span className="pmt-invoice-name">{cs.service?.name}</span>
@@ -329,7 +363,10 @@ function ClientPayments() {
                     )}
                     <div className="pmt-invoice-meta">
                       {price && price > 0 && (
-                        <span className="pmt-invoice-price">{formatRupees(price)}</span>
+                        <span className="pmt-invoice-price">
+                          {formatRupees(payable(price))}
+                          {gstEnabled && <span className="pmt-invoice-gst-note"> incl. GST</span>}
+                        </span>
                       )}
                       {dueDate && (
                         <span className={`pmt-invoice-due${isOverdue ? ' pmt-invoice-due--overdue' : ''}`}>
@@ -354,18 +391,44 @@ function ClientPayments() {
         </div>
       )}
 
+      {/* ── Combined pay bar ── */}
+      {selectedIds.length >= 2 && (
+        <div className="pmt-combine-bar">
+          <div className="pmt-combine-bar-info">
+            <span className="pmt-combine-bar-count">{selectedIds.length} services selected</span>
+            <span className="pmt-combine-bar-total">{formatRupees(selectedTotal)}{gstEnabled ? ' incl. GST' : ''}</span>
+          </div>
+          <div className="pmt-combine-bar-actions">
+            <button className="pmt-combine-clear" onClick={() => setSelected(new Set())}>Clear</button>
+            <PayButton to={`/client/invoices/combined?ids=${selectedIds.join(',')}`} label="Pay together" />
+          </div>
+        </div>
+      )}
+
       {/* ── Payment history ── */}
       <div className="pmt-history">
-        <div className="pmt-section-head">
+        <button
+          className="pmt-section-head pmt-section-head--toggle"
+          onClick={() => setHistoryOpen(o => !o)}
+          aria-expanded={historyOpen}
+        >
           <span className="pmt-section-title">Payment History</span>
-          {captured.length > 0 && (
-            <span className="pmt-section-count">
-              {captured.length} transaction{captured.length !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
+          <span className="pmt-section-head-right">
+            {captured.length > 0 && (
+              <span className="pmt-section-count">
+                {captured.length} transaction{captured.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            <svg
+              className={`pmt-section-chevron${historyOpen ? ' pmt-section-chevron--open' : ''}`}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"
+            >
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </span>
+        </button>
 
-        {captured.length === 0 && failed.length === 0 ? (
+        {!historyOpen ? null : captured.length === 0 && failed.length === 0 ? (
           <div className="pmt-empty pmt-empty--inline">
             <div className="pmt-empty-ico">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="26" height="26">
@@ -380,8 +443,9 @@ function ClientPayments() {
 
             {/* Successful */}
             {captured.map(p => {
-              const base     = p.base_amount     ?? calcGst(p.amount, p.gst_rate ?? 18).base;
-              const gst      = p.gst_amount      ?? calcGst(p.amount, p.gst_rate ?? 18).gst;
+              const base     = p.base_amount     ?? p.amount;
+              const gst      = p.gst_amount      ?? 0;
+              const showGst  = gst > 0;
               const discount = p.discount_amount ?? 0;
               const original = p.original_amount ?? p.amount;
               const method   = p.payment_method
@@ -409,12 +473,16 @@ function ClientPayments() {
 
                   {/* Breakdown */}
                   <div className="pmt-receipt-breakdown">
-                    <div className="pmt-brow">
-                      <span>Base amount</span><span>{formatRupees(base)}</span>
-                    </div>
-                    <div className="pmt-brow">
-                      <span>GST ({p.gst_rate ?? 18}%)</span><span>{formatRupees(gst)}</span>
-                    </div>
+                    {showGst && (
+                      <>
+                        <div className="pmt-brow">
+                          <span>Base amount</span><span>{formatRupees(base)}</span>
+                        </div>
+                        <div className="pmt-brow">
+                          <span>GST ({p.gst_rate ?? 18}%)</span><span>{formatRupees(gst)}</span>
+                        </div>
+                      </>
+                    )}
                     {discount > 0 && (
                       <div className="pmt-brow pmt-brow--discount">
                         <span>Discount applied</span>

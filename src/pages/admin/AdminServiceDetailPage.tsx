@@ -140,6 +140,45 @@ function ReuploadModal({ docName, docId, serviceId, onClose }: { docName: string
   );
 }
 
+function BatchReuploadModal({ docIds, serviceId, onClose, onDone }: { docIds: string[]; serviceId: string; onClose: () => void; onDone: () => void }) {
+  const [note, setNote] = useState('');
+  const qc = useQueryClient();
+  const n = docIds.length;
+
+  const mut = useMutation({
+    mutationFn: () => apiClient.patch(`/admin/client-services/${serviceId}/docs/batch`, { action: 'reupload', docIds, note }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', serviceId] }); onDone(); onClose(); },
+  });
+
+  return (
+    <div className="adm-modal-overlay" onClick={onClose}>
+      <div className="adm-modal" onClick={e => e.stopPropagation()}>
+        <div className="adm-modal-head">
+          <div>
+            <p className="adm-modal-eyebrow">— Documents</p>
+            <h3 className="adm-modal-title">Request Re-upload</h3>
+            <p className="adm-modal-sub">{n} document{n !== 1 ? 's' : ''} selected · the client gets one notification</p>
+          </div>
+          <button className="adm-modal-x" onClick={onClose} aria-label="Close">{Icon.x}</button>
+        </div>
+        <div className="adm-modal-body">
+          <div className="adm-field">
+            <label className="adm-label">Note to client <span className="adm-label-opt">(optional)</span></label>
+            <textarea className="adm-textarea" rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Explain what's wrong or what's needed for these documents…" />
+          </div>
+          {mut.isError && <p className="adm-modal-err">{Icon.alert}{(mut.error as any)?.response?.data?.error}</p>}
+        </div>
+        <div className="adm-modal-foot">
+          <button className="adm-btn adm-btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="adm-btn adm-btn--accent" disabled={mut.isPending} onClick={() => mut.mutate()}>
+            {mut.isPending ? 'Sending…' : `Request Re-upload (${n})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AssignTexpertModal({ serviceId, onClose }: { serviceId: string; onClose: () => void }) {
   const [texpertId, setTexpertId] = useState('');
   const qc = useQueryClient();
@@ -200,7 +239,10 @@ export default function AdminServiceDetailPage() {
   const [showAssign, setShowAssign] = useState(false);
 
   const [showAddDoc, setShowAddDoc] = useState(false);
-  const [docName, setDocName] = useState('');
+  const [docNames, setDocNames] = useState<string[]>(['']);
+
+  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
+  const [showBatchReupload, setShowBatchReupload] = useState(false);
 
   const [showLogNote, setShowLogNote] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -239,9 +281,18 @@ export default function AdminServiceDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }),
   });
 
-  const addDoc = useMutation({
-    mutationFn: () => apiClient.post(`/admin/client-services/${id}/docs`, { document_name: docName }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setDocName(''); setShowAddDoc(false); },
+  const addDocs = useMutation({
+    mutationFn: () => apiClient.post(`/admin/client-services/${id}/docs/batch`, {
+      document_names: docNames.map(s => s.trim()).filter(Boolean),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setDocNames(['']); setShowAddDoc(false); },
+  });
+
+  // Bulk approve / reject across the selected uploaded documents (one notification).
+  const batchDocAction = useMutation({
+    mutationFn: ({ action }: { action: 'approve' | 'reject' }) =>
+      apiClient.patch(`/admin/client-services/${id}/docs/batch`, { action, docIds: [...selectedDocs] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-service-detail', id] }); setSelectedDocs(new Set()); },
   });
 
   const logNote = useMutation({
@@ -281,6 +332,26 @@ export default function AdminServiceDetailPage() {
   const uploadedDocs = docs.filter(d => d.file_path || d.file_url).length;
   const pendingDocs = docs.filter(d => !d.file_path && !d.file_url).length;
   const reuploads = docs.filter(d => d.reupload_requested).length;
+
+  // Only uploaded docs can be approved/rejected/re-upload-requested → selectable.
+  const selectableDocs = docs.filter((d: any) => !!(d.file_path || d.file_url));
+  const selectedDocObjs = selectableDocs.filter((d: any) => selectedDocs.has(d.id));
+  const validSelected = selectedDocObjs.map((d: any) => d.id);
+  const allSelected = selectableDocs.length > 0 && validSelected.length === selectableDocs.length;
+
+  // Only offer an action when at least one selected doc isn't already in that state.
+  const canBatchApprove  = selectedDocObjs.some((d: any) => d.status !== 'approved');
+  const canBatchReject   = selectedDocObjs.some((d: any) => d.status !== 'rejected');
+  const canBatchReupload = selectedDocObjs.some((d: any) => !d.reupload_requested);
+  const toggleDoc = (docId: string) =>
+    setSelectedDocs(prev => {
+      const next = new Set(prev);
+      next.has(docId) ? next.delete(docId) : next.add(docId);
+      return next;
+    });
+  const toggleAllDocs = () =>
+    setSelectedDocs(allSelected ? new Set() : new Set(selectableDocs.map((d: any) => d.id)));
+
   const openTasks = tasks.filter((t: any) => t.status !== 'done' && t.status !== 'cancelled').length;
   const doneTasks = tasks.filter((t: any) => t.status === 'done').length;
 
@@ -378,23 +449,64 @@ export default function AdminServiceDetailPage() {
             <div className="adm-panel-titles">
               <h2 className="adm-panel-title">Documents<span className="adm-count">{docs.length}</span></h2>
             </div>
-            <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowAddDoc(v => !v)}>+ Add Document</button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {selectableDocs.length > 0 && (
+                <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={toggleAllDocs}>
+                  {allSelected ? 'Clear selection' : 'Select all uploaded'}
+                </button>
+              )}
+              <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setShowAddDoc(v => !v)}>+ Add Documents</button>
+            </div>
           </div>
 
           {showAddDoc && (
-            <div className="adm-addbar" style={{ marginBottom: '1.15rem' }}>
-              <div className="adm-field" style={{ flex: 1, minWidth: 240 }}>
-                <label className="adm-label">Document name</label>
-                <input className="adm-input" placeholder="e.g. Bank Statement Q2" value={docName} onChange={e => setDocName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && docName.trim() && addDoc.mutate()} />
+            <div className="adm-multiadd">
+              <label className="adm-label">Document names</label>
+              {docNames.map((name, i) => (
+                <div key={i} className="adm-multiadd-row">
+                  <input
+                    className="adm-input"
+                    placeholder="e.g. Bank Statement Q2"
+                    value={name}
+                    autoFocus={i === docNames.length - 1}
+                    onChange={e => setDocNames(arr => arr.map((v, j) => (j === i ? e.target.value : v)))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { e.preventDefault(); setDocNames(arr => [...arr, '']); }
+                    }}
+                  />
+                  {docNames.length > 1 && (
+                    <button className="adm-multiadd-del" title="Remove" onClick={() => setDocNames(arr => arr.filter((_, j) => j !== i))}>{Icon.x}</button>
+                  )}
+                </div>
+              ))}
+              <button className="adm-multiadd-more" onClick={() => setDocNames(arr => [...arr, ''])}>+ Add another</button>
+              <div className="adm-multiadd-foot">
+                <button className="adm-btn adm-btn--ghost" onClick={() => { setShowAddDoc(false); setDocNames(['']); }}>Cancel</button>
+                <button
+                  className="adm-btn adm-btn--accent"
+                  disabled={docNames.filter(s => s.trim()).length === 0 || addDocs.isPending}
+                  onClick={() => addDocs.mutate()}
+                >
+                  {addDocs.isPending ? 'Adding…' : `Add ${docNames.filter(s => s.trim()).length || ''} slot${docNames.filter(s => s.trim()).length !== 1 ? 's' : ''}`.trim()}
+                </button>
               </div>
-              <button className="adm-btn adm-btn--ghost" onClick={() => { setShowAddDoc(false); setDocName(''); }}>Cancel</button>
-              <button className="adm-btn adm-btn--accent" disabled={!docName.trim() || addDoc.isPending} onClick={() => addDoc.mutate()}>
-                {addDoc.isPending ? 'Adding…' : 'Add Slot'}
-              </button>
             </div>
           )}
-          {addDoc.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(addDoc.error as any)?.response?.data?.error}</p>}
+          {addDocs.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(addDocs.error as any)?.response?.data?.error}</p>}
+
+          {/* Bulk action bar */}
+          {validSelected.length > 0 && (
+            <div className="adm-batchbar">
+              <span className="adm-batchbar-count">{validSelected.length} selected</span>
+              <div className="adm-batchbar-actions">
+                {canBatchApprove && <button className="adm-btn adm-btn--sm adm-btn--accent" disabled={batchDocAction.isPending} onClick={() => batchDocAction.mutate({ action: 'approve' })}>Approve</button>}
+                {canBatchReject && <button className="adm-btn adm-btn--sm adm-btn--ghost" disabled={batchDocAction.isPending} onClick={() => batchDocAction.mutate({ action: 'reject' })}>Reject</button>}
+                {canBatchReupload && <button className="adm-btn adm-btn--sm adm-btn--danger" disabled={batchDocAction.isPending} onClick={() => setShowBatchReupload(true)}>Request re-upload</button>}
+                <button className="adm-btn adm-btn--sm adm-btn--ghost" onClick={() => setSelectedDocs(new Set())}>Clear</button>
+              </div>
+            </div>
+          )}
+          {batchDocAction.isError && <p className="adm-modal-err" style={{ marginBottom: '1rem' }}>{Icon.alert}{(batchDocAction.error as any)?.response?.data?.error}</p>}
 
           {docs.length === 0 ? (
             <div className="adm-empty-box"><span className="adm-empty-ico">{Icon.docs}</span><p className="adm-empty-txt">No document slots have been created for this service.</p></div>
@@ -402,8 +514,21 @@ export default function AdminServiceDetailPage() {
             <div className="adm-list">
               {docs.map((doc: any) => {
                 const hasFile = !!(doc.file_path || doc.file_url);
+                const isSel = selectedDocs.has(doc.id);
                 return (
-                  <div key={doc.id} className={`adm-row${doc.reupload_requested ? ' adm-row--flag' : ''}`}>
+                  <div
+                    key={doc.id}
+                    className={`adm-row${doc.reupload_requested ? ' adm-row--flag' : ''}${isSel ? ' adm-row--selected' : ''}${hasFile ? ' adm-row--clickable' : ''}`}
+                    onClick={hasFile ? () => toggleDoc(doc.id) : undefined}
+                  >
+                    {hasFile ? (
+                      <label className="adm-checkbox" title="Select for bulk action">
+                        <input type="checkbox" checked={isSel} readOnly tabIndex={-1} />
+                        <span className="adm-checkbox-box" aria-hidden="true" />
+                      </label>
+                    ) : (
+                      <span className="adm-checkbox adm-checkbox--placeholder" aria-hidden="true" />
+                    )}
                     <div className="adm-row-main">
                       <div className="adm-row-name">{doc.document_name}</div>
                       <div className="adm-row-meta">
@@ -414,7 +539,7 @@ export default function AdminServiceDetailPage() {
                       </div>
                       {doc.reupload_note && <div className="adm-row-note">Note: {doc.reupload_note}</div>}
                     </div>
-                    <div className="adm-row-actions">
+                    <div className="adm-row-actions" onClick={e => e.stopPropagation()}>
                       {hasFile && <a href={doc.signed_url || doc.file_url || '#'} target="_blank" rel="noopener noreferrer" className="adm-btn adm-btn--sm adm-btn--ghost">{Icon.ext} View</a>}
                       {hasFile && doc.status !== 'approved' && (
                         <button className="adm-btn adm-btn--sm adm-btn--accent" disabled={docAction.isPending} onClick={() => docAction.mutate({ docId: doc.id, action: 'approve' })}>Approve</button>
@@ -695,6 +820,7 @@ export default function AdminServiceDetailPage() {
 
       {/* Modals */}
       {reuploadDoc && <ReuploadModal docId={reuploadDoc.id} docName={reuploadDoc.name} serviceId={id!} onClose={() => setReuploadDoc(null)} />}
+      {showBatchReupload && <BatchReuploadModal docIds={validSelected} serviceId={id!} onClose={() => setShowBatchReupload(false)} onDone={() => setSelectedDocs(new Set())} />}
       {showAssign && <AssignTexpertModal serviceId={id!} onClose={() => setShowAssign(false)} />}
     </div>
   );

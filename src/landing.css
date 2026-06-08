@@ -10728,10 +10728,33 @@ html {
   font-weight: 700;
 }
 
-.ddc-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
+/* Due-day number: bolder inside its urgency-tinted circle (set inline) */
+.ddc-num.is-due {
+  font-weight: 700;
+}
+.ddc-cell.has-due:hover .ddc-num.is-due {
+  filter: brightness(0.97);
+}
+
+/* Count badge when a single day carries more than one deadline */
+.ddc-cell { position: relative; }
+.ddc-count {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  font-family: var(--lp-mono);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--lp-ink);
+  border: 1.5px solid var(--lp-surface);
+  border-radius: 999px;
 }
 
 /* expanded detail */
@@ -10905,6 +10928,47 @@ html {
   height: 13px;
   flex-shrink: 0;
 }
+
+/* Card footer — service tag + mark-done */
+.ddl-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ddl-card-foot .ddl-svc {
+  margin-top: 0;
+  min-width: 0;
+}
+.ddl-card-foot .ddl-svc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ddl-done {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-family: var(--lp-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lp-green);
+  background: var(--lp-green-soft);
+  border: 1px solid transparent;
+  border-radius: var(--lp-pill);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s var(--lp-ease);
+}
+.ddl-done svg { width: 13px; height: 13px; }
+.ddl-done:hover:not(:disabled) {
+  background: var(--lp-green);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.ddl-done:disabled { opacity: 0.6; cursor: default; }
 
 /* all-clear agenda state */
 .ddp-agenda-clear {
@@ -16219,3 +16283,550 @@ a.adm-btn, a.adm-view { text-decoration: none; }
 /* Amber banner variant — informational warnings (e.g. awaiting payment) */
 .adm-banner--amber { background: #f6ecd6; border: 1px solid #e8d9b0; color: #8a5a14; }
 .adm-banner--amber svg { flex-shrink: 0; color: #a96a16; }
+
+/* ════════════════════════════════════════════════════════════════
+   Payments — combine-to-pay selection + collapsible history
+   (pmt-* namespace; editorial cream/charcoal system)
+   ════════════════════════════════════════════════════════════════ */
+
+/* Hint under the pending-invoices header */
+.pmt-combine-hint {
+  margin: 0;
+  padding: 10px 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lp-ink-subtle);
+  background: var(--lp-surface-2);
+  border-bottom: 1px solid var(--lp-hairline-soft);
+}
+
+/* Selection checkbox — occupies the 40px icon slot so rows stay aligned */
+.pmt-invoice-check {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.pmt-invoice-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.pmt-invoice-check-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1.5px solid var(--lp-hairline);
+  background: var(--lp-surface);
+  display: grid;
+  place-items: center;
+  transition: border-color 0.18s var(--lp-ease), background 0.18s var(--lp-ease), box-shadow 0.18s var(--lp-ease);
+}
+.pmt-invoice-check:hover .pmt-invoice-check-box {
+  border-color: var(--lp-accent);
+}
+.pmt-invoice-check-box::after {
+  content: "";
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid var(--lp-accent-ink);
+  border-bottom: 2px solid var(--lp-accent-ink);
+  transform: rotate(-45deg) scale(0);
+  margin-top: -2px;
+  transition: transform 0.2s var(--lp-ease);
+}
+.pmt-invoice-check input:checked + .pmt-invoice-check-box {
+  background: var(--lp-accent);
+  border-color: var(--lp-accent);
+  box-shadow: 0 4px 12px rgba(232, 82, 32, 0.28);
+}
+.pmt-invoice-check input:checked + .pmt-invoice-check-box::after {
+  transform: rotate(-45deg) scale(1);
+}
+.pmt-invoice-check input:focus-visible + .pmt-invoice-check-box {
+  box-shadow: 0 0 0 3px var(--lp-accent-soft);
+}
+
+/* Selected pending row */
+.pmt-invoice--selected {
+  background: var(--lp-accent-soft);
+  box-shadow: inset 3px 0 0 var(--lp-accent);
+}
+.pmt-invoice--selected:hover {
+  background: #fbe0d3;
+}
+
+/* "incl. GST" suffix on the payable amount */
+.pmt-invoice-gst-note {
+  font-family: var(--lp-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--lp-ink-faint);
+}
+
+/* ── Combine-to-pay bar (sticky; light card matching the pending panel) ── */
+.pmt-combine-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px 13px 20px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-hairline);
+  border-left: 3px solid var(--lp-accent);
+  border-radius: var(--lp-r-lg);
+  box-shadow: var(--lp-shadow-lg);
+  overflow: hidden;
+  animation: pmt-combine-rise 0.32s var(--lp-ease);
+}
+@keyframes pmt-combine-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pmt-combine-bar-info {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pmt-combine-bar-count {
+  font-family: var(--lp-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--lp-accent-strong);
+}
+.pmt-combine-bar-total {
+  font-family: var(--lp-mono);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--lp-ink);
+}
+.pmt-combine-bar-actions {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.pmt-combine-clear {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--lp-hairline);
+  border-radius: var(--lp-pill);
+  padding: 9px 16px;
+  font-family: var(--lp-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lp-ink-muted);
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.pmt-combine-clear:hover {
+  border-color: var(--lp-ink-subtle);
+  color: var(--lp-ink);
+  background: var(--lp-surface-2);
+}
+
+/* ── Collapsible history header ── */
+.pmt-section-head--toggle {
+  width: 100%;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pmt-section-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.pmt-section-chevron {
+  color: var(--lp-ink-subtle);
+  transition: transform 0.26s var(--lp-ease), color 0.18s;
+}
+.pmt-section-chevron--open {
+  transform: rotate(180deg);
+}
+.pmt-section-head--toggle:hover .pmt-section-title {
+  color: var(--lp-ink);
+}
+.pmt-section-head--toggle:hover .pmt-section-chevron {
+  color: var(--lp-accent);
+}
+
+@media (max-width: 560px) {
+  .pmt-combine-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .pmt-combine-bar-actions {
+    justify-content: stretch;
+  }
+  .pmt-combine-bar-actions .lp-paybtn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Admin service detail — document multi-select / bulk actions / multi-add
+   (adm-* namespace)
+   ════════════════════════════════════════════════════════════════ */
+
+/* Custom selection checkbox (row leading slot) */
+.adm-checkbox {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  cursor: pointer;
+}
+.adm-checkbox--placeholder {
+  cursor: default;
+}
+.adm-checkbox input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.adm-checkbox-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--lp-hairline);
+  background: var(--lp-surface);
+  display: grid;
+  place-items: center;
+  transition: border-color 0.18s var(--lp-ease), background 0.18s var(--lp-ease), box-shadow 0.18s var(--lp-ease);
+}
+.adm-checkbox:hover .adm-checkbox-box {
+  border-color: var(--lp-accent);
+}
+.adm-checkbox-box::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--lp-accent-ink);
+  border-bottom: 2px solid var(--lp-accent-ink);
+  transform: rotate(-45deg) scale(0);
+  margin-top: -2px;
+  transition: transform 0.2s var(--lp-ease);
+}
+.adm-checkbox input:checked + .adm-checkbox-box {
+  background: var(--lp-accent);
+  border-color: var(--lp-accent);
+}
+.adm-checkbox input:checked + .adm-checkbox-box::after {
+  transform: rotate(-45deg) scale(1);
+}
+.adm-checkbox input:focus-visible + .adm-checkbox-box {
+  box-shadow: 0 0 0 3px var(--lp-accent-soft);
+}
+.adm-row--selected {
+  border-color: var(--lp-accent);
+  background: var(--lp-accent-soft);
+}
+.adm-row--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.adm-row--clickable:hover {
+  border-color: var(--lp-accent);
+}
+
+/* Bulk-action bar — light surface so standard adm-btn variants read correctly */
+.adm-batchbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0.5rem 0.65rem 1rem;
+  margin-bottom: 1.15rem;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-hairline);
+  border-left: 3px solid var(--lp-accent);
+  border-radius: var(--lp-r-md);
+  box-shadow: var(--lp-shadow-sm);
+}
+.adm-batchbar-count {
+  font-family: var(--lp-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lp-accent-strong);
+}
+.adm-batchbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Multi-add document panel */
+.adm-multiadd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.15rem;
+  background: var(--lp-surface-2);
+  border: 1px solid var(--lp-hairline-soft);
+  border-radius: var(--lp-r-md);
+}
+.adm-multiadd-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.adm-multiadd-row .adm-input {
+  flex: 1;
+}
+.adm-multiadd-del {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--lp-r-sm);
+  border: 1px solid var(--lp-hairline);
+  background: var(--lp-surface);
+  color: var(--lp-ink-subtle);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.adm-multiadd-del svg { width: 15px; height: 15px; }
+.adm-multiadd-del:hover {
+  color: #c43d33;
+  border-color: #e7b8ad;
+  background: #fbe9e2;
+}
+.adm-multiadd-more {
+  align-self: flex-start;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  font-family: var(--lp-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--lp-accent-strong);
+  cursor: pointer;
+}
+.adm-multiadd-more:hover { text-decoration: underline; }
+.adm-multiadd-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+/* Per-row file picker (label styled as a button) */
+.adm-file-pick {
+  flex-shrink: 0;
+  cursor: pointer;
+  max-width: 200px;
+}
+.adm-file-pick-label {
+  display: inline-block;
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   My Services — search / FY filter toolbar + pagination (lps-* namespace)
+   ════════════════════════════════════════════════════════════════ */
+.lps-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.lps-search {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+}
+.lps-search-ico {
+  position: absolute;
+  left: 14px;
+  width: 17px;
+  height: 17px;
+  color: var(--lp-ink-faint);
+  pointer-events: none;
+}
+.lps-search-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 38px 0 40px;
+  font-family: var(--lp-sans);
+  font-size: 14.5px;
+  color: var(--lp-ink);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-hairline);
+  border-radius: var(--lp-pill);
+  transition: border-color 0.18s var(--lp-ease), box-shadow 0.18s var(--lp-ease);
+}
+.lps-search-input::placeholder { color: var(--lp-ink-faint); }
+.lps-search-input:focus {
+  outline: none;
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px var(--lp-accent-soft);
+}
+.lps-search-clear {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: var(--lp-surface-2);
+  color: var(--lp-ink-subtle);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.lps-search-clear svg { width: 13px; height: 13px; }
+.lps-search-clear:hover { background: var(--lp-accent-soft); color: var(--lp-accent-strong); }
+
+.lps-select-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.lps-select {
+  appearance: none;
+  height: 44px;
+  padding: 0 38px 0 16px;
+  font-family: var(--lp-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lp-ink);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-hairline);
+  border-radius: var(--lp-pill);
+  cursor: pointer;
+  transition: border-color 0.18s var(--lp-ease), box-shadow 0.18s var(--lp-ease);
+}
+.lps-select:focus {
+  outline: none;
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px var(--lp-accent-soft);
+}
+.lps-select-ico {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--lp-ink-subtle);
+  pointer-events: none;
+}
+.lps-count {
+  font-family: var(--lp-mono);
+  font-size: 12px;
+  color: var(--lp-ink-subtle);
+  white-space: nowrap;
+  margin-left: auto;
+  transition: opacity 0.18s;
+}
+.lps-count strong { color: var(--lp-ink); font-weight: 600; }
+.lps-count.is-loading { opacity: 0.5; }
+
+/* Subtle dim while paginating/filtering */
+.lps-grid.is-fetching { opacity: 0.6; transition: opacity 0.15s; pointer-events: none; }
+
+/* No-match state */
+.lps-nomatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 56px 24px;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-hairline);
+  border-radius: var(--lp-r-xl);
+}
+.lps-nomatch-ico {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--lp-surface-2);
+  color: var(--lp-ink-faint);
+  margin-bottom: 4px;
+}
+.lps-nomatch-ico svg { width: 24px; height: 24px; }
+.lps-nomatch h3 { font-size: 17px; font-weight: 600; color: var(--lp-ink); margin: 0; }
+.lps-nomatch p { font-size: 14px; color: var(--lp-ink-muted); margin: 0 0 6px; }
+
+/* Pagination */
+.lps-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 28px;
+}
+.lps-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  font-family: var(--lp-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--lp-ink);
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-hairline);
+  border-radius: var(--lp-pill);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, transform 0.18s var(--lp-ease);
+}
+.lps-pager-btn svg { width: 16px; height: 16px; }
+.lps-pager-btn:hover:not(:disabled) {
+  border-color: var(--lp-ink-muted);
+  background: var(--lp-surface-2);
+  transform: translateY(-1px);
+}
+.lps-pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.lps-pager-info {
+  font-family: var(--lp-mono);
+  font-size: 12.5px;
+  color: var(--lp-ink-subtle);
+}
+
+@media (max-width: 560px) {
+  .lps-toolbar { gap: 10px; }
+  .lps-count { width: 100%; margin-left: 0; order: 3; }
+  .lps-select-wrap, .lps-select { width: 100%; }
+}

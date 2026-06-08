@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import Loader from "../../../components/ui/Loader";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../../api/client";
 import { useAuth } from "../../../contexts/AuthContext";
 import { Navigate } from "react-router-dom";
@@ -130,6 +130,13 @@ function Calendar({ items }: { items: DueDate[] }) {
           const isSel=k===sel;
           const hasDue=its.length>0;
           const urg=hasDue?topUrgency(its):null;
+          // Due days get a filled, urgency-tinted circle. If "today" also has a
+          // due, keep the solid today circle and ring it in the urgency colour.
+          const numStyle = hasDue && urg
+            ? (isToday
+                ? { boxShadow: `0 0 0 2px ${U[urg].dot}` }
+                : { background: U[urg].pillBg, color: U[urg].pillFg, boxShadow: `inset 0 0 0 1.5px ${U[urg].borderColor}` })
+            : undefined;
           return (
             <div key={k}
               className={`ddc-cell${isToday?" is-today":""}${hasDue?" has-due":""}${isSel?" is-sel":""}`}
@@ -138,10 +145,8 @@ function Calendar({ items }: { items: DueDate[] }) {
               tabIndex={hasDue?0:undefined}
               onKeyDown={hasDue?(e=>e.key==="Enter"&&setSel(isSel?null:k)):undefined}
             >
-              <span className="ddc-num">{day}</span>
-              {hasDue&&urg&&(
-                <span className="ddc-dot" style={{background:U[urg].dot}}/>
-              )}
+              <span className={`ddc-num${hasDue&&!isToday?" is-due":""}`} style={numStyle}>{day}</span>
+              {hasDue&&its.length>1&&<span className="ddc-count">{its.length}</span>}
             </div>
           );
         })}
@@ -165,7 +170,7 @@ function Calendar({ items }: { items: DueDate[] }) {
 }
 
 // ── Deadline card ─────────────────────────────────────────────
-function DeadlineCard({ d }: { d: DueDate }) {
+function DeadlineCard({ d, onMarkDone, pending }: { d: DueDate; onMarkDone: (id: string) => void; pending: boolean }) {
   const n = daysLeft(d.date);
   const u = U[d.urgency];
   const label = n<0?`${Math.abs(n)}d overdue`:n===0?"Today":n===1?"Tomorrow":`${n}d`;
@@ -178,9 +183,14 @@ function DeadlineCard({ d }: { d: DueDate }) {
         </div>
         <div className="ddl-name">{d.label}</div>
         {d.description&&<div className="ddl-desc">{d.description}</div>}
-        <div className="ddl-svc">
-          <IcoFolder />
-          {d.serviceName}
+        <div className="ddl-card-foot">
+          <span className="ddl-svc">
+            <IcoFolder />
+            {d.serviceName}
+          </span>
+          <button className="ddl-done" disabled={pending} onClick={() => onMarkDone(d.id)} title="Mark this deadline as done — it'll be removed from your list">
+            {pending ? "Marking…" : <><IcoCheck /> Mark done</>}
+          </button>
         </div>
       </div>
     </div>
@@ -188,7 +198,7 @@ function DeadlineCard({ d }: { d: DueDate }) {
 }
 
 // ── Group (agenda section) ────────────────────────────────────
-function Group({ title, items, accent }: { title: string; items: DueDate[]; accent?: string }) {
+function Group({ title, items, accent, onMarkDone, pendingId }: { title: string; items: DueDate[]; accent?: string; onMarkDone: (id: string) => void; pendingId: string | null }) {
   if (!items.length) return null;
   return (
     <section className="ddg">
@@ -197,7 +207,7 @@ function Group({ title, items, accent }: { title: string; items: DueDate[]; acce
         <span className="ddg-pill">{items.length}</span>
       </div>
       <div className="ddg-list">
-        {items.map(d=><DeadlineCard key={d.id} d={d}/>)}
+        {items.map(d=><DeadlineCard key={d.id} d={d} onMarkDone={onMarkDone} pending={pendingId===d.id}/>)}
       </div>
     </section>
   );
@@ -207,6 +217,8 @@ function Group({ title, items, accent }: { title: string; items: DueDate[]; acce
 export default function DueDatesPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const isClient = profile?.role === "client";
+
+  const qc = useQueryClient();
 
   const { data: dueDates=[], isLoading } = useQuery<DueDate[]>({
     queryKey: ["client-due-dates"],
@@ -220,12 +232,33 @@ export default function DueDatesPage() {
     enabled: isClient,
   });
 
+  // Due dates the client has marked done — hidden everywhere and not counted.
+  const { data: doneKeys=[] } = useQuery<string[]>({
+    queryKey: ["client-due-dates-done"],
+    queryFn: async () => (await apiClient.get("/client-services/due-dates/done")).data.data,
+    enabled: isClient,
+  });
+  const doneSet = useMemo(()=>new Set(doneKeys),[doneKeys]);
+
+  const markDone = useMutation({
+    mutationFn: (dueKey: string) => apiClient.post("/client-services/due-dates/done", { dueKey }),
+    onMutate: async (dueKey: string) => {
+      await qc.cancelQueries({ queryKey: ["client-due-dates-done"] });
+      const prev = qc.getQueryData<string[]>(["client-due-dates-done"]) ?? [];
+      qc.setQueryData<string[]>(["client-due-dates-done"], [...prev, dueKey]); // optimistic
+      return { prev };
+    },
+    onError: (_e, _k, ctx) => { if (ctx?.prev) qc.setQueryData(["client-due-dates-done"], ctx.prev); },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["client-due-dates-done"] }),
+  });
+  const pendingId = markDone.isPending ? (markDone.variables as string) : null;
+
   const now = new Date();
   const thisMonth = new Date(now.getFullYear(),now.getMonth(),1);
   const nextMonth = new Date(now.getFullYear(),now.getMonth()+1,1);
   const cutoff    = new Date(now.getFullYear(),now.getMonth()+2,1);
 
-  const hydrated = useMemo(()=>dueDates.map(d=>({...d,date:new Date(d.date)})),[dueDates]);
+  const hydrated = useMemo(()=>dueDates.filter(d=>!doneSet.has(d.id)).map(d=>({...d,date:new Date(d.date)})),[dueDates,doneSet]);
   const visible  = useMemo(()=>hydrated.filter(d=>d.urgency==="overdue"||d.date<cutoff),[hydrated,cutoff]);
 
   const sorted=(arr:DueDate[])=>[...arr].sort((a,b)=>a.date.getTime()-b.date.getTime());
@@ -336,9 +369,9 @@ export default function DueDatesPage() {
               </div>
             ) : (
               <>
-                <Group title="Overdue" items={overdue} accent="#c43d33"/>
-                <Group title={monthTitle(thisMonth)} items={thisMonthD}/>
-                <Group title={monthTitle(nextMonth)} items={nextMonthD}/>
+                <Group title="Overdue" items={overdue} accent="#c43d33" onMarkDone={markDone.mutate} pendingId={pendingId}/>
+                <Group title={monthTitle(thisMonth)} items={thisMonthD} onMarkDone={markDone.mutate} pendingId={pendingId}/>
+                <Group title={monthTitle(nextMonth)} items={nextMonthD} onMarkDone={markDone.mutate} pendingId={pendingId}/>
               </>
             )}
           </main>

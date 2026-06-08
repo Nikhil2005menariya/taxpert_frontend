@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Loader from "../../../components/ui/Loader";
 import CardPayButton from "../../../components/ui/CardPayButton";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, paymentClient } from "../../../api/client";
 import { formatRupees } from "../../../shared/finance-utils";
@@ -22,19 +22,42 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-type AppliedDiscount = {
-  codeType:       "coupon";
-  couponId:       string;
-  discountAmount: number;
-  finalAmount:    number;
-  description:    string;
+type Item = {
+  clientServiceId: string;
+  serviceId:       string | null;
+  slug:            string | null;
+  name:            string;
+  category:        string | null;
+  base:            number;
+  gstAmount:       number;
+  total:           number;
+};
+
+type CombinedData = {
+  items:      Item[];
+  subtotal:   number;
+  gstTotal:   number;
+  total:      number;
+  gstEnabled: boolean;
+  gstRate:    number;
+  settings:   any;
+  client:     { first_name?: string; last_name?: string; email?: string; pan?: string } | null;
 };
 
 // ── Payment panel ──────────────────────────────────────────────
 
-function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any) {
-  const navigate     = useNavigate();
-  const queryClient  = useQueryClient();
+type AppliedDiscount = {
+  couponId:       string;
+  discountAmount: number;
+  finalAmount:    number; // base subtotal after discount (pre-GST)
+  description:    string;
+};
+
+function CombinedPayPanel({ ids, subtotal, count, gstEnabled, gstRate }: {
+  ids: string[]; subtotal: number; count: number; gstEnabled: boolean; gstRate: number;
+}) {
+  const navigate    = useNavigate();
+  const queryClient = useQueryClient();
   const [state, setState] = useState<"idle" | "loading" | "verifying" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -45,14 +68,16 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
 
   useEffect(() => { loadRazorpayScript().then(setReady); }, []);
 
-  const finalPrice = applied ? applied.finalAmount : price;
-  const finalFmt   = formatRupees(finalPrice);
+  const gstFor    = (base: number) => (gstEnabled ? Math.round((base * gstRate) / 100) : 0);
+  const finalBase = applied ? applied.finalAmount : subtotal;
+  const payTotal  = finalBase + gstFor(finalBase);
+  const busy = state === "loading" || state === "verifying";
 
   async function applyCode() {
     if (!code.trim()) return;
     setCLoading(true); setCError(null);
     try {
-      const res = await apiClient.post("/coupons/validate", { code: code.trim().toUpperCase(), servicePrice: price });
+      const res = await apiClient.post("/coupons/validate", { code: code.trim().toUpperCase(), servicePrice: subtotal });
       const d = res.data;
       if (!d.valid) { setCError(d.error ?? "Invalid code"); setApplied(null); }
       else          { setApplied(d); setCError(null); }
@@ -64,15 +89,14 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
     setError(null); setState("loading");
     try {
       const { data: { data: ord } } = await paymentClient.post("/orders", {
-        slug: serviceSlug,
-        client_service_id: clientServiceId,
+        client_service_ids: ids,
         coupon_id:       applied?.couponId,
         discount_amount: applied?.discountAmount,
       });
       setState("idle");
       const rzp = new window.Razorpay({
         key: ord.keyId, amount: ord.amount, currency: ord.currency,
-        name: "TheTaxpert", description: serviceName, order_id: ord.orderId,
+        name: "TheTaxpert", description: `${count} services`, order_id: ord.orderId,
         handler: async (r: any) => {
           setState("verifying");
           try {
@@ -82,8 +106,8 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
               razorpay_signature:  r.razorpay_signature,
             });
             setState("success");
-            queryClient.invalidateQueries({ queryKey: ["invoice", clientServiceId] });
-            setTimeout(() => navigate(`/client/services/${clientServiceId}`), 2500);
+            queryClient.invalidateQueries({ queryKey: ["client-payments"] });
+            setTimeout(() => navigate("/client/payments"), 2500);
           } catch (e: any) {
             setState("error");
             setError(e.response?.data?.error ?? "Payment verification failed. Contact support.");
@@ -109,27 +133,23 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
             </svg>
           </div>
           <div className="inv-success-title">Payment confirmed</div>
-          <div className="inv-success-sub">Redirecting to your service workspace…</div>
+          <div className="inv-success-sub">All {count} services are now paid. Redirecting…</div>
         </div>
       </div>
     );
   }
 
-  const busy = state === "loading" || state === "verifying";
-
   return (
     <div className="inv-panel">
-
-      {/* Dark amount header */}
       <div className="inv-panel-dark">
         <div className="inv-panel-dark-glow" />
         <div className="inv-panel-dark-label">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
             <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
           </svg>
-          Amount due
+          Amount due · {count} services
         </div>
-        <div className="inv-panel-dark-amount">{finalFmt}</div>
+        <div className="inv-panel-dark-amount">{formatRupees(payTotal)}</div>
         {applied && (
           <div className="inv-panel-dark-saved">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
@@ -142,12 +162,12 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
 
       <div className="inv-panel-body">
 
-        {/* Breakdown (only when coupon applied) */}
-        {applied && (
-          <div className="inv-panel-breakdown">
-            <div className="inv-panel-row">
-              <span>Subtotal</span><span>{formatRupees(price)}</span>
-            </div>
+        {/* Breakdown */}
+        <div className="inv-panel-breakdown">
+          <div className="inv-panel-row">
+            <span>Subtotal</span><span>{formatRupees(subtotal)}</span>
+          </div>
+          {applied && (
             <div className="inv-panel-row inv-panel-row--discount">
               <span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="11" height="11" style={{ marginRight: 4, verticalAlign: 'middle' }}>
@@ -157,11 +177,16 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
               </span>
               <span>−{formatRupees(applied.discountAmount)}</span>
             </div>
-            <div className="inv-panel-row inv-panel-row--total">
-              <span>Total payable</span><span>{formatRupees(applied.finalAmount)}</span>
+          )}
+          {gstEnabled && (
+            <div className="inv-panel-row">
+              <span>GST ({gstRate}%)</span><span>{formatRupees(gstFor(finalBase))}</span>
             </div>
+          )}
+          <div className="inv-panel-row inv-panel-row--total">
+            <span>Total payable</span><span>{formatRupees(payTotal)}</span>
           </div>
-        )}
+        </div>
 
         {/* Coupon section */}
         <div className="inv-coupon-wrap">
@@ -183,14 +208,8 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
                   placeholder="e.g. SAVE500"
                   disabled={busy}
                 />
-                <button
-                  className="inv-coupon-btn"
-                  onClick={applyCode}
-                  disabled={!code.trim() || cLoading || busy}
-                >
-                  {cLoading ? (
-                    <span className="inv-pay-spinner" />
-                  ) : "Apply"}
+                <button className="inv-coupon-btn" onClick={applyCode} disabled={!code.trim() || cLoading || busy}>
+                  {cLoading ? <span className="inv-pay-spinner" /> : "Apply"}
                 </button>
               </div>
               {cError && (
@@ -213,17 +232,13 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
                   <div className="inv-coupon-applied-desc">{applied.description}</div>
                 </div>
               </div>
-              <button
-                className="inv-coupon-remove"
-                onClick={() => { setApplied(null); setCode(""); setCError(null); }}
-              >
+              <button className="inv-coupon-remove" onClick={() => { setApplied(null); setCode(""); setCError(null); }}>
                 Remove
               </button>
             </div>
           )}
         </div>
 
-        {/* Error */}
         {error && (
           <div className="inv-pay-error">
             <div className="inv-pay-error-inner">
@@ -236,24 +251,21 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
           </div>
         )}
 
-        {/* Pay button */}
         <div className="inv-paybtn-wrap">
           <CardPayButton
-            label={`Pay ${finalFmt}`}
+            label={`Pay ${formatRupees(payTotal)}`}
             onClick={handlePay}
             disabled={!ready}
             busy={busy}
           />
         </div>
 
-        {/* Secure note */}
         <div className="inv-pay-secure">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
-          Secured by Razorpay · One-time charge
+          Secured by Razorpay · One combined charge
         </div>
-
       </div>
     </div>
   );
@@ -261,72 +273,40 @@ function PaymentPanel({ serviceSlug, serviceName, clientServiceId, price }: any)
 
 // ── Main page ──────────────────────────────────────────────────
 
-export default function InvoicePage() {
-  const { id } = useParams();
+export default function CombinedInvoicePage() {
+  const [params] = useSearchParams();
+  const ids = (params.get("ids") ?? "").split(",").map(s => s.trim()).filter(Boolean);
 
   const { data, isLoading, error: queryError } = useQuery({
-    queryKey: ["invoice", id],
+    queryKey: ["combined-invoice", ids.join(",")],
+    enabled: ids.length >= 2,
     queryFn: async () => {
-      const [invRes, setRes] = await Promise.all([
-        apiClient.get(`/payments/invoices/${id}`),
-        apiClient.get("/payments/invoice-settings").catch(() => ({ data: { data: null } })),
-      ]);
-      return { invoice: invRes.data.data, settings: setRes.data.data };
+      const res = await apiClient.post("/payments/combined-invoice", { clientServiceIds: ids });
+      return res.data.data as CombinedData;
     },
   });
 
+  if (ids.length < 2) {
+    return <InvalidState message="Select at least two services to pay together." />;
+  }
   if (isLoading) return <div className="page-loader"><Loader /></div>;
-
-  if (queryError || !data?.invoice) {
-    return (
-      <div className="inv-shell">
-        <Link to="/client/payments" className="inv-back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-            <path d="m15 18-6-6 6-6"/>
-          </svg>
-          Back to Payments
-        </Link>
-        <div className="inv-not-found">
-          <div className="inv-nf-ico">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="11" x2="12" y2="17"/>
-              <line x1="9" y1="14" x2="15" y2="14"/>
-            </svg>
-          </div>
-          <p className="inv-nf-title">Invoice not found</p>
-          <p className="inv-nf-sub">This invoice may have been removed or you may not have access to it.</p>
-          <Link to="/client/payments" className="lp-btn lp-btn--ghost lp-btn--sm">Back to Payments</Link>
-        </div>
-      </div>
-    );
+  if (queryError || !data) {
+    return <InvalidState message={(queryError as any)?.response?.data?.error ?? "These services can no longer be combined."} />;
   }
 
-  const invoice = data.invoice;
-  const s       = data.settings;
-
-  const isPaid    = invoice.status === "paid"    || invoice.status === "captured";
-  const isPending = invoice.status === "pending" || invoice.status === "overdue";
-  const isOverdue = invoice.status === "overdue" ||
-    (!isPaid && !!invoice.due_date && new Date(invoice.due_date) < new Date());
-
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-
-  const clientName  = invoice.client ? `${invoice.client.first_name} ${invoice.client.last_name}`.trim() : "Client";
-  const bizName     = s?.business_name ?? "TheTaxpert";
-  const bizEmail    = s?.support_email ?? "info@thetaxpert.com";
-  const bizWebsite  = s?.website       ?? "https://thetaxpert.com";
-  const bizPhone    = s?.support_phone ?? null;
-  const bizPan      = s?.pan           ?? null;
-  const terms       = s?.default_terms ?? "Payment is due within 7 days of invoice date.";
-  const payInstr    = s?.payment_instructions ?? null;
-  const hasBanking  = !!(s?.bank_name || s?.upi_id || s?.account_number);
+  const s          = data.settings;
+  const clientName = data.client ? `${data.client.first_name ?? ""} ${data.client.last_name ?? ""}`.trim() : "Client";
+  const bizName    = s?.business_name ?? "TheTaxpert";
+  const bizEmail   = s?.support_email ?? "info@thetaxpert.com";
+  const bizWebsite = s?.website       ?? "https://thetaxpert.com";
+  const bizPhone   = s?.support_phone ?? null;
+  const bizPan     = s?.pan           ?? null;
+  const terms      = s?.default_terms ?? "Payment is due within 7 days of invoice date.";
+  const payInstr   = s?.payment_instructions ?? null;
+  const today      = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="inv-shell">
-
       {/* ── Top bar ── */}
       <div className="inv-topbar">
         <Link to="/client/payments" className="inv-back">
@@ -341,32 +321,15 @@ export default function InvoicePage() {
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
             <rect x="6" y="14" width="12" height="8"/>
           </svg>
-          Print invoice
+          Print
         </button>
       </div>
 
-      {/* ── Overdue banner ── */}
-      {isOverdue && !isPaid && (
-        <div className="inv-overdue-banner">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          <span>
-            <strong>Payment overdue.</strong>{" "}This invoice was due on {fmt(invoice.due_date)} and remains unpaid.
-            Please complete payment to avoid any disruption to your service.
-          </span>
-        </div>
-      )}
-
-      {/* ── Two-column layout ── */}
       <div className="inv-layout">
-
-        {/* ── Invoice document ── */}
+        {/* ── Combined bill ── */}
         <div className="inv-doc" id="invoice-printable">
           <div className="inv-doc-accent" />
 
-          {/* Header */}
           <div className="inv-doc-header">
             <div className="inv-doc-biz">
               <div className="inv-doc-biz-name">{bizName}</div>
@@ -376,46 +339,29 @@ export default function InvoicePage() {
               {bizPan     && <div className="inv-doc-biz-pan">PAN: {bizPan}</div>}
             </div>
             <div className="inv-doc-meta">
-              <div className="inv-doc-num">Invoice #{invoice.invoice_number}</div>
-              <div className={`inv-doc-status inv-doc-status--${isPaid ? "paid" : isOverdue ? "overdue" : "due"}`}>
-                {isPaid ? "Paid" : isOverdue ? "Overdue" : "Due"}
-              </div>
+              <div className="inv-doc-num">Combined invoice</div>
+              <div className="inv-doc-status inv-doc-status--due">{data.items.length} services</div>
             </div>
           </div>
 
           <div className="inv-doc-rule" />
 
-          {/* Bill To + Dates */}
           <div className="inv-doc-parties">
             <div>
               <div className="inv-doc-section-label">Bill To</div>
               <div className="inv-doc-client-name">{clientName}</div>
-              {invoice.client?.pan   && <div className="inv-doc-client-detail">PAN: {invoice.client.pan}</div>}
-              {invoice.client?.email && <div className="inv-doc-client-detail">{invoice.client.email}</div>}
+              {data.client?.pan   && <div className="inv-doc-client-detail">PAN: {data.client.pan}</div>}
+              {data.client?.email && <div className="inv-doc-client-detail">{data.client.email}</div>}
             </div>
             <div className="inv-doc-dates">
               <div className="inv-doc-date-row">
                 <span className="inv-doc-date-label">Issue date</span>
-                <span className="inv-doc-date-val">{fmt(invoice.issued_at)}</span>
+                <span className="inv-doc-date-val">{today}</span>
               </div>
-              {invoice.due_date && (
-                <div className="inv-doc-date-row">
-                  <span className="inv-doc-date-label">{isPaid ? "Was due" : "Due date"}</span>
-                  <span className={`inv-doc-date-val${!isPaid && isOverdue ? " inv-doc-date-val--overdue" : !isPaid ? " inv-doc-date-val--due" : ""}`}>
-                    {fmt(invoice.due_date)}
-                  </span>
-                </div>
-              )}
-              {invoice.paid_at && (
-                <div className="inv-doc-date-row">
-                  <span className="inv-doc-date-label">Paid on</span>
-                  <span className="inv-doc-date-val inv-doc-date-val--paid">{fmt(invoice.paid_at)}</span>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Line items */}
+          {/* Line items — one row per selected service */}
           <table className="inv-table">
             <thead>
               <tr>
@@ -426,17 +372,15 @@ export default function InvoicePage() {
               </tr>
             </thead>
             <tbody>
-              {(invoice.invoice_items ?? []).map((item: any, i: number) => (
-                <tr key={item.id ?? i} className="inv-tr">
+              {data.items.map(item => (
+                <tr key={item.clientServiceId} className="inv-tr">
                   <td className="inv-td inv-td--left">
-                    <div className="inv-td-desc">{item.description}</div>
-                    {invoice.service?.category && (
-                      <div className="inv-td-cat">{invoice.service.category}</div>
-                    )}
+                    <div className="inv-td-desc">{item.name}</div>
+                    {item.category && <div className="inv-td-cat">{item.category}</div>}
                   </td>
-                  <td className="inv-td inv-td--center">{item.quantity}</td>
-                  <td className="inv-td">{formatRupees(item.unit_price)}</td>
-                  <td className="inv-td inv-td--right inv-td--bold">{formatRupees(item.line_total)}</td>
+                  <td className="inv-td inv-td--center">1</td>
+                  <td className="inv-td">{formatRupees(item.base)}</td>
+                  <td className="inv-td inv-td--right inv-td--bold">{formatRupees(item.base)}</td>
                 </tr>
               ))}
             </tbody>
@@ -445,46 +389,23 @@ export default function InvoicePage() {
           {/* Totals */}
           <div className="inv-totals">
             <div className="inv-totals-inner">
-              {invoice.subtotal !== invoice.total_amount && (
+              <div className="inv-totals-row">
+                <span>Subtotal</span>
+                <span>{formatRupees(data.subtotal)}</span>
+              </div>
+              {data.gstTotal > 0 && (
                 <div className="inv-totals-row">
-                  <span>Subtotal</span>
-                  <span>{formatRupees(invoice.subtotal)}</span>
-                </div>
-              )}
-              {invoice.gst_amount > 0 && (
-                <div className="inv-totals-row">
-                  <span>GST ({Number(invoice.gst_percent ?? 18)}%)</span>
-                  <span>{formatRupees(invoice.gst_amount)}</span>
+                  <span>GST ({data.gstRate}%)</span>
+                  <span>{formatRupees(data.gstTotal)}</span>
                 </div>
               )}
               <div className="inv-totals-row inv-totals-row--total">
                 <span>Total</span>
-                <span>{formatRupees(invoice.total_amount)}</span>
+                <span>{formatRupees(data.total)}</span>
               </div>
-              {isPaid && (
-                <div className="inv-totals-row inv-totals-row--paid">
-                  <span>Amount paid</span>
-                  <span>{formatRupees(invoice.total_amount)}</span>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Banking details */}
-          {hasBanking && (
-            <div className="inv-banking">
-              <div className="inv-section-label">Payment Details</div>
-              <div className="inv-banking-grid">
-                {s?.bank_name            && <div className="inv-banking-item"><span>Bank</span>{s.bank_name}</div>}
-                {s?.account_holder_name  && <div className="inv-banking-item"><span>Account name</span>{s.account_holder_name}</div>}
-                {s?.account_number       && <div className="inv-banking-item"><span>Account no.</span>{s.account_number}</div>}
-                {s?.ifsc                 && <div className="inv-banking-item"><span>IFSC</span>{s.ifsc}</div>}
-                {s?.upi_id               && <div className="inv-banking-item"><span>UPI ID</span>{s.upi_id}</div>}
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
           <div className="inv-footer">
             {terms    && <p className="inv-footer-line"><strong>Terms:</strong> {terms}</p>}
             {payInstr && <p className="inv-footer-line"><strong>Payment:</strong> {payInstr}</p>}
@@ -492,40 +413,42 @@ export default function InvoicePage() {
           </div>
         </div>
 
-        {/* ── Right: payment panel ── */}
+        {/* ── Payment panel ── */}
         <div className="inv-panel-col">
-          {isPending && invoice.service?.slug ? (
-            <PaymentPanel
-              serviceSlug={invoice.service.slug}
-              serviceName={invoice.service.name ?? "Professional Service"}
-              clientServiceId={id}
-              price={invoice.total_amount}
-              invoice={invoice}
-            />
-          ) : isPaid ? (
-            <div className="inv-panel inv-panel--paid">
-              <div className="inv-paid-state">
-                <div className="inv-paid-ico">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
-                    <path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="10"/>
-                  </svg>
-                </div>
-                <div className="inv-paid-label">Invoice paid</div>
-                <div className="inv-paid-amount">{formatRupees(invoice.total_amount)}</div>
-                {invoice.paid_at && (
-                  <div className="inv-paid-date">on {fmt(invoice.paid_at)}</div>
-                )}
-                <Link to="/client/payments" className="inv-paid-link">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
-                    <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-                  </svg>
-                  View all payments
-                </Link>
-              </div>
-            </div>
-          ) : null}
+          <CombinedPayPanel
+            ids={data.items.map(i => i.clientServiceId)}
+            subtotal={data.subtotal}
+            count={data.items.length}
+            gstEnabled={data.gstEnabled}
+            gstRate={data.gstRate}
+          />
         </div>
+      </div>
+    </div>
+  );
+}
 
+function InvalidState({ message }: { message: string }) {
+  return (
+    <div className="inv-shell">
+      <Link to="/client/payments" className="inv-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+          <path d="m15 18-6-6 6-6"/>
+        </svg>
+        Back to Payments
+      </Link>
+      <div className="inv-not-found">
+        <div className="inv-nf-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="28" height="28">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="11" x2="12" y2="17"/>
+            <line x1="9" y1="14" x2="15" y2="14"/>
+          </svg>
+        </div>
+        <p className="inv-nf-title">Can’t combine these</p>
+        <p className="inv-nf-sub">{message}</p>
+        <Link to="/client/payments" className="lp-btn lp-btn--ghost lp-btn--sm">Back to Payments</Link>
       </div>
     </div>
   );

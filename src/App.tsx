@@ -37,6 +37,7 @@ import AdminPaymentsPage from './pages/admin/AdminPaymentsPage';
 import DueDatesPage from './pages/client/due-dates/DueDatesPage';
 import ReferralsPage from './pages/client/referrals/ReferralsPage';
 import InvoicePage from './pages/client/invoices/InvoicePage';
+import CombinedInvoicePage from './pages/client/invoices/CombinedInvoicePage';
 
 import HomePage from './pages/public/HomePage';
 import ServicesCatalogPage from './pages/public/ServicesCatalogPage';
@@ -96,6 +97,7 @@ function App() {
           <Route path="/client/payments"     element={<PaymentsPage />} />
           <Route path="/client/due-dates"    element={<DueDatesPage />} />
           <Route path="/client/referrals"    element={<ReferralsPage />} />
+          <Route path="/client/invoices/combined" element={<CombinedInvoicePage />} />
           <Route path="/client/invoices/:id" element={<InvoicePage />} />
 
           {/* ── Texpert ────────────────────────────────────────── */}
