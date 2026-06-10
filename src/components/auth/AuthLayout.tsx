@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import RotatingText from "../marketing/RotatingText";
+import BrandMark from "../ui/BrandMark";
 
 /**
  * Split-screen auth chrome: animated dark brand panel (left) + form area
@@ -17,8 +18,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
         <div className="lp-auth-aside-inner">
           <Link to="/" className="lp-auth-brand">
-            <span className="lp-auth-brand-the">The</span>
-            <span className="lp-auth-brand-name">Taxpert</span>
+            <BrandMark size={34} />
+            <span className="lp-auth-brand-word">
+              <span className="lp-auth-brand-the">The</span>
+              <span className="lp-auth-brand-name">Taxpert</span>
+            </span>
           </Link>
 
           <div className="lp-auth-aside-mid">
@@ -44,8 +48,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </Link>
           {/* compact brand — only shows when the aside is hidden (mobile) */}
           <Link to="/" className="lp-auth-brand lp-auth-brand--compact">
-            <span className="lp-auth-brand-the">The</span>
-            <span className="lp-auth-brand-name">Taxpert</span>
+            <BrandMark size={28} framed />
+            <span className="lp-auth-brand-word">
+              <span className="lp-auth-brand-the">The</span>
+              <span className="lp-auth-brand-name">Taxpert</span>
+            </span>
           </Link>
         </div>
 

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Loader from "./components/ui/Loader";
+import ScrollManager from "./components/util/ScrollManager";
 import { useAuth } from './contexts/AuthContext';
 import { PublicRoute } from './guards/PublicRoute';
 import { ProtectedRoute } from './guards/ProtectedRoute';
@@ -63,6 +64,7 @@ function RoleBasedRedirect() {
 function App() {
   return (
     <BrowserRouter>
+      <ScrollManager />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<HomePage />} />

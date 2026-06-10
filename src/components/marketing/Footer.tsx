@@ -1,14 +1,15 @@
 import { Link } from "react-router-dom";
+import BrandMark from "../ui/BrandMark";
 
 const serviceLinks = [
-  { label: "Incorporations", href: "/services#incorporations" },
-  { label: "Registrations", href: "/services#registrations" },
-  { label: "Accounting & Bookkeeping", href: "/services#accounting-bookkeeping" },
-  { label: "GST Filings", href: "/services#gst-filings" },
-  { label: "Income Tax Filings", href: "/services#income-tax-filings" },
-  { label: "TDS Compliance", href: "/services#tds-compliance" },
-  { label: "ROC Compliance", href: "/services#roc-compliance-companies" },
-  { label: "Other Services", href: "/services#other-services" },
+  { label: "Incorporations", href: "/services/incorporations" },
+  { label: "Registrations", href: "/services/registrations" },
+  { label: "Accounting & Bookkeeping", href: "/services/accounting-bookkeeping" },
+  { label: "GST Filings", href: "/services/gst-filings" },
+  { label: "Income Tax Filings", href: "/services/income-tax-filings" },
+  { label: "TDS Compliance", href: "/services/tds-compliance" },
+  { label: "ROC Compliance", href: "/services/roc-compliance-companies" },
+  { label: "Other Services", href: "/services/other-services" },
 ];
 
 const quickLinks = [
@@ -33,8 +34,8 @@ export default function Footer() {
         <div className="lp-footer-grid">
           <div className="lp-footer-brand">
             <Link to="/" className="lp-brand lp-footer-brand-mark">
-              <span className="lp-brand-mark"><span>T</span></span>
-              TheTaxpert
+              <BrandMark size={40} />
+              <span className="lp-footer-brand-word">TheTaxpert</span>
             </Link>
             <p className="lp-footer-tag">
               Your personal Taxpert plus a smart compliance platform — built for
@@ -43,6 +44,11 @@ export default function Footer() {
             <a href="mailto:info@thetaxpert.com" className="lp-footer-email">
               info@thetaxpert.com
             </a>
+            <address className="lp-footer-address">
+              TheTaxpert Fintech Private Limited<br />
+              SBI Road, Santoshnagar Colony, Saidabad,<br />
+              Hyderabad, Telangana&nbsp;– 500059, India
+            </address>
             <div className="lp-footer-legal">
               {legalLinks.map((link) => (
                 <Link key={link.href} to={link.href}>

@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import ConsultationButton from "./ConsultationButton";
+import BrandMark from "../ui/BrandMark";
 
 interface NavbarProps {
   isLoggedIn?: boolean;
 }
 
 const NAV_LINKS = [
-  { label: "Services", to: "/#services" },
+  { label: "Services", to: "/#all-services" },
   { label: "How it works", to: "/#how-it-works" },
   { label: "FAQ", to: "/#faq" },
   { label: "Blog", to: "/blog" },
@@ -21,8 +22,25 @@ export default function Navbar({ isLoggedIn = false }: NavbarProps) {
   const loginHref = isLoggedIn ? "/dashboard" : "/login";
   const loginLabel = isLoggedIn ? "Dashboard" : "Login";
 
+  const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Smooth-scroll same-page anchor links. Done on the click (not just on hash
+  // change) so re-clicking the same link — e.g. "FAQ" twice — still scrolls,
+  // which a hash-watching effect can't do since the URL never changes.
+  function handleAnchorClick(e: React.MouseEvent, to: string) {
+    const [path, id] = to.split("#");
+    const targetPath = path || "/";
+    if (!id || targetPath !== location.pathname) return; // let <Link> navigate; ScrollManager handles cross-page
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", `#${id}`);
+    }
+    setMenuOpen(false);
+  }
 
   // Sliding hover indicator ("glider")
   const listRef = useRef<HTMLElement>(null);
@@ -49,8 +67,11 @@ export default function Navbar({ isLoggedIn = false }: NavbarProps) {
     <header className={`lp-nav${scrolled ? " is-scrolled" : ""}`}>
       <div className="lp-container lp-nav-inner">
         <Link to="/" className="lp-brand" aria-label="TheTaxpert — home">
-          <span className="lp-brand-the">The</span>
-          <span className="lp-brand-name">Taxpert</span>
+          <BrandMark size={32} framed />
+          <span className="lp-brand-word">
+            <span className="lp-brand-the">The</span>
+            <span className="lp-brand-name">Taxpert</span>
+          </span>
         </Link>
 
         <nav className="lp-nav-links" ref={listRef} onMouseLeave={hidePill}>
@@ -65,6 +86,7 @@ export default function Navbar({ isLoggedIn = false }: NavbarProps) {
               to={l.to}
               ref={(el) => { itemRefs.current[i] = el; }}
               onMouseEnter={() => movePill(i)}
+              onClick={(e) => handleAnchorClick(e, l.to)}
               className="lp-nav-link"
             >
               {l.label}
@@ -100,7 +122,7 @@ export default function Navbar({ isLoggedIn = false }: NavbarProps) {
         <div className="lp-nav-mobile">
           <div className="lp-container">
             {NAV_LINKS.map((l) => (
-              <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)}>
+              <Link key={l.to} to={l.to} onClick={(e) => { handleAnchorClick(e, l.to); setMenuOpen(false); }}>
                 {l.label}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
               </Link>

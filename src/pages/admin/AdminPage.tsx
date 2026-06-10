@@ -13,11 +13,11 @@ type ValidRole = 'super_admin' | 'admin' | 'expert' | 'ca' | 'staff' | 'client';
 const LIMIT = 20;
 
 const STAFF_ROLES: { value: string; label: string }[] = [
-  { value: '',            label: 'All roles' },
-  { value: 'expert',      label: 'Expert' },
-  { value: 'ca',          label: 'CA' },
-  { value: 'admin',       label: 'Admin' },
-  { value: 'staff',       label: 'Staff' },
+  { value: '', label: 'All roles' },
+  { value: 'expert', label: 'Expert' },
+  { value: 'ca', label: 'CA' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'staff', label: 'Staff' },
   { value: 'super_admin', label: 'Super Admin' },
 ];
 
@@ -149,7 +149,7 @@ export default function AdminPage() {
   const isSuperAdmin = profile?.role === 'super_admin';
 
   // ── Client tab state ──────────────────────────────────────────
-  const [clientRaw, setClientRaw]   = useState('');
+  const [clientRaw, setClientRaw] = useState('');
   const [clientPage, setClientPage] = useState(1);
   const clientSearch = useDebounce(clientRaw);
 
@@ -162,7 +162,7 @@ export default function AdminPage() {
   }, [clientSearch]);
 
   // ── Staff tab state ───────────────────────────────────────────
-  const [staffRaw, setStaffRaw]   = useState('');
+  const [staffRaw, setStaffRaw] = useState('');
   const [staffPage, setStaffPage] = useState(1);
   const [staffRole, setStaffRole] = useState('');
   const staffSearch = useDebounce(staffRaw);
@@ -197,7 +197,7 @@ export default function AdminPage() {
     queryFn: async () => {
       const p = new URLSearchParams({ page: String(staffPage), limit: String(LIMIT) });
       if (staffSearch) p.append('search', staffSearch);
-      if (staffRole)   p.append('role',   staffRole);
+      if (staffRole) p.append('role', staffRole);
       return (await apiClient.get(`/admin/users/staff?${p}`)).data;
     },
     enabled: isAdmin && tab === 'staff',
@@ -205,20 +205,20 @@ export default function AdminPage() {
   });
 
   if (authLoading) return <div className="page-loader"><Loader /></div>;
-  if (!isAdmin)    return <Navigate to="/dashboard" replace />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
-  const clientUsers:      any[]  = clientData?.data  ?? [];
-  const clientCount:      number = clientData?.count  ?? 0;
+  const clientUsers: any[] = clientData?.data ?? [];
+  const clientCount: number = clientData?.count ?? 0;
   const clientTotalPages: number = Math.ceil(clientCount / LIMIT);
 
-  const staffUsers:      any[]  = staffData?.data  ?? [];
-  const staffCount:      number = staffData?.count  ?? 0;
+  const staffUsers: any[] = staffData?.data ?? [];
+  const staffCount: number = staffData?.count ?? 0;
   const staffTotalPages: number = Math.ceil(staffCount / LIMIT);
 
   const tabs = [
-    { id: 'clients', label: 'Clients',          icon: Icon.clients },
-    { id: 'staff',   label: 'Staff & Experts',  icon: Icon.staff },
-    { id: 'create',  label: 'Create User',      icon: Icon.create },
+    { id: 'clients', label: 'Clients', icon: Icon.clients },
+    { id: 'staff', label: 'Staff & Taxpert', icon: Icon.staff },
+    { id: 'create', label: 'Create User', icon: Icon.create },
   ];
 
   return (

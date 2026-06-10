@@ -136,6 +136,8 @@ function buildReceiptHtml(p: ClientPaymentRow, biz: any, clientName: string): st
   .page { max-width: 600px; margin: 0 auto; padding: 40px 0; }
   .accent { height: 4px; background: linear-gradient(90deg, #e85220 0%, #cf440f 100%); border-radius: 3px; margin-bottom: 28px; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .biz-row { display: flex; align-items: flex-start; gap: 13px; }
+  .biz-logo { width: 46px; height: 46px; border-radius: 12px; flex: 0 0 auto; box-shadow: 0 1px 2px rgba(7,18,36,0.22); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .biz-name { font-size: 1.35rem; font-weight: 800; color: #1a1813; }
   .biz-meta { font-size: 0.78rem; color: #5f5a50; margin-top: 3px; line-height: 1.6; }
   .receipt-badge { text-align: right; }
@@ -171,10 +173,19 @@ function buildReceiptHtml(p: ClientPaymentRow, biz: any, clientName: string): st
 <div class="page">
   <div class="accent"></div>
   <div class="header">
-    <div>
-      <div class="biz-name">${bizName}</div>
-      <div class="biz-meta">
-        ${bizEmail ? `${bizEmail}<br>` : ''}${bizWebsite ? `${bizWebsite}<br>` : ''}${bizPhone ? `${bizPhone}<br>` : ''}${bizPan ? `PAN: ${bizPan}` : ''}
+    <div class="biz-row">
+      <svg class="biz-logo" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        <rect width="300" height="300" rx="74" fill="#071224"/>
+        <circle cx="150" cy="150" r="118" fill="none" stroke="#F2F0EA" stroke-width="6"/>
+        <circle cx="150" cy="150" r="92" fill="none" stroke="#F2F0EA" stroke-width="3" stroke-dasharray="3 12" stroke-linecap="round"/>
+        <text x="150" y="178" text-anchor="middle" font-family="Times New Roman, Georgia, serif" font-size="120" fill="#F2F0EA">T</text>
+        <rect x="118" y="215" width="64" height="8" rx="2" fill="#C9A55A"/>
+      </svg>
+      <div>
+        <div class="biz-name">${bizName}</div>
+        <div class="biz-meta">
+          ${bizEmail ? `${bizEmail}<br>` : ''}${bizWebsite ? `${bizWebsite}<br>` : ''}${bizPhone ? `${bizPhone}<br>` : ''}${bizPan ? `PAN: ${bizPan}` : ''}
+        </div>
       </div>
     </div>
     <div class="receipt-badge">

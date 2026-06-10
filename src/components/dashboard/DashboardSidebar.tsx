@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
+import BrandMark from "../ui/BrandMark";
 
 interface SidebarProps {
   firstName: string;
@@ -256,8 +257,11 @@ export default function DashboardSidebar({
       {/* Brand */}
       <div className="db-sidebar-brand">
         <Link to="/dashboard" className="db-brandw" aria-label="Go to dashboard">
-          <span className="db-brandw-the">The</span>
-          <span className="db-brandw-name">Taxpert</span>
+          <BrandMark size={30} />
+          <span className="db-brandw-word">
+            <span className="db-brandw-the">The</span>
+            <span className="db-brandw-name">Taxpert</span>
+          </span>
         </Link>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Loader from "../../../components/ui/Loader";
 import CardPayButton from "../../../components/ui/CardPayButton";
+import BrandMark from "../../../components/ui/BrandMark";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, paymentClient } from "../../../api/client";
@@ -332,11 +333,14 @@ export default function CombinedInvoicePage() {
 
           <div className="inv-doc-header">
             <div className="inv-doc-biz">
-              <div className="inv-doc-biz-name">{bizName}</div>
-              {bizWebsite && <div className="inv-doc-biz-meta">{bizWebsite}</div>}
-              {bizEmail   && <div className="inv-doc-biz-meta">{bizEmail}</div>}
-              {bizPhone   && <div className="inv-doc-biz-meta">{bizPhone}</div>}
-              {bizPan     && <div className="inv-doc-biz-pan">PAN: {bizPan}</div>}
+              <BrandMark size={46} framed className="inv-doc-logo" />
+              <div className="inv-doc-biz-text">
+                <div className="inv-doc-biz-name">{bizName}</div>
+                {bizWebsite && <div className="inv-doc-biz-meta">{bizWebsite}</div>}
+                {bizEmail   && <div className="inv-doc-biz-meta">{bizEmail}</div>}
+                {bizPhone   && <div className="inv-doc-biz-meta">{bizPhone}</div>}
+                {bizPan     && <div className="inv-doc-biz-pan">PAN: {bizPan}</div>}
+              </div>
             </div>
             <div className="inv-doc-meta">
               <div className="inv-doc-num">Combined invoice</div>

@@ -365,7 +365,7 @@ function WorkloadGrid({ workload }: { workload: Texpert[] }) {
   const sorted = [...workload].sort((a, b) => b.active_count - a.active_count);
   return (
     <section data-anim>
-      <div className="adm-section-head"><span className="adm-eyebrow">Team</span><h3 className="adm-section-title">Texpert workload</h3></div>
+      <div className="adm-section-head"><span className="adm-eyebrow">Team</span><h3 className="adm-section-title">Taxpert workload</h3></div>
       <div className="adm-team-grid">
         {sorted.map((tx, i) => {
           const pct = Math.min((tx.active_count / 10) * 100, 100);

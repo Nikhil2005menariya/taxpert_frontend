@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import BrandMark from "../ui/BrandMark";
 
 interface MobileNavProps {
   firstName: string;
@@ -227,7 +228,10 @@ export default function MobileNav({
       <div className={`db-mobile-drawer${open ? " db-mobile-drawer-open" : ""}`} aria-hidden={!open}>
         {/* Drawer header */}
         <div className="db-mobile-drawer-header">
-          <span className="db-mobile-drawer-brand">TheTaxpert</span>
+          <span className="db-mobile-drawer-brand">
+            <BrandMark size={26} />
+            TheTaxpert
+          </span>
           <button
             className="db-mobile-close"
             onClick={() => setOpen(false)}

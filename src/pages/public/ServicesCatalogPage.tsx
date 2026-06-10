@@ -177,7 +177,7 @@ export default function ServicesCatalogPage() {
                   const from = cheapest(cat.items);
                   const count = cat.items?.length ?? cat.itemCount ?? 0;
                   return (
-                    <Link to={`/services/${cat.slug}`} className="lp-svccat" data-reveal key={cat.slug}>
+                    <Link to={`/services/${cat.slug}`} id={cat.slug} className="lp-svccat" data-reveal key={cat.slug}>
                       <div className="lp-svccat-top">
                         <span className="lp-svccat-icon"><CategoryIcon slug={cat.slug} /></span>
                         <span className="lp-svccat-count">{count} {count === 1 ? "service" : "services"}</span>
